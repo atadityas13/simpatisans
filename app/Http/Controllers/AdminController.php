@@ -26,23 +26,44 @@ class AdminController extends Controller
      */
     public function store(Request $request)
     {
+        $existingUser = User::where('username', $request->username)->first();
+
+        // Jika user sudah terdaftar dan rolenya adalah admin, beri pesan error username sudah digunakan
+        if ($existingUser && ($existingUser->isSuperAdmin() || $existingUser->isAdminKurikulum())) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'username' => 'Username/NIP ini sudah terdaftar sebagai Admin.'
+            ]);
+        }
+
         $validated = $request->validate([
-            'username'     => 'required|string|max:255|unique:users,username',
+            'username'     => 'required|string|max:255',
             'role'         => 'required|in:super_admin,admin_kurikulum',
             'nama_lengkap' => 'required|string|max:255',
             'jabatan'      => 'nullable|string|max:255',
-            'password'     => 'required|string|min:6',
+            'password'     => $existingUser ? 'nullable|string|min:6' : 'required|string|min:6',
             'foto'         => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $validated['password'] = Hash::make($validated['password']);
+        if ($request->filled('password')) {
+            $validated['password'] = Hash::make($validated['password']);
+        } else {
+            // Jika user 'guru' sudah ada dan password dikosongkan saat ganti role ke admin, pakai password lamanya
+            unset($validated['password']);
+        }
 
         if ($request->hasFile('foto')) {
             $path = $request->file('foto')->store('admin_photos', 'public');
             $validated['foto'] = $path;
         }
 
-        $user = User::create($validated);
+        if ($existingUser) {
+            // Upgrade role guru yang sudah ada menjadi admin
+            $existingUser->update($validated);
+            $user = $existingUser;
+        } else {
+            // Buat user admin baru dari nol
+            $user = User::create($validated);
+        }
 
         if ($request->ajax()) {
             return response()->json([
