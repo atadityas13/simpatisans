@@ -247,11 +247,16 @@
 
                         <div class="grid grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Password <span x-show="!isEdit" class="text-red-500">*</span></label>
-                                <input type="password" name="password" :required="!isEdit"
+                                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">
+                                    Password 
+                                    <span x-show="!isEdit && !selectedGuruId" class="text-red-500">*</span>
+                                </label>
+                                <input type="password" name="password" 
+                                    :required="!isEdit && !selectedGuruId"
                                     class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 font-bold transition-all placeholder-gray-400" 
-                                    placeholder="Min 6 karakter">
+                                    :placeholder="selectedGuruId ? 'Kosongkan untuk pakai password guru' : 'Min 6 karakter'">
                                 <p x-show="isEdit" class="text-[10px] text-gray-400 mt-1 ml-1">Kosongkan jika tidak ubah password.</p>
+                                <p x-show="!isEdit && selectedGuruId" class="text-[10px] text-amber-500 mt-1 ml-1 font-semibold">⚠ Jika dikosongkan, password guru yang sudah ada akan tetap dipakai.</p>
                             </div>
                             
                             <div>
