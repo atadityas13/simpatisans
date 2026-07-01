@@ -17,7 +17,7 @@ class AdminController extends Controller
         // Require super admin locally until middleware is fully mapped if needed,
         // but for now we expect routing or middleware to handle access later.
         
-        $users = User::orderBy('nama_lengkap')->paginate(10);
+        $users = User::whereIn('role', ['super_admin', 'admin_kurikulum'])->orderBy('nama_lengkap')->paginate(10);
         return view('admin.index', compact('users'));
     }
 

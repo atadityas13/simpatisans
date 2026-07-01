@@ -108,9 +108,13 @@
                                         <span class="px-2.5 py-1 rounded-md bg-purple-50 text-purple-700 text-[10px] font-bold uppercase tracking-widest">
                                             Super Admin
                                         </span>
-                                    @else
+                                    @elseif($user->role === 'admin_kurikulum')
                                         <span class="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold uppercase tracking-widest">
                                             Admin Kurikulum
+                                        </span>
+                                    @else
+                                        <span class="px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase tracking-widest">
+                                            {{ strtoupper($user->role) }}
                                         </span>
                                     @endif
                                 </td>
