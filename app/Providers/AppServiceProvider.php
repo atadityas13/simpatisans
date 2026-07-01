@@ -20,6 +20,11 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Share active semester to all views
-        \Illuminate\Support\Facades\View::share('activeSemester', app(\App\Services\SemesterService::class)->getActiveSemester());
+        // Wrapped in try-catch to prevent crash during first migration (tables may not exist yet)
+        try {
+            \Illuminate\Support\Facades\View::share('activeSemester', app(\App\Services\SemesterService::class)->getActiveSemester());
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\View::share('activeSemester', null);
+        }
     }
 }
