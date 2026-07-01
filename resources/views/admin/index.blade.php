@@ -6,6 +6,7 @@
         modalOpen: false, 
         isEdit: false,
         formAction: '{{ route('admin.store') }}',
+        selectedGuruId: '',
         formData: {
             id: '',
             username: '',
@@ -17,6 +18,7 @@
         openAdd() {
             this.isEdit = false;
             this.formAction = '{{ route('admin.store') }}';
+            this.selectedGuruId = '';
             this.formData = {
                 id: '',
                 username: '',
@@ -187,6 +189,32 @@
                     </template>
 
                     <div class="p-8 space-y-5">
+                        
+                        <div x-show="!isEdit">
+                            <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Pilih dari Data Guru (Opsional)</label>
+                            <select x-model="selectedGuruId" @change="
+                                if (selectedGuruId) {
+                                    const selectEl = $event.target;
+                                    const selectedOpt = selectEl.options[selectEl.selectedIndex];
+                                    formData.username = selectedOpt.dataset.username || '';
+                                    formData.nama_lengkap = selectedOpt.dataset.nama || '';
+                                    formData.jabatan = selectedOpt.dataset.jabatan || '';
+                                } else {
+                                    formData.username = '';
+                                    formData.nama_lengkap = '';
+                                    formData.jabatan = '';
+                                }
+                            " class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 font-bold transition-all">
+                                <option value="">-- Pilih Guru --</option>
+                                @foreach($gurus as $guru)
+                                    <option value="{{ $guru->id }}" 
+                                            data-username="{{ $guru->username }}" 
+                                            data-nama="{{ $guru->nama_lengkap }}" 
+                                            data-jabatan="{{ $guru->jabatan }}">{{ $guru->nama_lengkap }}</option>
+                                @endforeach
+                            </select>
+                            <p class="text-[10px] text-gray-400 mt-1 ml-1">Pilih guru untuk mengisi form di bawah secara otomatis.</p>
+                        </div>
                         
                         <div>
                             <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Username (NIP/ID) <span class="text-red-500">*</span></label>

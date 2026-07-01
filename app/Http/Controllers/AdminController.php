@@ -18,7 +18,8 @@ class AdminController extends Controller
         // but for now we expect routing or middleware to handle access later.
         
         $users = User::whereIn('role', ['super_admin', 'admin_kurikulum'])->orderBy('nama_lengkap')->paginate(10);
-        return view('admin.index', compact('users'));
+        $gurus = \App\Models\Guru::orderBy('nama_guru')->get();
+        return view('admin.index', compact('users', 'gurus'));
     }
 
     /**
