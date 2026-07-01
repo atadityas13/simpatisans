@@ -1,0 +1,118 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Guru extends Model
+{
+    protected $fillable = [
+        'username', 'kode_guru', 'duk', 'status_pegawai', 'nama_guru', 'gelar_depan', 'gelar_belakang', 'nuptk', 'jabatan',
+        'golongan', 'status_sertifikasi', 'is_bk', 'mapel_ijazah_id', 'rumpun_ijazah_id', 'mapel_sertifikasi_id'
+    ];
+
+    protected $casts = [
+        'status_sertifikasi' => 'boolean',
+        'is_bk' => 'boolean',
+        'mapel_ijazah_id' => 'integer',
+        'rumpun_ijazah_id' => 'integer',
+        'mapel_sertifikasi_id' => 'integer',
+    ];
+
+    public function getNamaLengkapAttribute() {
+        $prefix = ($this->gelar_depan && $this->gelar_depan !== '-') ? $this->gelar_depan . ' ' : '';
+        $suffix = ($this->gelar_belakang && $this->gelar_belakang !== '-') ? ', ' . $this->gelar_belakang : '';
+        return $prefix . $this->nama_guru . $suffix;
+    }
+
+    public function getKualifikasiIjazahAttribute() {
+        return $this->mapelIjazah?->nama_mapel ?: ($this->rumpunIjazah?->nama_rumpun ?: '—');
+    }
+
+    public function mapelIjazah() { return $this->belongsTo(Mapel::class, 'mapel_ijazah_id'); }
+    public function rumpunIjazah() { return $this->belongsTo(Rumpun::class, 'rumpun_ijazah_id'); }
+    public function mapelSertifikasi() { return $this->belongsTo(Mapel::class, 'mapel_sertifikasi_id'); }
+
+    /**
+     * Cek apakah mata pelajaran yang diampu Linear.
+     */
+    public function isLinear(Mapel $mapel): bool
+    {
+        // Catatan: Jika belum sertifikasi, dianggap tidak layak (Sipasti Rule)
+        if (!$this->status_sertifikasi) {
+            return false;
+        }
+
+        $mapelRumpunIds = $mapel->rumpuns->pluck('id')->toArray();
+
+        // 1. Cocok dengan Mapel Sertifikasi (Spesifik atau Rumpun yang sama)
+        if ($this->mapel_sertifikasi_id === $mapel->id) {
+            return true;
+        }
+        if ($this->mapelSertifikasi?->rumpuns->whereIn('id', $mapelRumpunIds)->count() > 0) {
+            return true;
+        }
+
+        // 2. Cocok dengan Mapel Ijazah (Spesifik atau Rumpun yang sama)
+        if ($this->mapel_ijazah_id === $mapel->id) {
+            return true;
+        }
+        if ($this->mapelIjazah?->rumpuns->whereIn('id', $mapelRumpunIds)->count() > 0) {
+            return true;
+        }
+
+        // 3. Cocok dengan Rumpun Ijazah (Direct ID)
+        if ($this->rumpun_ijazah_id && in_array((int)$this->rumpun_ijazah_id, $mapelRumpunIds)) {
+            return true;
+        }
+
+        return false;
+    }
+    /**
+     * Dapatkan jenis linearitas (Ijazah / Sertifikasi)
+     * @return array
+     */
+    public function getLinearityTypes(Mapel $mapel): array
+    {
+        if (!$this->status_sertifikasi) {
+            return [];
+        }
+
+        $types = [];
+
+        $mapelRumpunIds = $mapel->rumpuns->pluck('id')->toArray();
+
+        // 1. Cek Sertifikasi
+        $isSertifikasi = false;
+        if ((int)$this->mapel_sertifikasi_id === (int)$mapel->id) {
+            $isSertifikasi = true;
+        } elseif ($this->mapelSertifikasi?->rumpuns->whereIn('id', $mapelRumpunIds)->count() > 0) {
+            $isSertifikasi = true;
+        }
+
+        if ($isSertifikasi) {
+            $types[] = 'Sertifikasi';
+        }
+
+        // 2. Cek Ijazah
+        $isIjazah = false;
+        if ((int)$this->mapel_ijazah_id === (int)$mapel->id) {
+            $isIjazah = true;
+        } elseif ($this->mapelIjazah?->rumpuns->whereIn('id', $mapelRumpunIds)->count() > 0) {
+            $isIjazah = true;
+        } elseif ($this->rumpun_ijazah_id && in_array((int)$this->rumpun_ijazah_id, $mapelRumpunIds)) {
+            $isIjazah = true;
+        }
+
+        if ($isIjazah) {
+            $types[] = 'Ijazah';
+        }
+
+        return $types;
+    }
+
+    public function user() { return $this->hasOne(User::class, 'username', 'username'); }
+    public function mapelDiampu() { return $this->belongsToMany(Mapel::class, 'guru_mapels', 'guru_id', 'mapel_id')->orderBy('mapels.id'); }
+    public function tugasTambahans() { return $this->belongsToMany(TugasTambahan::class, 'guru_tugas_tambahans', 'guru_id', 'tugas_tambahan_id')->withPivot('is_ekuivalen', 'detail', 'hari', 'semester_id'); }
+    public function bebanMengajars() { return $this->hasMany(BebanMengajar::class, 'guru_id'); }
+}

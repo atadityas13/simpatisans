@@ -1,0 +1,154 @@
+﻿
+> build
+> vite build
+
+[36mvite v8.0.3 [32mbuilding client environment for production...[36m[39m
+[2K
+transforming...Ô£ô 53 modules transformed.
+node.exe : [31mÔ£ù[3
+9m Build failed in 954
+ms
+At line:1 char:1
++ & "C:\Program Files\
+nodejs/node.exe" "C:\P
+rogram Files\nodejs/no
+de_mo ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: ([31mÔ£ù[   
+ 39m Build failed     
+in 954ms:String)     [
+], RemoteExcepti    on
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+[31merror during buil
+d:
+[31mBuild failed with
+ 1 error:
+
+[plugin vite:css] D:/B
+ACKUP HOSTING/Source/s
+ipasti/resources/css/a
+pp.css:undefined:NaN
+Error: [postcss] It lo
+oks like you're trying
+ to use `tailwindcss` 
+directly as a PostCSS 
+plugin. The PostCSS pl
+ugin has moved to a se
+parate package, so to 
+continue using Tailwin
+d CSS with PostCSS you
+'ll need to install `@
+tailwindcss/postcss` a
+nd update your PostCSS
+ configuration.
+    at at (D:\BACKUP H
+OSTING\Source\sipasti\
+node_modules\tailwindc
+ss\dist\lib.js:38:1643
+)
+    at LazyResult.runO
+nRoot (D:\BACKUP HOSTI
+NG\Source\sipasti\node
+_modules\postcss\lib\l
+azy-result.js:361:16)
+    at LazyResult.runA
+sync (D:\BACKUP HOSTIN
+G\Source\sipasti\node_
+modules\postcss\lib\la
+zy-result.js:290:26)
+    at LazyResult.asyn
+c (D:\BACKUP HOSTING\S
+ource\sipasti\node_mod
+ules\postcss\lib\lazy-
+result.js:192:30)
+    at LazyResult.then
+ (D:\BACKUP HOSTING\So
+urce\sipasti\node_modu
+les\postcss\lib\lazy-r
+esult.js:436:17)
+    at async runPostCS
+S (file:///D:/BACKUP%2
+0HOSTING/Source/sipast
+i/node_modules/vite/di
+st/node/chunks/node.js
+:20945:19)
+    at async compilePo
+stCSS (file:///D:/BACK
+UP%20HOSTING/Source/si
+pasti/node_modules/vit
+e/dist/node/chunks/nod
+e.js:20929:6)
+    at async compileCS
+S (file:///D:/BACKUP%2
+0HOSTING/Source/sipast
+i/node_modules/vite/di
+st/node/chunks/node.js
+:20859:26)
+    at async Transform
+PluginContextImpl.hand
+ler (file:///D:/BACKUP
+%20HOSTING/Source/sipa
+sti/node_modules/vite/
+dist/node/chunks/node.
+js:20375:47)
+    at async plugin (f
+ile:///D:/BACKUP%20HOS
+TING/Source/sipasti/no
+de_modules/rolldown/di
+st/shared/bindingify-i
+nput-options-e7ze4hPR.
+mjs:1129:16)[31m
+    at aggregateBindin
+gErrorsIntoJsError (fi
+le:///D:/BACKUP%20HOST
+ING/Source/sipasti/nod
+e_modules/rolldown/dis
+t/shared/error-BLhcSye
+g.mjs:48:18)
+    at unwrapBindingRe
+sult (file:///D:/BACKU
+P%20HOSTING/Source/sip
+asti/node_modules/roll
+down/dist/shared/error
+-BLhcSyeg.mjs:18:128)
+    at #build (file://
+/D:/BACKUP%20HOSTING/S
+ource/sipasti/node_mod
+ules/rolldown/dist/sha
+red/rolldown-build-CPr
+IX9V6.mjs:3313:34)
+    at async buildEnvi
+ronment (file:///D:/BA
+CKUP%20HOSTING/Source/
+sipasti/node_modules/v
+ite/dist/node/chunks/n
+ode.js:32849:64)
+    at async Object.bu
+ild (file:///D:/BACKUP
+%20HOSTING/Source/sipa
+sti/node_modules/vite/
+dist/node/chunks/node.
+js:33271:19)
+    at async Object.bu
+ildApp (file:///D:/BAC
+KUP%20HOSTING/Source/s
+ipasti/node_modules/vi
+te/dist/node/chunks/no
+de.js:33268:153)
+    at async CAC.<anon
+ymous> (file:///D:/BAC
+KUP%20HOSTING/Source/s
+ipasti/node_modules/vi
+te/dist/node/cli.js:77
+8:3) {
+  errors: [Getter/Sett
+er]
+}[39m
