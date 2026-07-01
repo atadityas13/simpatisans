@@ -11,18 +11,25 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(BebanMengajarsTableSeeder::class);
-        $this->call(GuruConstraintsTableSeeder::class);
+        // 1. Master Data (Tabel tanpa foreign key atau dependency utama)
+        $this->call(UsersTableSeeder::class);
+        $this->call(SemestersTableSeeder::class);
+        $this->call(MapelsTableSeeder::class);
+        $this->call(KelasTableSeeder::class);
+        $this->call(TugasTambahansTableSeeder::class);
+        $this->call(RumpunsTableSeeder::class);
+        
+        // 2. Data Utama (Tabel yang bergantung pada master)
+        $this->call(GurusTableSeeder::class); // butuh mapel_ijazah_id (nullable, tapi aman kalau di bawah)
+
+        // 3. Relasi & Pivot (Bergantung pada Guru, Mapel, Kelas, dll)
         $this->call(GuruMapelsTableSeeder::class);
         $this->call(GuruTugasTambahansTableSeeder::class);
-        $this->call(GurusTableSeeder::class);
-        $this->call(JadwalsTableSeeder::class);
-        $this->call(KelasTableSeeder::class);
+        $this->call(BebanMengajarsTableSeeder::class);
+        $this->call(GuruConstraintsTableSeeder::class);
         $this->call(MapelRumpunTableSeeder::class);
-        $this->call(MapelsTableSeeder::class);
-        $this->call(RumpunsTableSeeder::class);
-        $this->call(SemestersTableSeeder::class);
-        $this->call(TugasTambahansTableSeeder::class);
-        $this->call(UsersTableSeeder::class);
+        
+        // 4. Data Transaksional (Jadwal bergantung pada semuanya)
+        $this->call(JadwalsTableSeeder::class);
     }
 }
