@@ -327,15 +327,18 @@
                         @if(count($analisa['pelanggaran_ketentuan']) > 0)
                             <div>
                                 <h4 class="bg-red-600 text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">🚨
-                                    KRITIKAL: PELANGGARAN ATURAN BLOKIR (Manual Edit)</h4>
+                                    PRESET BLOKIR DILANGGAR (Sesuaikan Manual)</h4>
+                                <p class="text-[10px] px-3 pt-2 text-red-800 bg-red-50 border-x border-red-600">
+                                    Sistem meletakkan guru di slot blokir karena tidak ada solusi lain. Pindahkan slot berikut secara manual agar sesuai preset guru.
+                                </p>
                                 <div class="border border-red-600 border-t-0 rounded-b overflow-hidden bg-red-50">
                                     <ul class="text-xs space-y-1 p-3">
                                         @foreach($analisa['pelanggaran_ketentuan'] as $p)
                                             <li class="flex items-center gap-2">
                                                 <span class="bg-white text-red-600 font-black px-1 border border-red-200">!</span>
-                                                Guru <span class="font-black">[{{ $p['guru'] }}]</span> dipaksa mengajar di <span
+                                                Guru <span class="font-black">[{{ $p['guru'] }}]</span> di <span
                                                     class="font-bold underline text-red-700">{{ $p['hari'] }} jam
-                                                    ke-{{ $p['jam'] }}</span> (Kelas {{ $p['kelas'] }}), padahal sedang **DIBLOKIR**.
+                                                    ke-{{ $p['jam'] }}</span> (Kelas {{ $p['kelas'] }}) — preset <b>DIBLOKIR</b> dilanggar otomatis.
                                             </li>
                                         @endforeach
                                     </ul>

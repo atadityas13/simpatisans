@@ -219,7 +219,7 @@ class JadwalController extends Controller
     public function generate(Request $request, JadwalSAOService $saoService)
     {
         @ini_set('memory_limit', '512M');
-        set_time_limit(120);
+        set_time_limit(180);
 
         $semesterId = (int) $request->get('semester_id');
         if (!$semesterId) {
@@ -235,15 +235,22 @@ class JadwalController extends Controller
             $target = $result['total_target'] ?? $terisi;
             $kosong = $result['slot_kosong'] ?? 0;
 
+            $presetViolations = count($analisa['pelanggaran_ketentuan'] ?? []);
+
             if ($result['status'] === 'partial') {
                 $msg = "<b>Jadwal disimpan sebagian.</b><br>Jam Terisi: {$terisi}/{$target} ({$kosong} belum terisi)<br>Masalah analisa: {$totalWarnings}";
-                $msg .= '<br><small>Kurangi preset blokir atau sesuaikan beban mengajar, lalu generate ulang.</small>';
+                if ($presetViolations > 0) {
+                    $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — sesuaikan manual di Laporan Analisa.";
+                }
+                $msg .= '<br><small>Sistem sudah mencoba mengabaikan preset blokir bila perlu. Periksa mapel belum terisi dan sesuaikan preset/beban mengajar.</small>';
                 return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('error', $msg);
             }
 
             $msg = "<b>Penjadwalan Otomatis Selesai!</b><br>Jam Terisi: {$terisi}/{$target}<br>Masalah: {$totalWarnings}";
-            if ($totalWarnings > 0) {
-                $msg .= "<br><small>Beberapa aturan belum sempurna — periksa Laporan Analisa atau kurangi preset blokir.</small>";
+            if ($presetViolations > 0) {
+                $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — sesuaikan manual (lihat Laporan Analisa).";
+            } elseif ($totalWarnings > 0) {
+                $msg .= '<br><small>Beberapa aturan belum sempurna — periksa Laporan Analisa.</small>';
             }
 
             return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('success', $msg);
