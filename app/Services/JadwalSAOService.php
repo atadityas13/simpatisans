@@ -69,12 +69,13 @@ class JadwalSAOService
         $bebanMap = $this->getBebanMap();
 
         $waktuMulai = time();
-        $batasWaktu = 110;
+        $deadlineTotal = $waktuMulai + 165;
+        $deadlineCari = $waktuMulai + 28;
         $solusiTerbaik = null;
         $skorTerbaik = PHP_INT_MAX;
 
-        for ($attempt = 0; $attempt < 40; $attempt++) {
-            if ((time() - $waktuMulai) >= $batasWaktu - 8) {
+        for ($attempt = 0; $attempt < 25; $attempt++) {
+            if (time() >= $deadlineCari) {
                 break;
             }
 
@@ -83,7 +84,7 @@ class JadwalSAOService
             $jadwal = $this->buatJadwalKosong($kelasIds);
             $urutanKelas = $this->urutkanKelas($unitsByKelas, $attempt);
 
-            $this->selesaikanSemuaKelas($jadwal, $unitsByKelas, $urutanKelas, $kelasIds, $waktuMulai, $batasWaktu);
+            $this->selesaikanSemuaKelas($jadwal, $unitsByKelas, $urutanKelas, $kelasIds, $waktuMulai, $deadlineCari);
             $this->tempatkanGlobalGreedy($jadwal, $unitsByKelas, $kelasIds);
 
             $kosong = $totalJtm - $this->hitungTerisi($jadwal);
@@ -107,39 +108,33 @@ class JadwalSAOService
 
         $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
 
+        if (time() < $deadlineCari + 6) {
+            $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
+            $solusiTerbaik = $this->paksaLengkapi($solusiTerbaik, $unitsByKelas, $kelasIds, $bebanMap, $waktuMulai, $deadlineCari + 6);
+            $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
+        }
+
+        // Fase paksa: budget waktu penuh, abaikan preset blokir, maks 7 jam/hari guru
+        $this->honorBlockConstraints = false;
+        $this->unlockNonBtqSlots($solusiTerbaik, $unitsByKelas);
         $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
-        $solusiTerbaik = $this->paksaLengkapi($solusiTerbaik, $unitsByKelas, $kelasIds, $bebanMap, $waktuMulai, $batasWaktu);
+        $solusiTerbaik = $this->isiSemuaPaksa($solusiTerbaik, $unitsByKelas, $kelasIds, time(), $deadlineTotal - 22);
+        $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
+
+        $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
+        $solusiTerbaik = $this->seimbangkanKelelahan($solusiTerbaik, $unitsByKelas, $kelasIds, $bebanMap, time(), $deadlineTotal - 8);
         $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
 
         if ($kosongTerbaik > 0) {
+            $this->unlockNonBtqSlots($solusiTerbaik, $unitsByKelas);
             $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
-            $solusiTerbaik = $this->lengkapiSerangkaian($solusiTerbaik, $unitsByKelas, $kelasIds, $waktuMulai, $batasWaktu);
+            $solusiTerbaik = $this->isiSemuaPaksa($solusiTerbaik, $unitsByKelas, $kelasIds, time(), $deadlineTotal);
             $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
         }
 
-        // Fase paksa: abaikan preset blokir agar semua JTM terisi (max 7 jam/hari guru)
-        if ($kosongTerbaik > 0) {
-            $this->honorBlockConstraints = false;
-            $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
-            $solusiTerbaik = $this->isiSemuaPaksa($solusiTerbaik, $unitsByKelas, $kelasIds, $waktuMulai, $batasWaktu);
-            $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
-            $this->honorBlockConstraints = true;
-        }
-
+        $this->honorBlockConstraints = true;
         $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
-        $solusiTerbaik = $this->seimbangkanKelelahan($solusiTerbaik, $unitsByKelas, $kelasIds, $bebanMap, $waktuMulai, $batasWaktu);
-        $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
-
-        if ($kosongTerbaik > 0) {
-            $this->honorBlockConstraints = false;
-            $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
-            $solusiTerbaik = $this->isiSemuaPaksa($solusiTerbaik, $unitsByKelas, $kelasIds, $waktuMulai, $batasWaktu);
-            $this->honorBlockConstraints = true;
-            $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
-        }
-
-        $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
-        $solusiTerbaik = $this->seimbangkanKelelahan($solusiTerbaik, $unitsByKelas, $kelasIds, $bebanMap, $waktuMulai, $batasWaktu);
+        $solusiTerbaik = $this->seimbangkanKelelahan($solusiTerbaik, $unitsByKelas, $kelasIds, $bebanMap, time(), $deadlineTotal);
 
         $terisi = $this->hitungTerisi($solusiTerbaik);
         if ($terisi === 0) {
@@ -150,6 +145,11 @@ class JadwalSAOService
         return $this->simpanJadwal($semesterId, $solusiTerbaik, $terisi, $totalJtm, $kosongTerbaik);
     }
 
+    private function waktuHabis(int $deadline): bool
+    {
+        return time() >= $deadline;
+    }
+
     // ─── Inti CSP per kelas ───────────────────────────────────────────────
 
     private function selesaikanSemuaKelas(array &$jadwal, array $unitsByKelas, array $urutanKelas, array $kelasIds, int $t0, int $limit): bool
@@ -157,7 +157,7 @@ class JadwalSAOService
         $this->tempatkanPreserveGlobal($jadwal, $unitsByKelas, $kelasIds);
 
         foreach ($urutanKelas as $kelasId) {
-            if ((time() - $t0) >= $limit - 5) {
+            if ($this->waktuHabis($limit)) {
                 break;
             }
             $units = $unitsByKelas[$kelasId] ?? [];
@@ -340,7 +340,7 @@ class JadwalSAOService
         $this->rebuildGuruOcc($best, $kelasIds);
 
         for ($round = 0; $round < 2000; $round++) {
-            if ((time() - $t0) >= $limit - 1) {
+            if ($this->waktuHabis($limit)) {
                 break;
             }
 
@@ -382,7 +382,7 @@ class JadwalSAOService
 
     private function backtrackKelas(array &$jadwal, array $units, int $kelasId, array $kelasIds, int $idx, int $t0, int $limit): bool
     {
-        if ((time() - $t0) >= $limit - 3) {
+        if ($this->waktuHabis($limit)) {
             return false;
         }
 
@@ -837,8 +837,8 @@ class JadwalSAOService
         }
         $bestKosong = $target - $this->hitungTerisi($best);
 
-        for ($round = 0; $round < 500; $round++) {
-            if ((time() - $t0) >= $limit - 2) {
+        for ($round = 0; $round < 40; $round++) {
+            if ($this->waktuHabis($limit)) {
                 break;
             }
 
@@ -882,13 +882,13 @@ class JadwalSAOService
     }
 
     /** Fase paksa: isi semua JTM tersisa, boleh langgar preset blokir, maks 7 jam/hari guru. */
-    private function isiSemuaPaksa(array $jadwal, array $unitsByKelas, array $kelasIds, int $t0, int $limit): array
+    private function isiSemuaPaksa(array $jadwal, array $unitsByKelas, array $kelasIds, int $t0, int $deadline): array
     {
         $best = $jadwal;
         $unitMap = $this->flatUnits($unitsByKelas);
 
-        for ($pass = 0; $pass < 80; $pass++) {
-            if ((time() - $t0) >= $limit - 2) {
+        for ($pass = 0; $pass < 200; $pass++) {
+            if ($this->waktuHabis($deadline)) {
                 break;
             }
 
@@ -904,50 +904,30 @@ class JadwalSAOService
                 break;
             }
 
-            usort($pending, fn($a, $b) => $this->sisaUnit($best, $b) <=> $this->sisaUnit($best, $a));
-            $progress = false;
+            if ($pass % 3 === 1) {
+                shuffle($pending);
+            } else {
+                usort($pending, fn($a, $b) => $this->sisaUnit($best, $b) <=> $this->sisaUnit($best, $a));
+            }
 
+            $progress = false;
             foreach ($pending as $unit) {
                 if ($this->unitLengkap($best, $unit)) {
                     continue;
                 }
-
-                $remaining = $this->sisaUnit($best, $unit);
-                $days = $this->hariTerpakai($best, $unit);
-                $combos = $this->urutkanComboByBeban(
-                    $best,
-                    $unit,
-                    $this->enumerasiPenempatan($best, $unit, $remaining, $kelasIds, $days, 1500),
-                    $kelasIds
-                );
-
-                if ($this->cobaTempatkanCombo($best, $unit, $combos, $kelasIds)) {
+                if ($this->isiSatuUnit($best, $unit, $kelasIds, $unitMap)) {
                     $progress = true;
-                    continue;
                 }
+            }
 
-                foreach ($combos as $combo) {
-                    if (!$this->comboLayakBeban($best, $unit, $combo, $kelasIds)) {
+            if (!$progress) {
+                foreach ($pending as $unit) {
+                    if ($this->unitLengkap($best, $unit)) {
                         continue;
                     }
-
-                    $trial = $this->salinJadwal($best);
-                    $this->rebuildGuruOcc($trial, $kelasIds);
-                    $this->bebaskanPenghalangGuru($trial, $unit, $combo, $kelasIds, $unitMap);
-
-                    if (!$this->comboLayakBeban($trial, $unit, $combo, $kelasIds)) {
-                        continue;
-                    }
-                    $this->terapkanCombo($trial, $unit, $combo);
-                    if ($this->unitLengkap($trial, $unit)) {
-                        if (!empty($unit['isBtq'])) {
-                            $this->kunciSlotBtq($trial, $unit);
-                        }
-                        $best = $trial;
+                    if ($this->cobaTempatkanSebagian($best, $unit, $kelasIds)) {
                         $progress = true;
-                        break;
                     }
-                    $this->batalkanCombo($trial, $unit, $combo);
                 }
             }
 
@@ -962,8 +942,227 @@ class JadwalSAOService
         return $best;
     }
 
+    private function isiSatuUnit(array &$jadwal, array $unit, array $kelasIds, array $unitMap): bool
+    {
+        $remaining = $this->sisaUnit($jadwal, $unit);
+        if ($remaining <= 0) {
+            return false;
+        }
+
+        $days = $this->hariTerpakai($jadwal, $unit);
+        $combos = $this->urutkanComboByBeban(
+            $jadwal,
+            $unit,
+            $this->enumerasiPenempatan($jadwal, $unit, $remaining, $kelasIds, $days, 2000),
+            $kelasIds
+        );
+
+        if ($this->cobaTempatkanCombo($jadwal, $unit, $combos, $kelasIds)) {
+            return true;
+        }
+
+        foreach ($combos as $combo) {
+            if (!$this->comboLayakBeban($jadwal, $unit, $combo, $kelasIds)) {
+                continue;
+            }
+
+            $trial = $this->salinJadwal($jadwal);
+            $this->rebuildGuruOcc($trial, $kelasIds);
+            $this->bebaskanPenghalangGuru($trial, $unit, $combo, $kelasIds, $unitMap, 4);
+
+            if (!$this->comboLayakBeban($trial, $unit, $combo, $kelasIds)) {
+                continue;
+            }
+            $this->terapkanCombo($trial, $unit, $combo);
+            if ($this->unitLengkap($trial, $unit)) {
+                if (!empty($unit['isBtq'])) {
+                    $this->kunciSlotBtq($trial, $unit);
+                }
+                $jadwal = $trial;
+                return true;
+            }
+            $this->batalkanCombo($trial, $unit, $combo);
+        }
+
+        if ($remaining === 1 || $unit['jtm'] === 1) {
+            return $this->tempatkanJamTunggal($jadwal, $unit, $kelasIds, $unitMap);
+        }
+
+        return false;
+    }
+
+    private function cobaTempatkanSebagian(array &$jadwal, array $unit, array $kelasIds): bool
+    {
+        $before = $this->sisaUnit($jadwal, $unit);
+        if ($before <= 0) {
+            return false;
+        }
+
+        foreach ($this->posisiLengkapi($jadwal, $unit, $kelasIds) as $pos) {
+            $combo = [$pos];
+            if (!$this->comboLayakBeban($jadwal, $unit, $combo, $kelasIds)) {
+                continue;
+            }
+            $this->terapkanCombo($jadwal, $unit, $combo);
+            if ($this->sisaUnit($jadwal, $unit) < $before && $this->bisaDilengkapi($jadwal, $unit)) {
+                return true;
+            }
+            $this->batalkanCombo($jadwal, $unit, $combo);
+        }
+
+        foreach ($this->getLeadingBlockSizes($before) as $size) {
+            foreach ($this->semuaPosisiBlok($jadwal, $unit, $size, $kelasIds, []) as $pos) {
+                $combo = [$pos];
+                if (!$this->comboLayakBeban($jadwal, $unit, $combo, $kelasIds)) {
+                    continue;
+                }
+                $this->terapkanCombo($jadwal, $unit, $combo);
+                if ($this->sisaUnit($jadwal, $unit) < $before && $this->bisaDilengkapi($jadwal, $unit)) {
+                    return true;
+                }
+                $this->batalkanCombo($jadwal, $unit, $combo);
+            }
+        }
+
+        return false;
+    }
+
+    private function tempatkanJamTunggal(array &$jadwal, array $unit, array $kelasIds, array $unitMap): bool
+    {
+        $kelasId = $unit['kelasId'];
+        foreach ($this->strukturHari as $hari => $maxJam) {
+            for ($jam = 1; $jam <= $maxJam; $jam++) {
+                if (($jadwal[$hari][$jam][$kelasId] ?? null) !== null) {
+                    continue;
+                }
+                $combo = [['hari' => $hari, 'startJam' => $jam, 'size' => 1]];
+                if (!$this->comboLayakBeban($jadwal, $unit, $combo, $kelasIds)) {
+                    continue;
+                }
+                $trial = $this->salinJadwal($jadwal);
+                $this->rebuildGuruOcc($trial, $kelasIds);
+                $this->bebaskanPenghalangGuru($trial, $unit, $combo, $kelasIds, $unitMap, 3);
+                if (!$this->comboLayakBeban($trial, $unit, $combo, $kelasIds)) {
+                    continue;
+                }
+                if (!$this->bisaLetakkan($trial, $unit, $hari, $jam, 1, $kelasIds)) {
+                    continue;
+                }
+                $this->terapkanCombo($trial, $unit, $combo);
+                if ($this->unitLengkap($trial, $unit)) {
+                    $jadwal = $trial;
+                    return true;
+                }
+                $this->batalkanCombo($trial, $unit, $combo);
+            }
+        }
+        return false;
+    }
+
+    private function getLeadingBlockSizes(int $remaining): array
+    {
+        $sizes = [];
+        foreach ($this->getBlockPatterns($remaining) as $pattern) {
+            $sizes[$pattern[0]] = true;
+        }
+        return array_keys($sizes);
+    }
+
+    private function distribusiHariUnit(array $jadwal, array $unit): array
+    {
+        $dist = [];
+        $kelasId = $unit['kelasId'];
+        $bmId = $unit['bmId'];
+        foreach ($this->strukturHari as $hari => $jml) {
+            $cnt = 0;
+            for ($j = 1; $j <= $jml; $j++) {
+                $s = $jadwal[$hari][$j][$kelasId] ?? null;
+                if ($s !== null && $s['beban_mengajar_id'] == $bmId) {
+                    $cnt++;
+                }
+            }
+            if ($cnt > 0) {
+                $dist[] = $cnt;
+            }
+        }
+        rsort($dist);
+        return $dist;
+    }
+
+    private function bisaDilengkapi(array $jadwal, array $unit): bool
+    {
+        $rem = $this->sisaUnit($jadwal, $unit);
+        if ($rem <= 0) {
+            return $this->validasiBeban($jadwal, $unit['kelasId'], $unit['bmId'], $unit['jtm']);
+        }
+        if (!$this->validasiKontiguitasUnit($jadwal, $unit)) {
+            return false;
+        }
+
+        $dist = $this->distribusiHariUnit($jadwal, $unit);
+        foreach ($this->getBlockPatterns($unit['jtm']) as $fullPattern) {
+            $target = $fullPattern;
+            rsort($target);
+            foreach ($this->getBlockPatterns($rem) as $remPattern) {
+                $candidate = array_merge($dist, $remPattern);
+                rsort($candidate);
+                if ($candidate === $target) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private function validasiKontiguitasUnit(array $jadwal, array $unit): bool
+    {
+        $kelasId = $unit['kelasId'];
+        $bmId = $unit['bmId'];
+        foreach ($this->strukturHari as $hari => $jml) {
+            $jams = [];
+            for ($j = 1; $j <= $jml; $j++) {
+                $s = $jadwal[$hari][$j][$kelasId] ?? null;
+                if ($s !== null && $s['beban_mengajar_id'] == $bmId) {
+                    $jams[] = $j;
+                }
+            }
+            if (count($jams) <= 1) {
+                continue;
+            }
+            sort($jams);
+            for ($i = 0; $i < count($jams) - 1; $i++) {
+                if ($jams[$i + 1] - $jams[$i] > 1) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private function unlockNonBtqSlots(array $jadwal, array $unitsByKelas): void
+    {
+        $btqBmIds = [];
+        foreach ($unitsByKelas as $units) {
+            foreach ($units as $u) {
+                if (!empty($u['isBtq'])) {
+                    $btqBmIds[$u['bmId']] = true;
+                }
+            }
+        }
+        foreach ($this->lockedSlots as $hari => $jams) {
+            foreach ($jams as $jam => $classes) {
+                foreach (array_keys($classes) as $kId) {
+                    $slot = $jadwal[$hari][$jam][$kId] ?? null;
+                    if ($slot === null || !isset($btqBmIds[$slot['beban_mengajar_id']])) {
+                        unset($this->lockedSlots[$hari][$jam][$kId]);
+                    }
+                }
+            }
+        }
+    }
+
     /** Relokasi mapel lain yang bentrok dengan guru di slot target. */
-    private function bebaskanPenghalangGuru(array &$jadwal, array $unit, array $combo, array $kelasIds, array $unitMap): void
+    private function bebaskanPenghalangGuru(array &$jadwal, array $unit, array $combo, array $kelasIds, array $unitMap, int $depth = 2): void
     {
         $guruId = $unit['guruId'];
         $kelasId = $unit['kelasId'];
@@ -983,7 +1182,7 @@ class JadwalSAOService
                     if (!$blocker || !empty($blocker['isBtq'])) {
                         continue;
                     }
-                    if (isset($this->lockedSlots[$hari][$jam][$kId])) {
+                    if ($this->honorBlockConstraints && isset($this->lockedSlots[$hari][$jam][$kId])) {
                         continue;
                     }
 
@@ -996,10 +1195,20 @@ class JadwalSAOService
                     $alt = $this->urutkanComboByBeban(
                         $jadwal,
                         $blocker,
-                        $this->enumerasiPenempatan($jadwal, $blocker, $rem, $kelasIds, [], 400),
+                        $this->enumerasiPenempatan($jadwal, $blocker, $rem, $kelasIds, [], 600),
                         $kelasIds
                     );
-                    $this->cobaTempatkanCombo($jadwal, $blocker, $alt, $kelasIds);
+                    if ($this->cobaTempatkanCombo($jadwal, $blocker, $alt, $kelasIds)) {
+                        continue;
+                    }
+                    if ($depth > 0) {
+                        foreach ($alt as $bc) {
+                            $this->bebaskanPenghalangGuru($jadwal, $blocker, [$bc], $kelasIds, $unitMap, $depth - 1);
+                            if ($this->cobaTempatkanCombo($jadwal, $blocker, $alt, $kelasIds)) {
+                                break;
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1011,8 +1220,8 @@ class JadwalSAOService
         $best = $jadwal;
         $this->rebuildGuruOcc($best, $kelasIds);
 
-        for ($i = 0; $i < 2500; $i++) {
-            if ((time() - $t0) >= $limit - 1) {
+        for ($i = 0; $i < 800; $i++) {
+            if ($this->waktuHabis($limit)) {
                 break;
             }
 
@@ -1137,7 +1346,7 @@ class JadwalSAOService
         $load = $this->bebanGuruHarian($best, $kelasIds);
 
         for ($i = 0; $i < 800; $i++) {
-            if ((time() - $t0) >= $limit - 1) {
+            if ($this->waktuHabis($limit)) {
                 break;
             }
             $over = null;
