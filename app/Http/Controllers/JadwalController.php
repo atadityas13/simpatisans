@@ -231,8 +231,17 @@ class JadwalController extends Controller
 
             $analisa = $this->jadwalService->analisaPenuh($semesterId);
             $totalWarnings = $analisa['summary']['total_warnings'] ?? 0;
+            $terisi = $result['total_slot_terisi'];
+            $target = $result['total_target'] ?? $terisi;
+            $kosong = $result['slot_kosong'] ?? 0;
 
-            $msg = "<b>Penjadwalan Otomatis Selesai!</b><br>Masalah: {$totalWarnings}<br>Jam Terisi: {$result['total_slot_terisi']}";
+            if ($result['status'] === 'partial') {
+                $msg = "<b>Jadwal disimpan sebagian.</b><br>Jam Terisi: {$terisi}/{$target} ({$kosong} belum terisi)<br>Masalah analisa: {$totalWarnings}";
+                $msg .= '<br><small>Kurangi preset blokir atau sesuaikan beban mengajar, lalu generate ulang.</small>';
+                return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('error', $msg);
+            }
+
+            $msg = "<b>Penjadwalan Otomatis Selesai!</b><br>Jam Terisi: {$terisi}/{$target}<br>Masalah: {$totalWarnings}";
             if ($totalWarnings > 0) {
                 $msg .= "<br><small>Beberapa aturan belum sempurna — periksa Laporan Analisa atau kurangi preset blokir.</small>";
             }

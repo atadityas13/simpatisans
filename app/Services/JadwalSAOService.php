@@ -66,11 +66,11 @@ class JadwalSAOService
         $bebanMap = $this->getBebanMap();
 
         $waktuMulai = time();
-        $batasWaktu = 100;
+        $batasWaktu = 105;
         $solusiTerbaik = null;
         $kosongTerbaik = $totalJtm;
 
-        for ($attempt = 0; $attempt < 30; $attempt++) {
+        for ($attempt = 0; $attempt < 40; $attempt++) {
             if ((time() - $waktuMulai) >= $batasWaktu - 8) {
                 break;
             }
@@ -100,7 +100,14 @@ class JadwalSAOService
         }
 
         if ($kosongTerbaik > 0) {
+            $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
             $solusiTerbaik = $this->paksaLengkapi($solusiTerbaik, $unitsByKelas, $kelasIds, $bebanMap, $waktuMulai, $batasWaktu);
+            $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
+        }
+
+        if ($kosongTerbaik > 0) {
+            $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
+            $solusiTerbaik = $this->lengkapiSerangkaian($solusiTerbaik, $unitsByKelas, $kelasIds, $waktuMulai, $batasWaktu);
             $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
         }
 
@@ -109,14 +116,12 @@ class JadwalSAOService
         }
 
         $terisi = $this->hitungTerisi($solusiTerbaik);
-        if ($terisi < $totalJtm) {
-            throw new \Exception(
-                "Jadwal belum lengkap: {$terisi}/{$totalJtm} jam terisi ({$kosongTerbaik} kosong). " .
-                'Kurangi preset blokir atau sesuaikan beban mengajar.'
-            );
+        if ($terisi === 0) {
+            throw new \Exception('Gagal membuat jadwal. Kurangi preset blokir guru atau periksa beban mengajar.');
         }
 
-        return $this->simpanJadwal($semesterId, $solusiTerbaik, $terisi);
+        $kosongTerbaik = $totalJtm - $terisi;
+        return $this->simpanJadwal($semesterId, $solusiTerbaik, $terisi, $totalJtm, $kosongTerbaik);
     }
 
     // ─── Inti CSP per kelas ───────────────────────────────────────────────
@@ -124,21 +129,106 @@ class JadwalSAOService
     private function selesaikanSemuaKelas(array &$jadwal, array $unitsByKelas, array $urutanKelas, array $kelasIds, int $t0, int $limit): bool
     {
         $this->tempatkanPreserveGlobal($jadwal, $unitsByKelas, $kelasIds);
-        $this->tempatkanBtqWajib($jadwal, $unitsByKelas, $kelasIds);
 
         foreach ($urutanKelas as $kelasId) {
             if ((time() - $t0) >= $limit - 5) {
-                return false;
+                break;
             }
             $units = $unitsByKelas[$kelasId] ?? [];
             if (empty($units)) {
                 continue;
             }
+
+            $this->tempatkanBtqKelas($jadwal, $units, $kelasIds);
+
             if (!$this->backtrackKelas($jadwal, $units, $kelasId, $kelasIds, 0, $t0, $limit)) {
-                return false;
+                $this->tempatkanKelasGreedy($jadwal, $units, $kelasIds);
             }
         }
+
         return $this->semuaLengkap($unitsByKelas, $jadwal);
+    }
+
+    /** Greedy fallback jika backtrack gagal — tetap isi sebanyak mungkin. */
+    private function tempatkanKelasGreedy(array &$jadwal, array $units, array $kelasIds): void
+    {
+        for ($pass = 0; $pass < 8; $pass++) {
+            $progress = false;
+            foreach ($units as $unit) {
+                if ($this->unitLengkap($jadwal, $unit)) {
+                    continue;
+                }
+                $remaining = $this->sisaUnit($jadwal, $unit);
+                if ($remaining <= 0) {
+                    continue;
+                }
+                $days = $this->hariTerpakai($jadwal, $unit);
+                foreach ($this->enumerasiPenempatan($jadwal, $unit, $remaining, $kelasIds, $days, 300) as $combo) {
+                    $this->terapkanCombo($jadwal, $unit, $combo);
+                    if ($this->sisaUnit($jadwal, $unit) <= 0 && $this->validasiBeban($jadwal, $unit['kelasId'], $unit['bmId'], $unit['jtm'])) {
+                        if (!empty($unit['isBtq'])) {
+                            $this->kunciSlotBtq($jadwal, $unit);
+                        }
+                        $progress = true;
+                        break;
+                    }
+                    $this->batalkanCombo($jadwal, $unit, $combo);
+                }
+            }
+            if (!$progress) {
+                break;
+            }
+        }
+    }
+
+    /** Fase akhir: coba isi semua unit yang masih kurang. */
+    private function lengkapiSerangkaian(array $jadwal, array $unitsByKelas, array $kelasIds, int $t0, int $limit): array
+    {
+        $best = $jadwal;
+        $this->rebuildGuruOcc($best, $kelasIds);
+
+        for ($round = 0; $round < 2000; $round++) {
+            if ((time() - $t0) >= $limit - 1) {
+                break;
+            }
+
+            $pending = [];
+            foreach ($unitsByKelas as $units) {
+                foreach ($units as $unit) {
+                    if ($this->sisaUnit($best, $unit) > 0) {
+                        $pending[] = $unit;
+                    }
+                }
+            }
+            if (empty($pending)) {
+                break;
+            }
+
+            usort($pending, fn($a, $b) => $this->sisaUnit($best, $b) <=> $this->sisaUnit($best, $a));
+            $roundProgress = false;
+
+            foreach ($pending as $unit) {
+                $remaining = $this->sisaUnit($best, $unit);
+                $days = $this->hariTerpakai($best, $unit);
+
+                foreach ($this->enumerasiPenempatan($best, $unit, $remaining, $kelasIds, $days, 500) as $combo) {
+                    $this->terapkanCombo($best, $unit, $combo);
+                    if ($this->sisaUnit($best, $unit) <= 0 && $this->validasiBeban($best, $unit['kelasId'], $unit['bmId'], $unit['jtm'])) {
+                        if (!empty($unit['isBtq'])) {
+                            $this->kunciSlotBtq($best, $unit);
+                        }
+                        $roundProgress = true;
+                        break;
+                    }
+                    $this->batalkanCombo($best, $unit, $combo);
+                }
+            }
+
+            if (!$roundProgress) {
+                break;
+            }
+        }
+        return $best;
     }
 
     private function backtrackKelas(array &$jadwal, array $units, int $kelasId, array $kelasIds, int $idx, int $t0, int $limit): bool
@@ -175,8 +265,7 @@ class JadwalSAOService
         return false;
     }
 
-    /** Enumerasi semua kombinasi blok valid untuk sisa JTM (tanpa rekursi dalam). */
-    private function enumerasiPenempatan(array $jadwal, array $unit, int $remaining, array $kelasIds, array $fixedDays): array
+    private function enumerasiPenempatan(array $jadwal, array $unit, int $remaining, array $kelasIds, array $fixedDays, int $maxCombo = 120): array
     {
         if (!empty($unit['isBtq'])) {
             return $this->enumerasiBtq($jadwal, $unit, $remaining, $kelasIds);
@@ -192,7 +281,7 @@ class JadwalSAOService
 
         $hasil = [];
         foreach ($this->getBlockPatterns($remaining) as $blocks) {
-            $this->kumpulkanCombo($jadwal, $unit, $blocks, 0, [], $kelasIds, $fixedDays, $hasil, 60);
+            $this->kumpulkanCombo($jadwal, $unit, $blocks, 0, [], $kelasIds, $fixedDays, $hasil, $maxCombo);
         }
         return $hasil;
     }
@@ -429,35 +518,40 @@ class JadwalSAOService
         }
     }
 
-    /** BTQ wajib Jumat jam terakhir (5) — kunci slot setelah ditempatkan. */
-    private function tempatkanBtqWajib(array &$jadwal, array $unitsByKelas, array $kelasIds): void
+    /** BTQ wajib Jumat jam terakhir — per kelas, setelah kelas sebelumnya terisi. */
+    private function tempatkanBtqKelas(array &$jadwal, array $units, array $kelasIds): void
     {
-        foreach ($unitsByKelas as $kelasId => $units) {
-            foreach ($units as $unit) {
-                if (empty($unit['isBtq'])) {
-                    continue;
-                }
+        foreach ($units as $unit) {
+            if (empty($unit['isBtq'])) {
+                continue;
+            }
 
-                foreach ($this->strukturHari as $hari => $jml) {
-                    for ($j = 1; $j <= $jml; $j++) {
-                        $s = $jadwal[$hari][$j][$kelasId] ?? null;
-                        if ($s !== null && $s['beban_mengajar_id'] == $unit['bmId']) {
-                            if (!isset($this->lockedSlots[$hari][$j][$kelasId])) {
-                                $this->copot($jadwal, $unit, $hari, $j, 1);
-                            }
-                        }
-                    }
-                }
-
-                $remaining = $this->sisaUnit($jadwal, $unit);
-                if ($remaining > 0) {
-                    foreach ($this->enumerasiBtq($jadwal, $unit, $remaining, $kelasIds) as $combo) {
-                        $this->terapkanCombo($jadwal, $unit, $combo);
-                        break;
-                    }
-                }
-
+            if ($this->unitLengkap($jadwal, $unit)) {
                 $this->kunciSlotBtq($jadwal, $unit);
+                continue;
+            }
+
+            foreach ($this->strukturHari as $hari => $jml) {
+                for ($j = 1; $j <= $jml; $j++) {
+                    $s = $jadwal[$hari][$j][$unit['kelasId']] ?? null;
+                    if ($s !== null && $s['beban_mengajar_id'] == $unit['bmId'] && !isset($this->lockedSlots[$hari][$j][$unit['kelasId']])) {
+                        $this->copot($jadwal, $unit, $hari, $j, 1);
+                    }
+                }
+            }
+
+            $remaining = $this->sisaUnit($jadwal, $unit);
+            if ($remaining <= 0) {
+                continue;
+            }
+
+            foreach ($this->enumerasiBtq($jadwal, $unit, $remaining, $kelasIds) as $combo) {
+                $this->terapkanCombo($jadwal, $unit, $combo);
+                if ($this->validasiBeban($jadwal, $unit['kelasId'], $unit['bmId'], $unit['jtm'])) {
+                    $this->kunciSlotBtq($jadwal, $unit);
+                    break;
+                }
+                $this->batalkanCombo($jadwal, $unit, $combo);
             }
         }
     }
@@ -966,7 +1060,7 @@ class JadwalSAOService
             && $this->fastConstraints[$guruId][$h][$jam] === 0;
     }
 
-    private function simpanJadwal(int $semesterId, array $solusi, int $terisi): array
+    private function simpanJadwal(int $semesterId, array $solusi, int $terisi, int $totalTarget, int $kosong): array
     {
         DB::table('jadwals')->where('semester_id', $semesterId)->delete();
         DB::beginTransaction();
@@ -994,7 +1088,13 @@ class JadwalSAOService
                 Jadwal::insert($chunk);
             }
             DB::commit();
-            return ['status' => 'success', 'biaya_penalti' => 0, 'total_slot_terisi' => $terisi];
+            return [
+                'status' => $kosong === 0 ? 'success' : 'partial',
+                'biaya_penalti' => 0,
+                'total_slot_terisi' => $terisi,
+                'total_target' => $totalTarget,
+                'slot_kosong' => $kosong,
+            ];
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('JadwalSAO save: ' . $e->getMessage());
