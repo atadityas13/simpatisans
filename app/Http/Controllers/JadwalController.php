@@ -12,6 +12,7 @@ use App\Services\JadwalSAOService;
 use App\Services\JadwalService;
 use App\Services\SemesterService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class JadwalController extends Controller
 {
@@ -217,21 +218,28 @@ class JadwalController extends Controller
 
     public function generate(Request $request, JadwalSAOService $saoService)
     {
-        set_time_limit(300); // Izinkan waktu lebih lama untuk Elite AI
+        @ini_set('memory_limit', '512M');
+        set_time_limit(120);
+
         $semesterId = (int) $request->get('semester_id');
-        if (!$semesterId)
+        if (!$semesterId) {
             return redirect()->back()->with('error', 'Semester tidak valid.');
+        }
 
         try {
             $result = $saoService->generate($semesterId);
-            
-            // Ambil analisa terbaru untuk menghitung jumlah masalah yang riil
+
             $analisa = $this->jadwalService->analisaPenuh($semesterId);
             $totalWarnings = $analisa['summary']['total_warnings'] ?? 0;
 
-            return redirect()->route('jadwal.index', ['semester_id' => $semesterId])
-                ->with('success', "<b>Penjadwalan Otomatis Berhasil Dibuat!</b><br> Masalah: " . $totalWarnings . "<br> Jam Pelajaran Terisi: " . $result['total_slot_terisi']);
-        } catch (\Exception $e) {
+            $msg = "<b>Penjadwalan Otomatis Selesai!</b><br>Masalah: {$totalWarnings}<br>Jam Terisi: {$result['total_slot_terisi']}";
+            if ($totalWarnings > 0) {
+                $msg .= "<br><small>Beberapa aturan belum sempurna — periksa Laporan Analisa atau kurangi preset blokir.</small>";
+            }
+
+            return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('success', $msg);
+        } catch (\Throwable $e) {
+            Log::error('Generate jadwal gagal: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return redirect()->route('jadwal.index', ['semester_id' => $semesterId])
                 ->with('error', $e->getMessage());
         }
