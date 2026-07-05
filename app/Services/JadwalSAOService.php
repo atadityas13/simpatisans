@@ -16,6 +16,7 @@ class JadwalSAOService
     private $suhuAwal = 1000.0;
     private $coolingRate = 0.9995;
     private $constraints = [];
+    private $fastConstraints = []; // Fast lookup [guru_id][hari][jam_ke] = type
     private $lockedSlots = []; // [Hari][Jam][KelasId] = true;
 
     public function generate(int $semesterId)
@@ -31,7 +32,12 @@ class JadwalSAOService
         if (empty($kelasIds)) throw new \Exception("Data Kelas kosong.");
 
         // Memuat Batasan Guru (Constraints bersifat global, namun bisa difilter jika nanti ada semester_id di constraints)
-        $this->constraints = GuruConstraint::all()->groupBy('guru_id');
+        $rawConstraints = GuruConstraint::all();
+        $this->constraints = $rawConstraints->groupBy('guru_id');
+        $this->fastConstraints = [];
+        foreach ($rawConstraints as $c) {
+            $this->fastConstraints[$c->guru_id][$c->hari][$c->jam_ke] = $c->type;
+        }
         $this->lockedSlots = [];
 
         $jadwalAwal = $this->buatJadwalKosong($kelasIds);
@@ -324,9 +330,10 @@ class JadwalSAOService
                         else $guruHadirJamIni[$guruId] = true;
 
                         // 2. Hard Constraint: Guru DIBLOKIR (1.000.000)
-                        if (isset($this->constraints[$guruId])) {
-                            $isBlocked = $this->constraints[$guruId]->where('type', 0)->where('hari', $hari)->where('jam_ke', $jam)->first();
-                            if ($isBlocked) $penalti += 1000000;
+                        if (isset($this->fastConstraints[$guruId][$hari][$jam])) {
+                            if ($this->fastConstraints[$guruId][$hari][$jam] == 0) {
+                                $penalti += 1000000;
+                            }
                         }
                     }
                 }
