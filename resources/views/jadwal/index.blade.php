@@ -380,6 +380,24 @@
                             </div>
                         @endif
 
+                        {{-- Mapel belum terisi --}}
+                        @if(count($analisa['belum_terisi'] ?? []) > 0)
+                            <div>
+                                <h4 class="bg-orange-600 text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">📋
+                                    MAPEL BELUM TERISI PENUH</h4>
+                                <div class="border border-orange-600 border-t-0 rounded-b overflow-hidden bg-orange-50">
+                                    <ul class="text-[10px] space-y-1 p-3">
+                                        @foreach($analisa['belum_terisi'] as $b)
+                                            <li class="flex items-start gap-2">
+                                                <span class="bg-white text-orange-600 font-black px-1 border border-orange-200 mt-0.5">!</span>
+                                                <span><b>{{ $b['mapel'] }}</b> ({{ $b['guru'] }}) di {{ $b['kelas'] }}: {{ $b['aktual'] }}/{{ $b['standar'] }} jam</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </div>
+                        @endif
+
                         {{-- Bagian Bentrok --}}
                         @if(count($analisa['bentrok']) > 0)
                             <div>

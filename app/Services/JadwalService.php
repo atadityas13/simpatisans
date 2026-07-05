@@ -28,6 +28,7 @@ class JadwalService
             'pelanggaran_ketentuan' => [],
             'struktur_jtm' => [],
             'aturan_btq' => [],
+            'belum_terisi' => [],
             'invalid_slots' => [],
             'summary' => [
                 'total_warnings' => 0,
@@ -203,8 +204,26 @@ class JadwalService
             }
         }
 
+        // 6c. Mapel belum terisi penuh (JTM vs slot jadwal)
+        $allBeban = BebanMengajar::where('semester_id', $semesterId)->where('is_satminkal', 1)
+            ->with(['guru', 'mapel', 'kelas'])->get();
+        foreach ($allBeban as $beban) {
+            $placed = $bebanUsage->get($beban->id)?->count() ?? 0;
+            if ($placed < $beban->jtm) {
+                $analisa['belum_terisi'][] = [
+                    'mapel' => $beban->mapel->nama_mapel,
+                    'guru' => $beban->guru->kode_guru,
+                    'kelas' => $beban->kelas->nama_kelas,
+                    'standar' => $beban->jtm,
+                    'aktual' => $placed,
+                ];
+            }
+        }
+
         // 7. Calculate Summary
-        $totalProblems = count($analisa['bentrok']) + count($analisa['kelebihan_jtm']) + count($analisa['fatigue']) + count($analisa['pelanggaran_ketentuan']) + count($analisa['struktur_jtm']) + count($analisa['aturan_btq']) + count($analisa['invalid_slots']);
+        $totalProblems = count($analisa['bentrok']) + count($analisa['kelebihan_jtm']) + count($analisa['fatigue'])
+            + count($analisa['pelanggaran_ketentuan']) + count($analisa['struktur_jtm']) + count($analisa['aturan_btq'])
+            + count($analisa['belum_terisi']) + count($analisa['invalid_slots']);
         $analisa['summary']['total_warnings'] = $totalProblems;
         $analisa['summary']['health_score'] = max(0, 100 - ($totalProblems * 5));
 
