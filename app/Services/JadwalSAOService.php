@@ -65,9 +65,18 @@ class JadwalSAOService
         $solusiTerbaik = $solusiSekarang;
         $biayaTerbaik = $biayaSekarang;
 
+        $waktuMulai = time();
+        $batasWaktu = 110; // Batas 110 detik untuk mencegah timeout 120 detik dari hosting
+
         $suhu = $this->suhuAwal;
         for ($i = 0; $i < $this->maxIterasi; $i++) {
             if ($suhu < 0.01 || $biayaTerbaik === 0) break;
+
+            // Safeguard timeout
+            if ($i % 500 === 0 && (time() - $waktuMulai) >= $batasWaktu) {
+                Log::warning("SAO Time Limit Reached ($batasWaktu detik). Berhenti di iterasi $i.");
+                break;
+            }
 
             $solusiBaru = $this->buatTetangga($solusiSekarang, $kelasIds);
             $biayaBaru = $this->hitungHardPenalti($solusiBaru, $kelasIds, $bebanMap);
