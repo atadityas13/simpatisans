@@ -362,6 +362,24 @@
                             </div>
                         @endif
 
+                        {{-- Aturan BTQ --}}
+                        @if(count($analisa['aturan_btq'] ?? []) > 0)
+                            <div>
+                                <h4 class="bg-emerald-700 text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">📖
+                                    ATURAN BTQ (Jumat Jam Terakhir)</h4>
+                                <div class="border border-emerald-700 border-t-0 rounded-b overflow-hidden bg-emerald-50">
+                                    <ul class="text-[10px] space-y-1 p-3">
+                                        @foreach($analisa['aturan_btq'] as $msg)
+                                            <li class="flex items-start gap-2">
+                                                <span class="bg-white text-emerald-700 font-black px-1 border border-emerald-200 mt-0.5">!</span>
+                                                <span class="leading-relaxed">{!! $msg !!}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </div>
+                        @endif
+
                         {{-- Bagian Bentrok --}}
                         @if(count($analisa['bentrok']) > 0)
                             <div>

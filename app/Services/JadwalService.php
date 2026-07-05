@@ -27,6 +27,7 @@ class JadwalService
             'over_blocked' => [],
             'pelanggaran_ketentuan' => [],
             'struktur_jtm' => [],
+            'aturan_btq' => [],
             'invalid_slots' => [],
             'summary' => [
                 'total_warnings' => 0,
@@ -176,11 +177,46 @@ class JadwalService
             }
         }
 
+        // 6b. Aturan BTQ — wajib Jumat jam ke-5 (terakhir)
+        foreach ($bebanUsage as $bmId => $items) {
+            $beban = $items->first()->bebanMengajar;
+            if (!$this->isMapelBtq($beban->mapel->nama_mapel ?? '')) {
+                continue;
+            }
+            $mapelName = $beban->mapel->nama_mapel;
+            $kelasName = $beban->kelas->nama_kelas;
+            $guruName = $beban->guru->kode_guru;
+            $prefix = "Mapel <b>{$mapelName}</b> ({$guruName}) di <b>{$kelasName}</b>";
+
+            $jams = $items->map(fn($j) => [
+                'hari' => ucfirst(strtolower(trim($j->hari))),
+                'jam' => $j->jam_ke,
+            ])->values();
+
+            $ok = $jams->count() === $beban->jtm
+                && $jams->every(fn($j) => $j['hari'] === 'Jumat')
+                && $jams->max('jam') === 5
+                && $jams->pluck('jam')->sort()->values()->toArray() === range(6 - $beban->jtm, 5);
+
+            if (!$ok) {
+                $analisa['aturan_btq'][] = "{$prefix} <b>wajib</b> di hari <b>Jumat jam ke-5</b> (jam pelajaran terakhir).";
+            }
+        }
+
         // 7. Calculate Summary
-        $totalProblems = count($analisa['bentrok']) + count($analisa['kelebihan_jtm']) + count($analisa['fatigue']) + count($analisa['pelanggaran_ketentuan']) + count($analisa['struktur_jtm']) + count($analisa['invalid_slots']);
+        $totalProblems = count($analisa['bentrok']) + count($analisa['kelebihan_jtm']) + count($analisa['fatigue']) + count($analisa['pelanggaran_ketentuan']) + count($analisa['struktur_jtm']) + count($analisa['aturan_btq']) + count($analisa['invalid_slots']);
         $analisa['summary']['total_warnings'] = $totalProblems;
         $analisa['summary']['health_score'] = max(0, 100 - ($totalProblems * 5));
 
         return $analisa;
+    }
+
+    private function isMapelBtq(?string $namaMapel): bool
+    {
+        if ($namaMapel === null || $namaMapel === '') {
+            return false;
+        }
+        $n = strtolower($namaMapel);
+        return str_contains($n, 'btq') || str_contains($n, 'baca tulis');
     }
 }
