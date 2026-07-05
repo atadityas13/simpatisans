@@ -12,106 +12,97 @@ use Illuminate\Support\Facades\Log;
 class JadwalSAOService
 {
     private $strukturHari = ['Senin' => 9, 'Selasa' => 10, 'Rabu' => 10, 'Kamis' => 10, 'Jumat' => 5];
-    private $maxIterasi = 400000;
-    private $suhuAwal = 2000000.0;
-    private $coolingRate = 0.99995;
-    private $constraints = [];
     private $fastConstraints = [];
     private $lockedSlots = [];
+    private $bebanMeta = [];
 
     public function generate(int $semesterId)
     {
         $bebanMengajar = BebanMengajar::where('semester_id', $semesterId)
-                            ->where('is_satminkal', 1)
-                            ->with(['guru', 'mapel', 'kelas'])
-                            ->get();
-        if ($bebanMengajar->isEmpty()) throw new \Exception("Data Beban Mengajar (KBM) kosong untuk semester ini. Silakan distribusikan jam terlebih dahulu.");
+            ->where('is_satminkal', 1)
+            ->with(['guru', 'mapel', 'kelas'])
+            ->get();
+
+        if ($bebanMengajar->isEmpty()) {
+            throw new \Exception("Data Beban Mengajar (KBM) kosong untuk semester ini. Silakan distribusikan jam terlebih dahulu.");
+        }
 
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")->get();
         $kelasIds = $kelasList->pluck('id')->toArray();
-        if (empty($kelasIds)) throw new \Exception("Data Kelas kosong.");
-
-        $rawConstraints = GuruConstraint::all();
-        $this->constraints = $rawConstraints->groupBy('guru_id');
-        $this->fastConstraints = [];
-        foreach ($rawConstraints as $c) {
-            $this->fastConstraints[$c->guru_id][$c->hari][$c->jam_ke] = $c->type;
+        if (empty($kelasIds)) {
+            throw new \Exception("Data Kelas kosong.");
         }
-        $this->lockedSlots = [];
 
-        $jadwalAwal = $this->buatJadwalKosong($kelasIds);
-
-        $slotTugas = [];
+        $this->loadConstraints();
+        $this->bebanMeta = [];
         foreach ($bebanMengajar as $beban) {
-            for ($i = 0; $i < $beban->jtm; $i++) {
-                $slotTugas[] = [
-                    'beban_mengajar_id' => $beban->id,
-                    'guru_id' => $beban->guru_id,
-                    'mapel_id' => $beban->mapel_id,
-                    'kelas_id' => $beban->kelas_id
-                ];
-            }
+            $this->bebanMeta[$beban->id] = [
+                'jtm' => $beban->jtm,
+                'guru_id' => $beban->guru_id,
+                'kelas_id' => $beban->kelas_id,
+                'mapel_id' => $beban->mapel_id,
+            ];
         }
 
         $totalSlotTersedia = count($kelasIds) * 44;
-        if (count($slotTugas) > $totalSlotTersedia) throw new \Exception("Kelebihan Beban: ".count($slotTugas)." JTM vs ". $totalSlotTersedia ." Kapasitas Slot Tersedia.");
-
-        $bebanMap = $bebanMengajar->pluck('jtm', 'id')->toArray();
-
-        // Multi-restart: coba beberapa solusi awal, pilih yang terbaik
-        $solusiTerbaik = null;
-        $biayaTerbaik = PHP_INT_MAX;
-        $jumlahRestart = 5;
-
-        for ($r = 0; $r < $jumlahRestart; $r++) {
-            $this->lockedSlots = [];
-            $solusi = $this->sebarkanTugasAcak($this->buatJadwalKosong($kelasIds), $slotTugas, $kelasIds, $bebanMap);
-            $biaya = $this->hitungHardPenalti($solusi, $kelasIds, $bebanMap);
-            if ($biaya < $biayaTerbaik) {
-                $solusiTerbaik = $solusi;
-                $biayaTerbaik = $biaya;
-            }
-            if ($biayaTerbaik === 0) break;
+        $totalJtm = $bebanMengajar->sum('jtm');
+        if ($totalJtm > $totalSlotTersedia) {
+            throw new \Exception("Kelebihan Beban: {$totalJtm} JTM vs {$totalSlotTersedia} Kapasitas Slot Tersedia.");
         }
 
-        $solusiSekarang = $solusiTerbaik;
-        $biayaSekarang = $biayaTerbaik;
+        $bebanMap = $bebanMengajar->pluck('jtm', 'id')->toArray();
+        $units = $this->buildUnits($bebanMengajar);
 
         $waktuMulai = time();
-        $batasWaktu = 110;
+        $batasWaktu = 250;
+        $solusiTerbaik = null;
+        $biayaTerbaik = PHP_INT_MAX;
+        $maxRestart = 15;
 
-        $suhu = $this->suhuAwal;
-        for ($i = 0; $i < $this->maxIterasi; $i++) {
-            if ($suhu < 0.01 || $biayaTerbaik === 0) break;
+        for ($r = 0; $r < $maxRestart; $r++) {
+            if ((time() - $waktuMulai) >= $batasWaktu) break;
 
-            if ($i % 500 === 0 && (time() - $waktuMulai) >= $batasWaktu) {
-                Log::warning("SAO Time Limit Reached ($batasWaktu detik). Berhenti di iterasi $i.");
+            $this->lockedSlots = [];
+            $jadwal = $this->buatJadwalKosong($kelasIds);
+            $orderedUnits = $this->urutkanUnits($units, $r);
+
+            if ($this->tempatkanPreserve($jadwal, $orderedUnits, $kelasIds)) {
+                $orderedUnits = array_values(array_filter($orderedUnits, fn($u) => $u['remaining'] > 0));
+            }
+
+            if ($this->backtrackTempatkan($jadwal, $orderedUnits, 0, $kelasIds, $waktuMulai, $batasWaktu)) {
+                $solusiTerbaik = $jadwal;
+                $biayaTerbaik = 0;
                 break;
             }
 
-            $solusiBaru = $this->buatTetangga($solusiSekarang, $kelasIds);
-            $biayaBaru = $this->hitungHardPenalti($solusiBaru, $kelasIds, $bebanMap);
-
-            $delta = $biayaBaru - $biayaSekarang;
-
-            if ($delta < 0 || exp(-$delta / $suhu) > (mt_rand() / mt_getrandmax())) {
-                $solusiSekarang = $solusiBaru;
-                $biayaSekarang = $biayaBaru;
-                if ($biayaSekarang < $biayaTerbaik) {
-                    $solusiTerbaik = $solusiSekarang;
-                    $biayaTerbaik = $biayaSekarang;
-                }
-            }
-            $suhu *= $this->coolingRate;
-
-            if ($i % 5000 === 0) {
-                Log::info("SAO Iterasi {$i}: Biaya Terbaik = {$biayaTerbaik}");
+            $biaya = $this->hitungHardPenalti($jadwal, $kelasIds, $bebanMap);
+            if ($biaya < $biayaTerbaik) {
+                $solusiTerbaik = $jadwal;
+                $biayaTerbaik = $biaya;
             }
         }
 
-        // Fase perbaikan terakhir untuk JTM & kelelahan
-        $solusiTerbaik = $this->perbaikiSolusi($solusiTerbaik, $kelasIds, $bebanMap, $waktuMulai, $batasWaktu);
-        $biayaTerbaik = $this->hitungHardPenalti($solusiTerbaik, $kelasIds, $bebanMap);
+        if ($solusiTerbaik === null) {
+            throw new \Exception("Gagal membuat jadwal. Coba kurangi preset blokir atau periksa beban mengajar.");
+        }
+
+        if ($biayaTerbaik > 0) {
+            $solusiTerbaik = $this->perbaikiAgresif($solusiTerbaik, $kelasIds, $bebanMap, $waktuMulai, $batasWaktu);
+            $biayaTerbaik = $this->hitungHardPenalti($solusiTerbaik, $kelasIds, $bebanMap);
+        }
+
+        if ($biayaTerbaik > 0) {
+            $solusiTerbaik = $this->optimasiKelelahan($solusiTerbaik, $kelasIds, $bebanMap, $waktuMulai, $batasWaktu);
+            $biayaTerbaik = $this->hitungHardPenalti($solusiTerbaik, $kelasIds, $bebanMap);
+        }
+
+        if ($biayaTerbaik > 0) {
+            throw new \Exception(
+                "Generate selesai tapi masih ada {$this->ringkasPelanggaran($solusiTerbaik, $kelasIds, $bebanMap)}. " .
+                "Kurangi preset blokir atau sesuaikan beban mengajar lalu coba lagi."
+            );
+        }
 
         DB::table('jadwals')->where('semester_id', $semesterId)->delete();
 
@@ -126,62 +117,130 @@ class JadwalSAOService
                             $insertData[] = [
                                 'semester_id' => $semesterId,
                                 'beban_mengajar_id' => $isiSlot['beban_mengajar_id'],
-                                'hari' => $hari,
+                                'hari' => $this->normalizeHari($hari),
                                 'jam_ke' => $jam,
                                 'created_at' => $now,
-                                'updated_at' => $now
+                                'updated_at' => $now,
                             ];
                         }
                     }
                 }
             }
-            foreach (array_chunk($insertData, 500) as $chunk) Jadwal::insert($chunk);
+            foreach (array_chunk($insertData, 500) as $chunk) {
+                Jadwal::insert($chunk);
+            }
             DB::commit();
-            return ['status' => 'success', 'biaya_penalti' => $biayaTerbaik, 'total_slot_terisi' => count($insertData)];
+            return ['status' => 'success', 'biaya_penalti' => 0, 'total_slot_terisi' => count($insertData)];
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error($e->getMessage());
-            throw new \Exception("Gagal menyimpan jadwal SAO: " . $e->getMessage());
+            throw new \Exception("Gagal menyimpan jadwal: " . $e->getMessage());
         }
     }
 
-    /**
-     * Pola blok valid untuk sisa JTM yang belum ditempatkan.
-     */
-    private function getBlockPatterns(int $remaining): array
+    private function normalizeHari(string $hari): string
     {
-        return match ($remaining) {
+        return ucfirst(strtolower(trim($hari)));
+    }
+
+    private function loadConstraints(): void
+    {
+        $this->fastConstraints = [];
+        foreach (GuruConstraint::all() as $c) {
+            $h = $this->normalizeHari($c->hari);
+            $this->fastConstraints[$c->guru_id][$h][$c->jam_ke] = (int) $c->type;
+        }
+    }
+
+    private function isBlocked(int $guruId, string $hari, int $jam): bool
+    {
+        $h = $this->normalizeHari($hari);
+        return isset($this->fastConstraints[$guruId][$h][$jam])
+            && $this->fastConstraints[$guruId][$h][$jam] === 0;
+    }
+
+    private function getBlockPatterns(int $jtm): array
+    {
+        return match ($jtm) {
             1 => [[1]],
             2 => [[2]],
             3 => [[3], [2, 1]],
             4 => [[2, 2]],
             5 => [[3, 2], [2, 2, 1]],
             6 => [[3, 3], [2, 2, 2]],
-            default => [array_fill(0, (int) ceil($remaining / 2), 2)],
+            default => [array_fill(0, (int) ceil($jtm / 2), 2)],
         };
     }
 
-    private function buatJadwalKosong($kelasIds) {
+    private function buildUnits($bebanMengajar): array
+    {
+        $units = [];
+        foreach ($bebanMengajar as $beban) {
+            $slotTemplate = [
+                'beban_mengajar_id' => $beban->id,
+                'guru_id' => $beban->guru_id,
+                'mapel_id' => $beban->mapel_id,
+                'kelas_id' => $beban->kelas_id,
+            ];
+            $units[] = [
+                'bmId' => $beban->id,
+                'guruId' => $beban->guru_id,
+                'kelasId' => $beban->kelas_id,
+                'jtm' => $beban->jtm,
+                'remaining' => $beban->jtm,
+                'slotTemplate' => $slotTemplate,
+                'constraintCount' => count($this->fastConstraints[$beban->guru_id] ?? []),
+            ];
+        }
+        return $units;
+    }
+
+    private function urutkanUnits(array $units, int $seed): array
+    {
+        $copy = $units;
+        usort($copy, function ($a, $b) {
+            if ($a['jtm'] !== $b['jtm']) return $b['jtm'] <=> $a['jtm'];
+            if ($a['constraintCount'] !== $b['constraintCount']) return $b['constraintCount'] <=> $a['constraintCount'];
+            return $a['bmId'] <=> $b['bmId'];
+        });
+
+        if ($seed > 0) {
+            mt_srand($seed * 7919);
+            $chunks = array_chunk($copy, max(1, (int) ceil(count($copy) / 4)));
+            foreach ($chunks as &$chunk) {
+                shuffle($chunk);
+            }
+            $copy = array_merge(...$chunks);
+        }
+        return $copy;
+    }
+
+    private function buatJadwalKosong(array $kelasIds): array
+    {
         $jadwal = [];
         foreach ($this->strukturHari as $hari => $jml) {
             for ($jam = 1; $jam <= $jml; $jam++) {
-                foreach ($kelasIds as $kId) $jadwal[$hari][$jam][$kId] = null;
+                foreach ($kelasIds as $kId) {
+                    $jadwal[$hari][$jam][$kId] = null;
+                }
             }
         }
         return $jadwal;
     }
 
-    private function guruBebasDiBlok($jadwal, $guruId, $hari, $startJam, $size, $kelasId, $kelasIds): bool
+    private function slotPayload(array $template): array
+    {
+        return $template;
+    }
+
+    private function guruBebasDiBlok(array $jadwal, int $guruId, string $hari, int $startJam, int $size, int $kelasId, array $kelasIds): bool
     {
         $maxJam = $this->strukturHari[$hari];
         if ($startJam + $size - 1 > $maxJam) return false;
 
         for ($s = 0; $s < $size; $s++) {
             $jam = $startJam + $s;
-            if (isset($this->fastConstraints[$guruId][$hari][$jam]) &&
-                $this->fastConstraints[$guruId][$hari][$jam] == 0) {
-                return false;
-            }
+            if ($this->isBlocked($guruId, $hari, $jam)) return false;
             foreach ($kelasIds as $kId) {
                 if ($kId == $kelasId) continue;
                 $slot = $jadwal[$hari][$jam][$kId];
@@ -191,200 +250,264 @@ class JadwalSAOService
         return true;
     }
 
-    private function kelasSlotKosong($jadwal, $hari, $startJam, $size, $kelasId): bool
+    private function kelasSlotKosong(array $jadwal, string $hari, int $startJam, int $size, int $kelasId): bool
     {
         $maxJam = $this->strukturHari[$hari];
         if ($startJam + $size - 1 > $maxJam) return false;
         for ($s = 0; $s < $size; $s++) {
-            if ($jadwal[$hari][$startJam + $s][$kelasId] !== null) return false;
-            if (isset($this->lockedSlots[$hari][$startJam + $s][$kelasId])) return false;
+            $jam = $startJam + $s;
+            if ($jadwal[$hari][$jam][$kelasId] !== null) return false;
+            if (isset($this->lockedSlots[$hari][$jam][$kelasId])) return false;
         }
         return true;
     }
 
-    /**
-     * Cari semua posisi blok kosong untuk kelas, diurutkan acak.
-     * @param array $excludeDays Hari yang sudah dipakai (wajib berbeda untuk multi-blok JTM)
-     */
-    private function cariPosisiBlokKosong($jadwal, $size, $kelasId, $kelasIds, $guruId = null, array $excludeDays = []): array
+    private function cariPosisiBlok(array $jadwal, int $size, int $kelasId, array $kelasIds, int $guruId, array $excludeDays = []): array
     {
         $posisi = [];
         $hariArr = array_keys($this->strukturHari);
-        shuffle($hariArr);
 
         foreach ($hariArr as $hari) {
             if (in_array($hari, $excludeDays, true)) continue;
             $maxJam = $this->strukturHari[$hari];
-            $startJams = range(1, $maxJam - $size + 1);
-            shuffle($startJams);
-            foreach ($startJams as $startJam) {
+            for ($startJam = 1; $startJam <= $maxJam - $size + 1; $startJam++) {
                 if (!$this->kelasSlotKosong($jadwal, $hari, $startJam, $size, $kelasId)) continue;
-                if ($guruId !== null && !$this->guruBebasDiBlok($jadwal, $guruId, $hari, $startJam, $size, $kelasId, $kelasIds)) continue;
+                if (!$this->guruBebasDiBlok($jadwal, $guruId, $hari, $startJam, $size, $kelasId, $kelasIds)) continue;
                 $posisi[] = ['hari' => $hari, 'startJam' => $startJam];
             }
         }
         return $posisi;
     }
 
-    private function tempatkanBlok(&$jadwal, &$tugasList, $hari, $startJam, $size): void
+    private function tempatkanBlok(array &$jadwal, array $template, string $hari, int $startJam, int $size): void
+    {
+        $kelasId = $template['kelas_id'];
+        for ($s = 0; $s < $size; $s++) {
+            $jadwal[$hari][$startJam + $s][$kelasId] = $this->slotPayload($template);
+        }
+    }
+
+    private function hapusBlok(array &$jadwal, int $kelasId, string $hari, int $startJam, int $size): void
     {
         for ($s = 0; $s < $size; $s++) {
-            if (!empty($tugasList)) {
-                $kelasId = $tugasList[0]['kelas_id'];
-                $jadwal[$hari][$startJam + $s][$kelasId] = array_shift($tugasList);
+            $jam = $startJam + $s;
+            if (!isset($this->lockedSlots[$hari][$jam][$kelasId])) {
+                $jadwal[$hari][$jam][$kelasId] = null;
             }
         }
     }
 
-    private function sebarkanTugasAcak($jadwal, $slotTugas, $kelasIds, $bebanMap) {
-        $bebanGroups = [];
-        foreach ($slotTugas as $tugas) {
-            $bebanGroups[$tugas['beban_mengajar_id']][] = $tugas;
-        }
+    private function tempatkanPreserve(array &$jadwal, array &$units, array $kelasIds): bool
+    {
+        foreach ($units as &$unit) {
+            $guruId = $unit['guruId'];
+            $kelasId = $unit['kelasId'];
+            $bmId = $unit['bmId'];
 
-        // Preserve constraints
-        foreach ($this->constraints as $guruId => $guruCons) {
-            $preserved = $guruCons->where('type', 1);
-            foreach ($preserved as $con) {
-                foreach ($bebanGroups as $bmId => &$tugasList) {
-                    if (empty($tugasList)) continue;
-                    $first = $tugasList[0];
-                    if ($first['guru_id'] == $guruId && $jadwal[$con->hari][$con->jam_ke][$first['kelas_id']] === null) {
-                        $jadwal[$con->hari][$con->jam_ke][$first['kelas_id']] = array_shift($tugasList);
-                        $this->lockedSlots[$con->hari][$con->jam_ke][$first['kelas_id']] = true;
-                        break;
+            foreach ($this->fastConstraints[$guruId] ?? [] as $hari => $jams) {
+                foreach ($jams as $jam => $type) {
+                    if ($type !== 1) continue;
+                    if ($jadwal[$hari][$jam][$kelasId] !== null) continue;
+                    if ($unit['remaining'] <= 0) continue;
+
+                    if ($this->guruBebasDiBlok($jadwal, $guruId, $hari, $jam, 1, $kelasId, $kelasIds)) {
+                        $jadwal[$hari][$jam][$kelasId] = $this->slotPayload($unit['slotTemplate']);
+                        $this->lockedSlots[$hari][$jam][$kelasId] = true;
+                        $unit['remaining']--;
                     }
                 }
             }
         }
+        unset($unit);
 
-        // Perbaiki blok parsial dari preserve
-        foreach ($bebanGroups as $bmId => &$tugasList) {
-            if (empty($tugasList)) continue;
-            $kelasId = $tugasList[0]['kelas_id'];
-            $guruId = $tugasList[0]['guru_id'];
-            $placedSlots = [];
+        foreach ($units as &$unit) {
+            if ($unit['remaining'] <= 0) continue;
+            $kelasId = $unit['kelasId'];
+            $guruId = $unit['guruId'];
+            $bmId = $unit['bmId'];
+
+            $placed = [];
             foreach ($this->strukturHari as $hari => $jml) {
                 for ($j = 1; $j <= $jml; $j++) {
                     $slot = $jadwal[$hari][$j][$kelasId];
                     if ($slot !== null && $slot['beban_mengajar_id'] == $bmId) {
-                        $placedSlots[] = ['hari' => $hari, 'jam' => $j];
+                        $placed[] = ['hari' => $hari, 'jam' => $j];
                     }
                 }
             }
-            if (!empty($placedSlots) && !empty($tugasList)) {
-                foreach ($placedSlots as $placed) {
-                    $hari = $placed['hari'];
-                    $jam = $placed['jam'];
-                    $maxJam = $this->strukturHari[$hari];
-                    if ($jam + 1 <= $maxJam && $jadwal[$hari][$jam + 1][$kelasId] === null &&
-                        $this->guruBebasDiBlok($jadwal, $guruId, $hari, $jam + 1, 1, $kelasId, $kelasIds)) {
-                        $jadwal[$hari][$jam + 1][$kelasId] = array_shift($tugasList);
-                        if (empty($tugasList)) break;
-                    }
-                    if (!empty($tugasList) && $jam - 1 >= 1 && $jadwal[$hari][$jam - 1][$kelasId] === null &&
-                        $this->guruBebasDiBlok($jadwal, $guruId, $hari, $jam - 1, 1, $kelasId, $kelasIds)) {
-                        $jadwal[$hari][$jam - 1][$kelasId] = array_shift($tugasList);
-                        if (empty($tugasList)) break;
-                    }
+
+            foreach ($placed as $p) {
+                if ($unit['remaining'] <= 0) break;
+                foreach ([1, -1] as $delta) {
+                    $nj = $p['jam'] + $delta;
+                    if ($nj < 1 || $nj > $this->strukturHari[$p['hari']]) continue;
+                    if ($jadwal[$p['hari']][$nj][$kelasId] !== null) continue;
+                    if (!$this->guruBebasDiBlok($jadwal, $guruId, $p['hari'], $nj, 1, $kelasId, $kelasIds)) continue;
+                    $jadwal[$p['hari']][$nj][$kelasId] = $this->slotPayload($unit['slotTemplate']);
+                    $unit['remaining']--;
                 }
             }
         }
-        unset($tugasList);
+        unset($unit);
 
-        // Urutkan: JTM besar dulu, guru dengan banyak constraint dulu
-        $sortedBmIds = array_keys($bebanGroups);
-        usort($sortedBmIds, function ($a, $b) use ($bebanGroups, $bebanMap) {
-            $jtmA = $bebanMap[$a] ?? count($bebanGroups[$a]);
-            $jtmB = $bebanMap[$b] ?? count($bebanGroups[$b]);
-            if ($jtmA !== $jtmB) return $jtmB <=> $jtmA;
-            $consA = count($this->constraints[$bebanGroups[$a][0]['guru_id']] ?? []);
-            $consB = count($this->constraints[$bebanGroups[$b][0]['guru_id']] ?? []);
-            return $consB <=> $consA;
-        });
+        return true;
+    }
 
-        foreach ($sortedBmIds as $bmId) {
-            $tugasList = $bebanGroups[$bmId];
-            if (empty($tugasList)) continue;
-
-            $remaining = count($tugasList);
-            $kelasId = $tugasList[0]['kelas_id'];
-            $guruId = $tugasList[0]['guru_id'];
-            $patterns = $this->getBlockPatterns($remaining);
-            shuffle($patterns);
-
-            $placed = false;
-            foreach ($patterns as $blocks) {
-                $tempJadwal = $jadwal;
-                $tempTugas = $tugasList;
-                $usedDays = [];
-                $allBlocksPlaced = true;
-                $multiDay = count($blocks) > 1;
-
-                foreach ($blocks as $size) {
-                    $posisi = $this->cariPosisiBlokKosong($tempJadwal, $size, $kelasId, $kelasIds, $guruId, $multiDay ? $usedDays : []);
-                    if (empty($posisi)) {
-                        $allBlocksPlaced = false;
-                        break;
-                    }
-                    $pick = $posisi[array_rand($posisi)];
-                    $this->tempatkanBlok($tempJadwal, $tempTugas, $pick['hari'], $pick['startJam'], $size);
-                    $usedDays[] = $pick['hari'];
-                }
-
-                if ($allBlocksPlaced && empty($tempTugas)) {
-                    $jadwal = $tempJadwal;
-                    $tugasList = $tempTugas;
-                    $placed = true;
-                    break;
-                }
-            }
-
-            // Fallback cerdas: coba setiap blok secara individual dengan pencarian sistematis
-            if (!$placed && !empty($tugasList)) {
-                $jtm = $remaining;
-                $fallbackPatterns = $this->getBlockPatterns($jtm);
-                foreach ($fallbackPatterns as $blocks) {
-                    $tempJadwal = $jadwal;
-                    $tempTugas = $tugasList;
-                    $usedDays = [];
-                    $ok = true;
-                    $multiDay = count($blocks) > 1;
-                    foreach ($blocks as $size) {
-                        $posisi = $this->cariPosisiBlokKosong($tempJadwal, $size, $kelasId, $kelasIds, $guruId, $multiDay ? $usedDays : []);
-                        if (empty($posisi)) { $ok = false; break; }
-                        $pick = $posisi[0];
-                        $this->tempatkanBlok($tempJadwal, $tempTugas, $pick['hari'], $pick['startJam'], $size);
-                        $usedDays[] = $pick['hari'];
-                    }
-                    if ($ok && empty($tempTugas)) {
-                        $jadwal = $tempJadwal;
-                        $placed = true;
-                        break;
-                    }
-                }
-            }
-
-            // Fallback terakhir: pecah blok menjadi ukuran 1 tapi tetap cari slot bersebelahan jika memungkinkan
-            if (!$placed && !empty($tugasList)) {
-                while (!empty($tugasList)) {
-                    $posisi = $this->cariPosisiBlokKosong($jadwal, 1, $kelasId, $kelasIds, $guruId);
-                    if (empty($posisi)) {
-                        $posisi = $this->cariPosisiBlokKosong($jadwal, 1, $kelasId, $kelasIds, null);
-                    }
-                    if (empty($posisi)) break;
-                    $pick = $posisi[array_rand($posisi)];
-                    $this->tempatkanBlok($jadwal, $tugasList, $pick['hari'], $pick['startJam'], 1);
+    private function getHariTerpakaiBeban(array $jadwal, array $unit): array
+    {
+        $days = [];
+        foreach ($this->strukturHari as $hari => $jml) {
+            for ($j = 1; $j <= $jml; $j++) {
+                $slot = $jadwal[$hari][$j][$unit['kelasId']];
+                if ($slot !== null && $slot['beban_mengajar_id'] == $unit['bmId']) {
+                    $days[$hari] = true;
                 }
             }
         }
-        return $jadwal;
+        return array_keys($days);
+    }
+
+    private function cariPosisiMelengkapi(array $jadwal, array $unit, array $kelasIds): array
+    {
+        $posisi = [];
+        $kelasId = $unit['kelasId'];
+        $bmId = $unit['bmId'];
+        $byDay = [];
+
+        foreach ($this->strukturHari as $hari => $jml) {
+            for ($j = 1; $j <= $jml; $j++) {
+                $slot = $jadwal[$hari][$j][$kelasId];
+                if ($slot !== null && $slot['beban_mengajar_id'] == $bmId) {
+                    $byDay[$hari][] = $j;
+                }
+            }
+        }
+
+        foreach ($byDay as $hari => $jams) {
+            $minJ = min($jams);
+            $maxJ = max($jams);
+            foreach ([$minJ - 1, $maxJ + 1] as $aj) {
+                if ($aj < 1 || $aj > $this->strukturHari[$hari]) continue;
+                if ($jadwal[$hari][$aj][$kelasId] !== null) continue;
+                if (!$this->guruBebasDiBlok($jadwal, $unit['guruId'], $hari, $aj, 1, $kelasId, $kelasIds)) continue;
+                $posisi[] = ['hari' => $hari, 'startJam' => $aj, 'size' => 1];
+            }
+        }
+        return $posisi;
     }
 
     /**
-     * Temukan semua blok kontigu per beban_mengajar dalam satu kelas.
+     * Cari semua kombinasi penempatan blok valid untuk satu unit.
      */
-    private function temukanBlokMapel($jadwal, $kelasId, $bmId): array
+    private function cariKombinasiPenempatan(array $jadwal, array $unit, array $blocks, array $kelasIds, int $limit = 80, array $fixedExcludeDays = []): array
+    {
+        $hasil = [];
+        $this->cariKombinasiRekursif($jadwal, $unit, $blocks, 0, [], $kelasIds, $hasil, $limit, $fixedExcludeDays);
+        shuffle($hasil);
+        return array_slice($hasil, 0, $limit);
+    }
+
+    private function cariKombinasiRekursif(array $jadwal, array $unit, array $blocks, int $idx, array $usedDays, array $kelasIds, array &$hasil, int $limit, array $fixedExcludeDays = []): void
+    {
+        if (count($hasil) >= $limit) return;
+
+        if ($idx >= count($blocks)) {
+            $hasil[] = $usedDays;
+            return;
+        }
+
+        $size = $blocks[$idx];
+        $multiDay = count($blocks) > 1;
+        $exclude = $multiDay ? array_unique(array_merge($fixedExcludeDays, array_column($usedDays, 'hari'))) : [];
+
+        $posisi = $this->cariPosisiBlok(
+            $jadwal,
+            $size,
+            $unit['kelasId'],
+            $kelasIds,
+            $unit['guruId'],
+            $exclude
+        );
+
+        foreach ($posisi as $pos) {
+            $temp = $jadwal;
+            $this->tempatkanBlok($temp, $unit['slotTemplate'], $pos['hari'], $pos['startJam'], $size);
+            $newUsed = $usedDays;
+            $newUsed[] = ['hari' => $pos['hari'], 'startJam' => $pos['startJam'], 'size' => $size];
+            $this->cariKombinasiRekursif($temp, $unit, $blocks, $idx + 1, $newUsed, $kelasIds, $hasil, $limit, $fixedExcludeDays);
+        }
+    }
+
+    private function syncRemainingUnit(array &$jadwal, array &$unit): void
+    {
+        $placed = $this->hitungSlotBeban($jadwal, $unit['kelasId'], $unit['bmId']);
+        $unit['remaining'] = max(0, $unit['jtm'] - $placed);
+    }
+
+    private function terapkanKombinasi(array &$jadwal, array &$unit, array $kombinasi): void
+    {
+        foreach ($kombinasi as $blok) {
+            $this->tempatkanBlok($jadwal, $unit['slotTemplate'], $blok['hari'], $blok['startJam'], $blok['size']);
+        }
+        $this->syncRemainingUnit($jadwal, $unit);
+    }
+
+    private function batalkanKombinasi(array &$jadwal, array &$unit, array $kombinasi): void
+    {
+        foreach ($kombinasi as $blok) {
+            $this->hapusBlok($jadwal, $unit['kelasId'], $blok['hari'], $blok['startJam'], $blok['size']);
+        }
+        $this->syncRemainingUnit($jadwal, $unit);
+    }
+
+    private function backtrackTempatkan(array &$jadwal, array &$units, int $index, array $kelasIds, int $waktuMulai, int $batasWaktu): bool
+    {
+        if ((time() - $waktuMulai) >= $batasWaktu) return false;
+
+        while ($index < count($units) && $units[$index]['remaining'] <= 0) {
+            $index++;
+        }
+        if ($index >= count($units)) {
+            return $this->hitungHardPenalti($jadwal, $kelasIds, $this->getBebanMap()) === 0;
+        }
+
+        $unit = &$units[$index];
+        $this->syncRemainingUnit($jadwal, $unit);
+        if ($unit['remaining'] <= 0) {
+            return $this->backtrackTempatkan($jadwal, $units, $index + 1, $kelasIds, $waktuMulai, $batasWaktu);
+        }
+
+        $existingDays = $this->getHariTerpakaiBeban($jadwal, $unit);
+
+        // JTM 2/3: lengkapi slot bersebelahan jika sudah ada sebagian
+        if ($unit['remaining'] === 1 && count($existingDays) === 1) {
+            foreach ($this->cariPosisiMelengkapi($jadwal, $unit, $kelasIds) as $pos) {
+                $kombinasi = [$pos];
+                $this->terapkanKombinasi($jadwal, $unit, $kombinasi);
+                if ($this->backtrackTempatkan($jadwal, $units, $index + 1, $kelasIds, $waktuMulai, $batasWaktu)) {
+                    return true;
+                }
+                $this->batalkanKombinasi($jadwal, $unit, $kombinasi);
+            }
+        }
+
+        $patterns = $this->getBlockPatterns($unit['remaining']);
+
+        foreach ($patterns as $blocks) {
+            $kombinasiList = $this->cariKombinasiPenempatan($jadwal, $unit, $blocks, $kelasIds, 80, $existingDays);
+            foreach ($kombinasiList as $kombinasi) {
+                $this->terapkanKombinasi($jadwal, $unit, $kombinasi);
+                if ($this->backtrackTempatkan($jadwal, $units, $index + 1, $kelasIds, $waktuMulai, $batasWaktu)) {
+                    return true;
+                }
+                $this->batalkanKombinasi($jadwal, $unit, $kombinasi);
+            }
+        }
+
+        return false;
+    }
+
+    private function temukanBlokMapel(array $jadwal, int $kelasId, int $bmId): array
     {
         $blok = [];
         foreach ($this->strukturHari as $hari => $jml) {
@@ -394,367 +517,268 @@ class JadwalSAOService
                 if ($slot !== null && $slot['beban_mengajar_id'] == $bmId) {
                     $run[] = $j;
                 } elseif (!empty($run)) {
-                    $blok[] = ['hari' => $hari, 'startJam' => $run[0], 'size' => count($run), 'bmId' => $bmId];
+                    $blok[] = ['hari' => $hari, 'startJam' => $run[0], 'size' => count($run)];
                     $run = [];
                 }
             }
             if (!empty($run)) {
-                $blok[] = ['hari' => $hari, 'startJam' => $run[0], 'size' => count($run), 'bmId' => $bmId];
+                $blok[] = ['hari' => $hari, 'startJam' => $run[0], 'size' => count($run)];
             }
         }
         return $blok;
     }
 
-    private function hapusBlok($jadwal, $kelasId, $hari, $startJam, $size)
+    private function hapusSemuaSlotBeban(array &$jadwal, int $kelasId, int $bmId): array
     {
-        for ($s = 0; $s < $size; $s++) {
-            if (!isset($this->lockedSlots[$hari][$startJam + $s][$kelasId])) {
-                $jadwal[$hari][$startJam + $s][$kelasId] = null;
-            }
-        }
-        return $jadwal;
-    }
-
-    private function pindahkanBlok($jadwal, $kelasId, $kelasIds, $fromHari, $fromStart, $size, $toHari, $toStart): ?array
-    {
-        $slot = $jadwal[$fromHari][$fromStart][$kelasId];
-        if ($slot === null) return null;
-        $guruId = $slot['guru_id'];
-
-        for ($s = 0; $s < $size; $s++) {
-            if (isset($this->lockedSlots[$fromHari][$fromStart + $s][$kelasId])) return null;
-        }
-
-        $isiBlok = [];
-        for ($s = 0; $s < $size; $s++) {
-            $isiBlok[] = $jadwal[$fromHari][$fromStart + $s][$kelasId];
-        }
-
-        $temp = $this->hapusBlok($jadwal, $kelasId, $fromHari, $fromStart, $size);
-
-        if (!$this->kelasSlotKosong($temp, $toHari, $toStart, $size, $kelasId)) return null;
-        if (!$this->guruBebasDiBlok($temp, $guruId, $toHari, $toStart, $size, $kelasId, $kelasIds)) return null;
-
-        for ($s = 0; $s < $size; $s++) {
-            $temp[$toHari][$toStart + $s][$kelasId] = $isiBlok[$s];
-        }
-        return $temp;
-    }
-
-    private function rebalanceGuru($solusi, $kelasIds)
-    {
-        $guruLoad = [];
-        foreach ($this->strukturHari as $hari => $jml) {
-            for ($jam = 1; $jam <= $jml; $jam++) {
-                foreach ($kelasIds as $kId) {
-                    $slot = $solusi[$hari][$jam][$kId];
-                    if ($slot !== null) {
-                        $gid = $slot['guru_id'];
-                        $guruLoad[$gid][$hari] = ($guruLoad[$gid][$hari] ?? 0) + 1;
-                    }
-                }
-            }
-        }
-
-        $overloaded = [];
-        foreach ($guruLoad as $gid => $days) {
-            foreach ($days as $hari => $count) {
-                if ($count >= 8) $overloaded[] = ['guru_id' => $gid, 'hari' => $hari, 'count' => $count];
-            }
-        }
-        if (empty($overloaded)) return $solusi;
-
-        usort($overloaded, fn($a, $b) => $b['count'] <=> $a['count']);
-        $pick = $overloaded[array_rand(array_slice($overloaded, 0, min(5, count($overloaded))))];
-        $guruId = $pick['guru_id'];
-        $fromHari = $pick['hari'];
-
-        $hariArr = array_keys($this->strukturHari);
-        shuffle($hariArr);
-
-        foreach ($hariArr as $toHari) {
-            if ($toHari === $fromHari) continue;
-            if (($guruLoad[$guruId][$toHari] ?? 0) >= 7) continue;
-
-            foreach ($kelasIds as $kId) {
-                $bloks = [];
-                foreach ($this->strukturHari as $h => $jml) {
-                    if ($h !== $fromHari) continue;
-                    $run = [];
-                    $runSlots = [];
-                    for ($j = 1; $j <= $jml; $j++) {
-                        $slot = $solusi[$h][$j][$kId];
-                        if ($slot !== null && $slot['guru_id'] == $guruId) {
-                            $run[] = $j;
-                            $runSlots[] = $slot;
-                        } elseif (!empty($run)) {
-                            $bloks[] = ['startJam' => $run[0], 'size' => count($run)];
-                            $run = [];
-                        }
-                    }
-                    if (!empty($run)) $bloks[] = ['startJam' => $run[0], 'size' => count($run)];
-                }
-
-                foreach ($bloks as $blok) {
-                    $posisi = $this->cariPosisiBlokKosong($solusi, $blok['size'], $kId, $kelasIds, $guruId);
-                    foreach ($posisi as $pos) {
-                        if ($pos['hari'] === $toHari) {
-                            $hasil = $this->pindahkanBlok($solusi, $kId, $kelasIds, $fromHari, $blok['startJam'], $blok['size'], $pos['hari'], $pos['startJam']);
-                            if ($hasil !== null) return $hasil;
-                        }
-                    }
-                }
-            }
-        }
-        return $solusi;
-    }
-
-    private function swapBlokMapel($solusi, $kelasIds)
-    {
-        $kelasAcak = $kelasIds[array_rand($kelasIds)];
-        $bmIds = [];
-        foreach ($this->strukturHari as $hari => $jml) {
-            for ($j = 1; $j <= $jml; $j++) {
-                $slot = $solusi[$hari][$j][$kelasAcak];
-                if ($slot !== null) $bmIds[$slot['beban_mengajar_id']] = true;
-            }
-        }
-        $bmIdList = array_keys($bmIds);
-        if (count($bmIdList) < 1) return $solusi;
-
-        $bmPick = $bmIdList[array_rand($bmIdList)];
-        $bloks = $this->temukanBlokMapel($solusi, $kelasAcak, $bmPick);
-        if (count($bloks) < 1) return $solusi;
-
-        $blok = $bloks[array_rand($bloks)];
-        $guruId = $solusi[$blok['hari']][$blok['startJam']][$kelasAcak]['guru_id'] ?? null;
-        $posisi = $this->cariPosisiBlokKosong($solusi, $blok['size'], $kelasAcak, $kelasIds, $guruId);
-        if (empty($posisi)) return $solusi;
-
-        $pick = $posisi[array_rand($posisi)];
-        if ($pick['hari'] === $blok['hari'] && $pick['startJam'] === $blok['startJam']) return $solusi;
-
-        $hasil = $this->pindahkanBlok($solusi, $kelasAcak, $kelasIds, $blok['hari'], $blok['startJam'], $blok['size'], $pick['hari'], $pick['startJam']);
-        return $hasil ?? $solusi;
-    }
-
-    private function buatTetangga($solusi, $kelasIds) {
-        $roll = mt_rand(1, 100);
-
-        // 15% Rebalance guru overload
-        if ($roll <= 15) {
-            return $this->rebalanceGuru($solusi, $kelasIds);
-        }
-
-        // 25% Pindah blok mapel utuh (JTM-aware)
-        if ($roll <= 40) {
-            return $this->swapBlokMapel($solusi, $kelasIds);
-        }
-
-        $baru = $solusi;
-        $kelasAcak = $kelasIds[array_rand($kelasIds)];
-        $hariArr = array_keys($this->strukturHari);
-
-        // 30% Swap entire days for this class
-        if ($roll <= 70) {
-            $h1 = $hariArr[array_rand($hariArr)];
-            $h2 = $hariArr[array_rand($hariArr)];
-            if ($h1 != $h2) {
-                $max1 = $this->strukturHari[$h1];
-                $max2 = $this->strukturHari[$h2];
-                $max = max($max1, $max2);
-
-                $locked = false;
-                for ($j = 1; $j <= $max; $j++) {
-                    if (isset($this->lockedSlots[$h1][$j][$kelasAcak]) || isset($this->lockedSlots[$h2][$j][$kelasAcak])) {
-                        $locked = true;
-                        break;
-                    }
-                }
-
-                if (!$locked) {
-                    for ($j = 1; $j <= $max; $j++) {
-                        if ($j <= $max1 && $j <= $max2) {
-                            if (isset($baru[$h1][$j][$kelasAcak]) || isset($baru[$h2][$j][$kelasAcak])) {
-                                $t = $baru[$h1][$j][$kelasAcak] ?? null;
-                                $baru[$h1][$j][$kelasAcak] = $baru[$h2][$j][$kelasAcak] ?? null;
-                                $baru[$h2][$j][$kelasAcak] = $t;
-                            }
-                        }
-                    }
-                    return $baru;
-                }
-            }
-        }
-
-        // 30% Standard swap (reduced from 60%)
-        $hari1 = $hariArr[array_rand($hariArr)];
-        $jam1 = mt_rand(1, $this->strukturHari[$hari1]);
-        $hari2 = $hariArr[array_rand($hariArr)];
-        $jam2 = mt_rand(1, $this->strukturHari[$hari2]);
-
-        if (isset($this->lockedSlots[$hari1][$jam1][$kelasAcak]) || isset($this->lockedSlots[$hari2][$jam2][$kelasAcak])) {
-            return $this->swapBlokMapel($solusi, $kelasIds);
-        }
-
-        $temp = $baru[$hari1][$jam1][$kelasAcak];
-        $baru[$hari1][$jam1][$kelasAcak] = $baru[$hari2][$jam2][$kelasAcak];
-        $baru[$hari2][$jam2][$kelasAcak] = $temp;
-        return $baru;
-    }
-
-    /**
-     * Perbaiki satu beban mengajar yang melanggar struktur JTM dengan menempatkan ulang semua slotnya.
-     */
-    private function perbaikiBebanMapel($jadwal, $kelasId, $bmId, $jtm, $kelasIds)
-    {
-        $tugasList = [];
+        $slots = [];
         foreach ($this->strukturHari as $hari => $jml) {
             for ($j = 1; $j <= $jml; $j++) {
                 $slot = $jadwal[$hari][$j][$kelasId];
                 if ($slot !== null && $slot['beban_mengajar_id'] == $bmId) {
                     if (!isset($this->lockedSlots[$hari][$j][$kelasId])) {
-                        $tugasList[] = $slot;
+                        $slots[] = ['hari' => $hari, 'jam' => $j, 'data' => $slot];
                         $jadwal[$hari][$j][$kelasId] = null;
                     }
                 }
             }
         }
-        if (empty($tugasList)) return $jadwal;
-
-        $guruId = $tugasList[0]['guru_id'];
-        $remaining = count($tugasList);
-        $patterns = $this->getBlockPatterns($remaining);
-
-        foreach ($patterns as $blocks) {
-            $temp = $jadwal;
-            $tempTugas = $tugasList;
-            $usedDays = [];
-            $multiDay = count($blocks) > 1;
-            $ok = true;
-
-            foreach ($blocks as $size) {
-                $posisi = $this->cariPosisiBlokKosong($temp, $size, $kelasId, $kelasIds, $guruId, $multiDay ? $usedDays : []);
-                if (empty($posisi)) { $ok = false; break; }
-                $pick = $posisi[array_rand($posisi)];
-                $this->tempatkanBlok($temp, $tempTugas, $pick['hari'], $pick['startJam'], $size);
-                $usedDays[] = $pick['hari'];
-            }
-
-            if ($ok && empty($tempTugas)) return $temp;
-        }
-        return $jadwal;
+        return $slots;
     }
 
-    private function deteksiPelanggarJTM($jadwal, $kelasIds, $bebanMap): array
+    private function perbaikiBebanMapel(array $jadwal, int $kelasId, int $bmId, array $kelasIds): ?array
+    {
+        $meta = $this->bebanMeta[$bmId] ?? null;
+        if (!$meta) return null;
+
+        $unit = [
+            'bmId' => $bmId,
+            'guruId' => $meta['guru_id'],
+            'kelasId' => $meta['kelas_id'],
+            'jtm' => $meta['jtm'],
+            'remaining' => $meta['jtm'],
+            'slotTemplate' => [
+                'beban_mengajar_id' => $bmId,
+                'guru_id' => $meta['guru_id'],
+                'mapel_id' => $meta['mapel_id'],
+                'kelas_id' => $meta['kelas_id'],
+            ],
+        ];
+
+        $temp = $jadwal;
+        $this->hapusSemuaSlotBeban($temp, $kelasId, $bmId);
+
+        $unit['remaining'] = $meta['jtm'] - $this->hitungSlotBeban($temp, $kelasId, $bmId);
+
+        if ($unit['remaining'] <= 0) return $temp;
+
+        foreach ($this->getBlockPatterns($unit['remaining']) as $blocks) {
+            foreach ($this->cariKombinasiPenempatan($temp, $unit, $blocks, $kelasIds, 120) as $kombinasi) {
+                $trial = $temp;
+                $u = $unit;
+                $this->terapkanKombinasi($trial, $u, $kombinasi);
+                if ($this->validasiBeban($trial, $kelasId, $bmId, $meta['jtm'])) {
+                    return $trial;
+                }
+            }
+        }
+        return null;
+    }
+
+    private function hitungSlotBeban(array $jadwal, int $kelasId, int $bmId): int
+    {
+        $n = 0;
+        foreach ($this->strukturHari as $hari => $jml) {
+            for ($j = 1; $j <= $jml; $j++) {
+                $slot = $jadwal[$hari][$j][$kelasId];
+                if ($slot !== null && $slot['beban_mengajar_id'] == $bmId) $n++;
+            }
+        }
+        return $n;
+    }
+
+    private function validasiBeban(array $jadwal, int $kelasId, int $bmId, int $jtm): bool
+    {
+        $days = [];
+        foreach ($this->strukturHari as $hari => $jml) {
+            $jams = [];
+            for ($j = 1; $j <= $jml; $j++) {
+                $slot = $jadwal[$hari][$j][$kelasId];
+                if ($slot !== null && $slot['beban_mengajar_id'] == $bmId) {
+                    $jams[] = $j;
+                }
+            }
+            if (empty($jams)) continue;
+
+            for ($i = 0; $i < count($jams) - 1; $i++) {
+                if ($jams[$i + 1] - $jams[$i] > 1) return false;
+            }
+            $days[] = count($jams);
+        }
+        rsort($days);
+
+        return match ($jtm) {
+            1 => $days === [1],
+            2 => $days === [2],
+            3 => $days === [3] || $days === [2, 1],
+            4 => $days === [2, 2],
+            5 => $days === [3, 2] || $days === [2, 2, 1],
+            6 => $days === [3, 3] || $days === [2, 2, 2],
+            default => true,
+        };
+    }
+
+    private function deteksiPelanggar(array $jadwal, array $kelasIds, array $bebanMap): array
     {
         $pelanggar = [];
         foreach ($kelasIds as $kId) {
-            $mapelDaily = [];
-            $mapelBlocks = [];
-
-            foreach ($this->strukturHari as $hari => $jml) {
-                $lastBMId = null;
-                for ($j = 1; $j <= $jml; $j++) {
-                    $slot = $jadwal[$hari][$j][$kId];
-                    if ($slot !== null) {
-                        $bmId = $slot['beban_mengajar_id'];
-                        if (!isset($mapelDaily[$bmId][$hari])) {
-                            $mapelDaily[$bmId][$hari] = 0;
-                            $mapelBlocks[$bmId][$hari] = 0;
-                        }
-                        $mapelDaily[$bmId][$hari]++;
-                        if ($bmId !== $lastBMId) $mapelBlocks[$bmId][$hari]++;
-                        $lastBMId = $bmId;
-                    } else {
-                        $lastBMId = null;
-                    }
+            foreach ($bebanMap as $bmId => $jtm) {
+                if (($this->bebanMeta[$bmId]['kelas_id'] ?? null) != $kId) continue;
+                if (!$this->validasiBeban($jadwal, $kId, $bmId, $jtm)) {
+                    $pelanggar[] = ['kelasId' => $kId, 'bmId' => $bmId, 'jtm' => $jtm];
                 }
-            }
-
-            foreach ($mapelDaily as $bmId => $days) {
-                $jtm = $bebanMap[$bmId] ?? 0;
-                if ($jtm === 0) continue;
-                $distribution = array_values($days);
-                rsort($distribution);
-                $violation = false;
-
-                foreach ($mapelBlocks[$bmId] as $blocks) {
-                    if ($blocks > 1) { $violation = true; break; }
-                }
-                if (!$violation) {
-                    $valid = match ($jtm) {
-                        1 => $distribution === [1],
-                        2 => $distribution === [2],
-                        3 => $distribution === [3] || $distribution === [2, 1],
-                        4 => $distribution === [2, 2],
-                        5 => $distribution === [3, 2] || $distribution === [2, 2, 1],
-                        6 => $distribution === [3, 3] || $distribution === [2, 2, 2],
-                        default => true,
-                    };
-                    if (!$valid) $violation = true;
-                }
-                if ($violation) $pelanggar[] = ['kelasId' => $kId, 'bmId' => $bmId, 'jtm' => $jtm];
             }
         }
         return $pelanggar;
     }
 
-    /**
-     * Fase perbaikan: coba perbaiki pelanggaran JTM dengan memindahkan blok utuh.
-     */
-    private function perbaikiSolusi($jadwal, $kelasIds, $bebanMap, $waktuMulai, $batasWaktu)
+    private function perbaikiAgresif(array $jadwal, array $kelasIds, array $bebanMap, int $waktuMulai, int $batasWaktu): array
     {
         $terbaik = $jadwal;
-        $biayaTerbaik = $this->hitungHardPenalti($terbaik, $kelasIds, $bebanMap);
-        if ($biayaTerbaik === 0) return $terbaik;
+        $biaya = $this->hitungHardPenalti($terbaik, $kelasIds, $bebanMap);
 
-        // Perbaikan JTM terarah: tempatkan ulang mapel yang melanggar
-        $pelanggar = $this->deteksiPelanggarJTM($terbaik, $kelasIds, $bebanMap);
-        shuffle($pelanggar);
-        foreach ($pelanggar as $p) {
-            if ((time() - $waktuMulai) >= $batasWaktu - 10) break;
-            $kandidat = $this->perbaikiBebanMapel($terbaik, $p['kelasId'], $p['bmId'], $p['jtm'], $kelasIds);
-            $biaya = $this->hitungHardPenalti($kandidat, $kelasIds, $bebanMap);
-            if ($biaya < $biayaTerbaik) {
-                $terbaik = $kandidat;
-                $biayaTerbaik = $biaya;
-            }
-            if ($biayaTerbaik === 0) return $terbaik;
-        }
+        for ($pass = 0; $pass < 5; $pass++) {
+            if ((time() - $waktuMulai) >= $batasWaktu - 3) break;
 
-        $maxPerbaikan = 8000;
-        for ($i = 0; $i < $maxPerbaikan; $i++) {
-            if ($i % 200 === 0 && (time() - $waktuMulai) >= $batasWaktu - 5) break;
-            if ($biayaTerbaik === 0) break;
-
-            $roll = mt_rand(1, 100);
-            if ($roll <= 30) {
-                $pelanggar = $this->deteksiPelanggarJTM($terbaik, $kelasIds, $bebanMap);
-                if (!empty($pelanggar)) {
-                    $p = $pelanggar[array_rand($pelanggar)];
-                    $kandidat = $this->perbaikiBebanMapel($terbaik, $p['kelasId'], $p['bmId'], $p['jtm'], $kelasIds);
-                } else {
-                    $kandidat = $this->swapBlokMapel($terbaik, $kelasIds);
+            $pelanggar = $this->deteksiPelanggar($terbaik, $kelasIds, $bebanMap);
+            shuffle($pelanggar);
+            foreach ($pelanggar as $p) {
+                $kandidat = $this->perbaikiBebanMapel($terbaik, $p['kelasId'], $p['bmId'], $kelasIds);
+                if ($kandidat !== null) {
+                    $b = $this->hitungHardPenalti($kandidat, $kelasIds, $bebanMap);
+                    if ($b <= $biaya) {
+                        $terbaik = $kandidat;
+                        $biaya = $b;
+                    }
                 }
-            } elseif ($roll <= 55) {
-                $kandidat = $this->swapBlokMapel($terbaik, $kelasIds);
-            } elseif ($roll <= 80) {
-                $kandidat = $this->rebalanceGuru($terbaik, $kelasIds);
-            } else {
-                $kandidat = $this->buatTetangga($terbaik, $kelasIds);
+                if ($biaya === 0) return $terbaik;
             }
 
-            $biaya = $this->hitungHardPenalti($kandidat, $kelasIds, $bebanMap);
-            if ($biaya < $biayaTerbaik) {
-                $terbaik = $kandidat;
-                $biayaTerbaik = $biaya;
+            $bentrok = $this->deteksiBentrok($terbaik, $kelasIds);
+            foreach ($bentrok as $b) {
+                $kandidat = $this->perbaikiBebanMapel($terbaik, $b['kelasId'], $b['bmId'], $kelasIds);
+                if ($kandidat !== null) {
+                    $cost = $this->hitungHardPenalti($kandidat, $kelasIds, $bebanMap);
+                    if ($cost < $biaya) {
+                        $terbaik = $kandidat;
+                        $biaya = $cost;
+                    }
+                }
             }
         }
         return $terbaik;
     }
 
-    private function hitungHardPenalti($jadwal, $kelasIds, $bebanMap) {
+    private function deteksiBentrok(array $jadwal, array $kelasIds): array
+    {
+        $out = [];
+        foreach ($this->strukturHari as $hari => $jml) {
+            for ($jam = 1; $jam <= $jml; $jam++) {
+                $seen = [];
+                foreach ($kelasIds as $kId) {
+                    $slot = $jadwal[$hari][$jam][$kId];
+                    if ($slot === null) continue;
+                    $gid = $slot['guru_id'];
+                    if (isset($seen[$gid])) {
+                        $out[] = ['kelasId' => $kId, 'bmId' => $slot['beban_mengajar_id']];
+                    }
+                    $seen[$gid] = true;
+                }
+            }
+        }
+        return $out;
+    }
+
+    private function optimasiKelelahan(array $jadwal, array $kelasIds, array $bebanMap, int $waktuMulai, int $batasWaktu): array
+    {
+        $terbaik = $jadwal;
+        $biaya = $this->hitungHardPenalti($terbaik, $kelasIds, $bebanMap);
+        if ($biaya === 0) return $terbaik;
+
+        for ($i = 0; $i < 3000; $i++) {
+            if ((time() - $waktuMulai) >= $batasWaktu - 2) break;
+            $kandidat = $this->cobaRebalanceSatu($terbaik, $kelasIds);
+            if ($kandidat === null) continue;
+            $b = $this->hitungHardPenalti($kandidat, $kelasIds, $bebanMap);
+            if ($b < $biaya) {
+                $terbaik = $kandidat;
+                $biaya = $b;
+                if ($biaya === 0) return $terbaik;
+            }
+        }
+        return $terbaik;
+    }
+
+    private function cobaRebalanceSatu(array $jadwal, array $kelasIds): ?array
+    {
+        $load = [];
+        foreach ($this->strukturHari as $hari => $jml) {
+            for ($jam = 1; $jam <= $jml; $jam++) {
+                foreach ($kelasIds as $kId) {
+                    $slot = $jadwal[$hari][$jam][$kId];
+                    if ($slot !== null) {
+                        $load[$slot['guru_id']][$hari] = ($load[$slot['guru_id']][$hari] ?? 0) + 1;
+                    }
+                }
+            }
+        }
+
+        $over = [];
+        foreach ($load as $gid => $days) {
+            foreach ($days as $hari => $cnt) {
+                if ($cnt >= 8) $over[] = ['guruId' => $gid, 'hari' => $hari];
+            }
+        }
+        if (empty($over)) return null;
+
+        $pick = $over[array_rand($over)];
+        foreach ($kelasIds as $kId) {
+            $bmIds = [];
+            foreach ($this->strukturHari as $hari => $jml) {
+                if ($hari !== $pick['hari']) continue;
+                for ($j = 1; $j <= $jml; $j++) {
+                    $slot = $jadwal[$hari][$j][$kId];
+                    if ($slot !== null && $slot['guru_id'] == $pick['guruId']) {
+                        $bmIds[$slot['beban_mengajar_id']] = true;
+                    }
+                }
+            }
+            foreach (array_keys($bmIds) as $bmId) {
+                $kandidat = $this->perbaikiBebanMapel($jadwal, $kId, $bmId, $kelasIds);
+                if ($kandidat !== null) return $kandidat;
+            }
+        }
+        return null;
+    }
+
+    private function ringkasPelanggaran(array $jadwal, array $kelasIds, array $bebanMap): string
+    {
+        $p = $this->hitungHardPenalti($jadwal, $kelasIds, $bebanMap);
+        $jtm = count($this->deteksiPelanggar($jadwal, $kelasIds, $bebanMap));
+        $bentrok = count($this->deteksiBentrok($jadwal, $kelasIds));
+        return "penalti {$p} (JTM: {$jtm}, bentrok: {$bentrok})";
+    }
+
+    private function getBebanMap(): array
+    {
+        $map = [];
+        foreach ($this->bebanMeta as $id => $meta) {
+            $map[$id] = $meta['jtm'];
+        }
+        return $map;
+    }
+
+    private function hitungHardPenalti(array $jadwal, array $kelasIds, array $bebanMap): int
+    {
         $penalti = 0;
         $guruDailyLoad = [];
 
@@ -763,83 +787,31 @@ class JadwalSAOService
                 $guruHadirJamIni = [];
                 foreach ($kelasIds as $kId) {
                     $slot = $jadwal[$hari][$jam][$kId];
-                    if ($slot !== null) {
-                        $guruId = $slot['guru_id'];
+                    if ($slot === null) continue;
 
-                        if ($hari === 'Jumat' && $jam > 5) $penalti += 2000000;
+                    $guruId = $slot['guru_id'];
+                    if ($hari === 'Jumat' && $jam > 5) $penalti += 2000000;
 
-                        if (!isset($guruDailyLoad[$guruId][$hari])) $guruDailyLoad[$guruId][$hari] = 0;
-                        $guruDailyLoad[$guruId][$hari]++;
+                    $guruDailyLoad[$guruId][$hari] = ($guruDailyLoad[$guruId][$hari] ?? 0) + 1;
 
-                        if (isset($guruHadirJamIni[$guruId])) $penalti += 1000000;
-                        else $guruHadirJamIni[$guruId] = true;
+                    if (isset($guruHadirJamIni[$guruId])) $penalti += 1000000;
+                    else $guruHadirJamIni[$guruId] = true;
 
-                        if (isset($this->fastConstraints[$guruId][$hari][$jam])) {
-                            if ($this->fastConstraints[$guruId][$hari][$jam] == 0) {
-                                $penalti += 1000000;
-                            }
-                        }
-                    }
+                    if ($this->isBlocked($guruId, $hari, $jam)) $penalti += 1000000;
                 }
             }
         }
 
         foreach ($kelasIds as $kId) {
-            $mapelDaily = [];
-            $mapelBlocks = [];
-
-            foreach ($this->strukturHari as $hari => $jml) {
-                $lastBMId = null;
-                for ($j = 1; $j <= $jml; $j++) {
-                    $slot = $jadwal[$hari][$j][$kId];
-                    if ($slot !== null) {
-                        $bmId = $slot['beban_mengajar_id'];
-                        if (!isset($mapelDaily[$bmId][$hari])) {
-                            $mapelDaily[$bmId][$hari] = 0;
-                            $mapelBlocks[$bmId][$hari] = 0;
-                        }
-                        $mapelDaily[$bmId][$hari]++;
-
-                        if ($bmId !== $lastBMId) $mapelBlocks[$bmId][$hari]++;
-                        $lastBMId = $bmId;
-                    } else {
-                        $lastBMId = null;
-                    }
-                }
-            }
-
-            foreach ($mapelDaily as $bmId => $days) {
-                $jtm = $bebanMap[$bmId] ?? 0;
-                if ($jtm === 0) continue;
-                $distribution = array_values($days);
-                rsort($distribution);
-
-                foreach ($mapelBlocks[$bmId] as $hari => $blocks) {
-                    if ($blocks > 1) $penalti += 1000000;
-                }
-
-                if ($jtm == 1) {
-                    if ($distribution !== [1]) $penalti += 1000000;
-                } elseif ($jtm == 2) {
-                    if ($distribution !== [2]) $penalti += 1000000;
-                } elseif ($jtm == 3) {
-                    if ($distribution !== [3] && $distribution !== [2, 1]) $penalti += 1000000;
-                } elseif ($jtm == 4) {
-                    if ($distribution !== [2, 2]) $penalti += 1000000;
-                } elseif ($jtm == 5) {
-                    if ($distribution !== [3, 2] && $distribution !== [2, 2, 1]) $penalti += 1000000;
-                } elseif ($jtm == 6) {
-                    if ($distribution !== [3, 3] && $distribution !== [2, 2, 2]) $penalti += 1000000;
-                }
+            foreach ($bebanMap as $bmId => $jtm) {
+                if (($this->bebanMeta[$bmId]['kelas_id'] ?? null) != $kId) continue;
+                if (!$this->validasiBeban($jadwal, $kId, $bmId, $jtm)) $penalti += 1000000;
             }
         }
 
-        // Fatigue: penalty setara hard constraint, skala progresif
-        foreach ($guruDailyLoad as $guruId => $days) {
-            foreach ($days as $hari => $count) {
-                if ($count >= 8) {
-                    $penalti += 1000000 + (($count - 8) * 200000);
-                }
+        foreach ($guruDailyLoad as $days) {
+            foreach ($days as $count) {
+                if ($count >= 8) $penalti += 1000000 + (($count - 8) * 200000);
             }
         }
 
