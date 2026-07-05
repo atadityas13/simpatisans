@@ -12,9 +12,9 @@ use Illuminate\Support\Facades\Log;
 class JadwalSAOService
 {
     private $strukturHari = ['Senin' => 9, 'Selasa' => 10, 'Rabu' => 10, 'Kamis' => 10, 'Jumat' => 5];
-    private $maxIterasi = 100000;
-    private $suhuAwal = 1000.0;
-    private $coolingRate = 0.9995;
+    private $maxIterasi = 400000;
+    private $suhuAwal = 2000000.0;
+    private $coolingRate = 0.99995;
     private $constraints = [];
     private $fastConstraints = []; // Fast lookup [guru_id][hari][jam_ke] = type
     private $lockedSlots = []; // [Hari][Jam][KelasId] = true;
