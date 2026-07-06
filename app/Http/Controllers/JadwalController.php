@@ -242,17 +242,17 @@ class JadwalController extends Controller
                 $belum = count($analisa['belum_terisi'] ?? []);
                 $msg = "<b>Jadwal disimpan sebagian.</b><br>Jam Terisi: {$terisi}/{$target} ({$kosong} slot kosong, {$belum} mapel belum penuh)<br>Masalah analisa: {$totalWarnings}";
                 if ($presetViolations > 0) {
-                    $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — penanda saja, sesuaikan manual di Laporan Analisa.";
+                    $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — penanda saja, sesuaikan manual.";
                 }
-                $msg .= '<br><small>Prioritas: semua mapel teralokasi. Periksa mapel belum terisi di Laporan Analisa — mungkin beban guru melebihi kapasitas (max 7 jam/hari).</small>';
+                $msg .= '<br><small>Generate: hanya bentrok guru/kelas + BTQ Jumat jam 5. Preset, JTM, kelelahan → Laporan Analisa.</small>';
                 return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('error', $msg);
             }
 
-            $msg = "<b>Penjadwalan Otomatis Selesai!</b><br>Jam Terisi: {$terisi}/{$target}<br>Masalah: {$totalWarnings}";
+            $msg = "<b>Penjadwalan Otomatis Selesai!</b><br>Jam Terisi: {$terisi}/{$target}<br>Masalah analisa: {$totalWarnings}";
             if ($presetViolations > 0) {
-                $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — penanda saja, sesuaikan manual (Laporan Analisa).";
+                $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — sesuaikan manual bila perlu.";
             } elseif ($totalWarnings > 0) {
-                $msg .= '<br><small>Beberapa aturan belum sempurna — periksa Laporan Analisa.</small>';
+                $msg .= '<br><small>Semua slot terisi. Periksa struktur JTM / kelelahan di Laporan Analisa.</small>';
             }
 
             return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('success', $msg);
