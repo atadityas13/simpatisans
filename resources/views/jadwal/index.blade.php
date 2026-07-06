@@ -17,10 +17,10 @@
         <div class="print:hidden mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm gap-4">
             <div class="flex-1">
                 <div class="flex items-center gap-2">
-                    <h2 class="text-xl font-black text-indigo-900 tracking-tighter uppercase">MATRIKS JADWAL GURU</h2>
+                    <h2 class="text-xl font-black text-indigo-900 tracking-tighter uppercase">MANAJEMEN JADWAL</h2>
                 </div>
                 <p class="text-[10px] text-gray-500 font-bold mt-0.5">
-                    Menampilkan tabel pemetaan dan analisa jadwal mengajar guru.
+                    Input manual per kelas, guru, atau hari — ketik KG, pilih mapel, atau cari autocomplete.
                 </p>
             </div>
             
@@ -552,6 +552,8 @@
             </div>
         </div>
 
+        @include('jadwal.partials.manual-editor')
+
         @if($selectedSemester->is_active)
             <div class="flex justify-start mb-1.5 px-0.5">
                 <form action="{{ route('jadwal.clear') }}" method="POST" 
@@ -569,6 +571,7 @@
             </div>
         @endif
 
+        <div x-show="viewMode === 'matrix'" x-cloak>
         <div
             class="bg-white rounded shadow-xl border border-gray-800 overflow-hidden print:border-0 print:shadow-none mb-10 overflow-x-auto">
             <table class="w-full text-[9px] border-collapse table-fixed min-w-[900px] print:min-w-0 print:w-full">
@@ -782,40 +785,28 @@
                 </tbody>
             </table>
 
-            <!-- Floating Editor Overlay -->
-            <template x-if="editing">
-                <div x-show="editing" x-cloak @click.away="save()"
-                    class="absolute z-50 shadow-2xl bg-white border-2 border-indigo-600 rounded-md"
-                    :style="`left: ${editing.x - 2}px; top: ${editing.y - 2}px; width: ${editing.w + 4}px; min-width: 150px;`">
-                    <input type="text" x-ref="kgInput" x-model="editing.kg" @input.debounce.100ms="search"
-                        @keydown.enter.prevent="save()" @keydown.escape="editing = null"
-                        class="w-full p-2 text-xs font-bold border-none focus:ring-0 uppercase placeholder-gray-400"
-                        placeholder="Ketik KG...">
-
-                    <div x-show="searchResults.length > 0"
-                        class="absolute left-0 w-full bg-white border border-gray-200 mt-1 rounded shadow-lg max-h-48 overflow-y-auto">
-                        <template x-for="(item, index) in searchResults" :key="item.id">
-                            <div @click="save(item.id)"
-                                class="p-2 hover:bg-indigo-50 border-b border-gray-50 cursor-pointer"
-                                :class="index === highlightedIndex ? 'bg-indigo-50' : ''">
-                                <div class="font-bold text-indigo-700 text-[10px]"
-                                    x-text="`[${item.kg}]` + ' ' + item.mapel"></div>
-                                <div class="text-[9px] text-gray-500" x-text="item.guru"></div>
-                            </div>
-                        </template>
-                    </div>
-                    <div x-show="editing.kg && searchResults.length === 0"
-                        class="p-2 text-[9px] text-red-500 bg-red-50 italic border-t border-red-100">
-                        KG tidak ditemukan untuk kelas ini!
-                    </div>
-                </div>
-            </template>
-
+        </div>
+        </div>
 
             <script>
                 document.addEventListener('alpine:init', () => {
                     Alpine.data('scheduler', () => ({
-                        editing: null,
+                        viewMode: 'kelas',
+                        showEditorModal: false,
+                        editor: null,
+                        editorInputMode: 'kg',
+                        editorSearchQuery: '',
+                        slotData: @json($slotData ?? []),
+                        strukturHari: @json($strukturHari ?? []),
+                        jamLabels: @json($jamLabels ?? []),
+                        kelasFlat: @json($kelasFlat ?? []),
+                        guruList: @json($guruList ?? []),
+                        days: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'],
+                        selectedKelasId: @json(collect($kelasFlat ?? [])->pluck('id')->first()),
+                        selectedGuruIdView: @json(collect($guruList ?? [])->pluck('id')->first()),
+                        selectedHariView: 'Senin',
+                        strukturHariTotal: {{ array_sum($strukturHari ?? []) }},
+                        lastEditing: null,
                         showAnalysis: false,
                         showConstraintModal: false,
                         // MODAL LOADING STATE (V2.6)
@@ -844,9 +835,265 @@
                         isSelecting: false,
                         selectionType: null, // 0: block, 1: preserve, 2: reset
                         constraints: @json($constraints),
-                        bebanData: @json($bebanPerKelas),
+                        bebanData: @json($bebanPerKelas ?? []),
                         searchResults: [],
                         highlightedIndex: 0,
+
+                        getSlot(hari, jam, kelasId) {
+                            return this.slotData?.[hari]?.[jam]?.[kelasId] ?? null;
+                        },
+
+                        getJamLabel(hari, jam) {
+                            if (hari === 'Senin') return this.jamLabels['Senin']?.[jam] ?? '';
+                            if (hari === 'Jumat') return this.jamLabels['Jumat']?.[jam] ?? '';
+                            return this.jamLabels['Selasa-Kamis']?.[jam] ?? '';
+                        },
+
+                        jamRange(hari) {
+                            const n = this.strukturHari[hari] || 0;
+                            return Array.from({ length: n }, (_, i) => i + 1);
+                        },
+
+                        kelasName(kelasId) {
+                            const k = this.kelasFlat.find(c => c.id == kelasId);
+                            return k ? k.nama : kelasId;
+                        },
+
+                        kelasFilledCount(kelasId) {
+                            let c = 0;
+                            for (const h of this.days) {
+                                for (const j of this.jamRange(h)) {
+                                    if (this.getSlot(h, j, kelasId)) c++;
+                                }
+                            }
+                            return c;
+                        },
+
+                        hariFilledCount(hari) {
+                            let c = 0;
+                            for (const k of this.kelasFlat) {
+                                for (const j of this.jamRange(hari)) {
+                                    if (this.getSlot(hari, j, k.id)) c++;
+                                }
+                            }
+                            return c;
+                        },
+
+                        incompleteBebanForKelas(kelasId) {
+                            return (this.bebanData[kelasId] || []).filter(b => b.placed < b.jtm);
+                        },
+
+                        bebanListForGuruIncomplete(guruId) {
+                            const out = [];
+                            for (const kelasId in this.bebanData) {
+                                for (const b of this.bebanData[kelasId]) {
+                                    if (b.guru_id == guruId && b.placed < b.jtm) out.push(b);
+                                }
+                            }
+                            return out;
+                        },
+
+                        guruPlacedCount(guruId) {
+                            let c = 0;
+                            for (const kelasId in this.bebanData) {
+                                for (const b of this.bebanData[kelasId]) {
+                                    if (b.guru_id == guruId) c += b.placed;
+                                }
+                            }
+                            return c;
+                        },
+
+                        guruJtmTotal(guruId) {
+                            let t = 0;
+                            for (const kelasId in this.bebanData) {
+                                for (const b of this.bebanData[kelasId]) {
+                                    if (b.guru_id == guruId) t += b.jtm;
+                                }
+                            }
+                            return t;
+                        },
+
+                        findGuruSlot(guruId, hari, jam) {
+                            const row = this.slotData?.[hari]?.[jam] || {};
+                            for (const kelasId in row) {
+                                const s = row[kelasId];
+                                if (s && s.guru_id == guruId) {
+                                    return { ...s, kelas_id: parseInt(kelasId) };
+                                }
+                            }
+                            return null;
+                        },
+
+                        hasConstraintForGuru(guruId, hari, jam, type) {
+                            if (!guruId || !this.constraints[guruId]) return false;
+                            return (this.constraints[guruId] || []).some(c => c.hari == hari && c.jam_ke == jam && c.type == type);
+                        },
+
+                        bebanListForEditor() {
+                            if (this.editor?.fromGuru) {
+                                return this.bebanListForGuruIncomplete(this.editor.guruId);
+                            }
+                            return this.bebanData[this.editor?.kelasId] || [];
+                        },
+
+                        openEditor(hari, jam, kelasId, slot = null) {
+                            if (!this.is_active) return;
+                            const s = slot || this.getSlot(hari, jam, kelasId);
+                            this.editor = {
+                                hari, jam, kelasId,
+                                kg: s?.kg || '',
+                                bebanId: s?.beban_id || null,
+                                fromGuru: false,
+                                guruId: null,
+                            };
+                            this.editorInputMode = 'kg';
+                            this.editorSearchQuery = '';
+                            this.showEditorModal = true;
+                            this.searchEditor();
+                            this.$nextTick(() => this.$refs.editorKgInput?.focus());
+                        },
+
+                        openEditorFromGuru(hari, jam) {
+                            if (!this.is_active) return;
+                            const slot = this.findGuruSlot(this.selectedGuruIdView, hari, jam);
+                            if (slot) {
+                                this.openEditor(hari, jam, slot.kelas_id, slot);
+                                return;
+                            }
+                            this.editor = {
+                                hari, jam, kelasId: null,
+                                kg: '', bebanId: null,
+                                fromGuru: true,
+                                guruId: this.selectedGuruIdView,
+                            };
+                            this.editorInputMode = 'mapel';
+                            this.editorSearchQuery = '';
+                            this.showEditorModal = true;
+                        },
+
+                        closeEditor() {
+                            this.showEditorModal = false;
+                            this.editor = null;
+                            this.searchResults = [];
+                        },
+
+                        onBebanSelect() {
+                            const b = this.bebanListForEditor().find(x => x.id == this.editor.bebanId);
+                            if (b) {
+                                this.editor.kg = b.kg;
+                                this.editor.kelasId = b.kelas_id;
+                            }
+                        },
+
+                        pickSearchResult(item) {
+                            this.editor.bebanId = item.id;
+                            this.editor.kg = item.kg;
+                            this.editor.kelasId = item.kelas_id;
+                            this.saveFromEditor();
+                        },
+
+                        searchEditor() {
+                            if (!this.editor) return;
+                            const query = (this.editorInputMode === 'cari' ? this.editorSearchQuery : this.editor.kg).toLowerCase();
+                            const list = this.bebanListForEditor();
+                            this.searchResults = list.filter(b =>
+                                b.kg.toLowerCase().includes(query) ||
+                                b.mapel.toLowerCase().includes(query) ||
+                                b.guru.toLowerCase().includes(query)
+                            );
+                            this.highlightedIndex = 0;
+                        },
+
+                        clearSlot() {
+                            if (!this.editor) return;
+                            this.editor.kg = '';
+                            this.editor.bebanId = null;
+                            this.saveFromEditor();
+                        },
+
+                        saveFromEditor(force = false) {
+                            if (!this.editor && !force) return;
+
+                            let bebanId = this.editor?.bebanId || null;
+                            const kelasId = this.editor?.kelasId;
+
+                            if (!force && !bebanId && this.editor?.kg) {
+                                const match = this.bebanListForEditor().find(b => b.kg.toLowerCase() === this.editor.kg.toLowerCase());
+                                if (match) {
+                                    bebanId = match.id;
+                                    this.editor.kelasId = match.kelas_id;
+                                } else if (this.editor.kg.trim()) {
+                                    Swal.fire({ icon: 'warning', title: 'KG tidak ditemukan', text: 'Periksa kode guru atau pilih dari dropdown mapel.', confirmButtonColor: '#4f46e5' });
+                                    return;
+                                }
+                            }
+
+                            if (!kelasId && bebanId) {
+                                const b = this.bebanListForEditor().find(x => x.id == bebanId);
+                                if (b) this.editor.kelasId = b.kelas_id;
+                            }
+
+                            this.lastEditing = {
+                                hari: this.editor.hari,
+                                jam: this.editor.jam,
+                                kelasId: this.editor.kelasId,
+                            };
+
+                            this.postSlotUpdate(this.editor.hari, this.editor.jam, this.editor.kelasId, bebanId, force);
+                            this.closeEditor();
+                        },
+
+                        postSlotUpdate(hari, jam, kelasId, bebanId, force = false) {
+                            const payload = {
+                                hari, jam_ke: jam, kelas_id: kelasId,
+                                beban_mengajar_id: bebanId,
+                                semester_id: this.semester_id,
+                                force: force ? 1 : 0,
+                                _token: '{{ csrf_token() }}'
+                            };
+
+                            fetch('{{ route('jadwal.update-slot') }}', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                                body: JSON.stringify(payload)
+                            })
+                                .then(async res => {
+                                    const data = await res.json();
+                                    if (res.ok && data.success) {
+                                        location.reload();
+                                    } else if (data.has_conflict) {
+                                        Swal.fire({
+                                            icon: 'warning',
+                                            title: 'Guru Bentrok!',
+                                            html: `<div class="text-sm border-l-4 border-amber-500 pl-3 bg-amber-50 py-2 text-amber-800 text-left font-bold">${data.message}</div><p class="text-xs text-gray-500 mt-3 italic">*Apakah Anda ingin tetap menyimpan jadwal ini?</p>`,
+                                            showCancelButton: true,
+                                            confirmButtonColor: '#4f46e5',
+                                            cancelButtonColor: '#6b7280',
+                                            confirmButtonText: 'Lanjutkan Simpan',
+                                            cancelButtonText: 'Batalkan',
+                                        }).then((result) => {
+                                            if (result.isConfirmed) {
+                                                this.postSlotUpdate(hari, jam, kelasId, bebanId, true);
+                                            }
+                                        });
+                                    } else {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Gagal Simpan',
+                                            text: data.message || 'Gagal menyimpan jadwal.',
+                                            confirmButtonColor: '#4f46e5',
+                                        });
+                                    }
+                                })
+                                .catch(() => {
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Koneksi Terputus',
+                                        text: 'Gagal koneksi ke server.',
+                                        confirmButtonColor: '#4f46e5',
+                                    });
+                                });
+                        },
 
                         hasConstraint(hari, jam, type) {
                             if (!this.selectedGuruId || !this.constraints[this.selectedGuruId]) return false;
@@ -910,122 +1157,18 @@
                         },
 
                         editCell(hari, jam, kelasId, currentKg, event) {
-                            // Calculate absolute position relative to the container
-                            const container = event.target.closest('[x-data="scheduler"]');
-                            const containerRect = container.getBoundingClientRect();
-                            const rect = event.target.getBoundingClientRect();
-
-                            this.editing = {
-                                hari, jam, kelasId,
-                                kg: currentKg || '',
-                                x: rect.left - containerRect.left,
-                                y: rect.top - containerRect.top,
-                                w: rect.width,
-                                h: rect.height
-                            };
-                            this.search();
-                            this.$nextTick(() => this.$refs.kgInput.focus());
+                            const slot = this.getSlot(hari, jam, kelasId);
+                            this.openEditor(hari, jam, kelasId, slot || (currentKg ? { kg: currentKg, beban_id: null } : null));
                         },
 
                         search() {
-                            if (!this.editing) return;
-                            const query = this.editing.kg.toLowerCase();
-                            const list = this.bebanData[this.editing.kelasId] || [];
-                            this.searchResults = list.filter(b =>
-                                b.kg.toLowerCase().includes(query) ||
-                                b.mapel.toLowerCase().includes(query) ||
-                                b.guru.toLowerCase().includes(query)
-                            );
-                            this.highlightedIndex = 0;
+                            this.searchEditor();
                         },
 
                         save(bebanId = null, force = false) {
-                            if (!this.editing && !force) return;
-
-                            // Jika ini pemanggilan pertama (bukan force), cari bebanId jika perlu
-                            if (!force && bebanId === null) {
-                                if (!this.editing.kg) {
-                                    // Empty KG means Clear Slot
-                                } else {
-                                    const match = (this.bebanData[this.editing.kelasId] || []).find(b => b.kg.toLowerCase() === this.editing.kg.toLowerCase());
-                                    if (match) bebanId = match.id;
-                                    else {
-                                        this.editing = null;
-                                        return;
-                                    }
-                                }
+                            if (force && this.lastEditing) {
+                                this.postSlotUpdate(this.lastEditing.hari, this.lastEditing.jam, this.lastEditing.kelasId, bebanId, true);
                             }
-
-                            // Tangkap data dari editing sebelum dihapus
-                            const hari = force ? this.lastEditing?.hari : this.editing.hari;
-                            const jam = force ? this.lastEditing?.jam : this.editing.jam;
-                            const kelasId = force ? this.lastEditing?.kelasId : this.editing.kelasId;
-                            
-                            // Simpan context terakhir untuk jaga-jaga rekursif
-                            if (!force) {
-                                this.lastEditing = { hari, jam, kelasId };
-                            }
-
-                            const payload = {
-                                hari: hari,
-                                jam_ke: jam,
-                                kelas_id: kelasId,
-                                beban_mengajar_id: bebanId,
-                                semester_id: this.semester_id,
-                                force: force ? 1 : 0,
-                                _token: '{{ csrf_token() }}'
-                            };
-
-                            // Tutup UI editor segera untuk feedback yang responsif
-                            this.editing = null;
-
-                            fetch('{{ route('jadwal.update-slot') }}', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                                body: JSON.stringify(payload)
-                            })
-                                .then(async res => {
-                                    const data = await res.json();
-                                    if (res.ok && data.success) {
-                                        location.reload(); 
-                                    } else if (data.has_conflict) {
-                                        Swal.fire({
-                                            icon: 'warning',
-                                            title: 'Guru Bentrok!',
-                                            html: `<div class="text-sm border-l-4 border-amber-500 pl-3 bg-amber-50 py-2 text-amber-800 text-left font-bold">${data.message}</div><p class="text-xs text-gray-500 mt-3 italic">*Apakah Anda ingin tetap menyimpan jadwal ini?</p>`,
-                                            showCancelButton: true,
-                                            confirmButtonColor: '#4f46e5',
-                                            cancelButtonColor: '#6b7280',
-                                            confirmButtonText: 'Lanjutkan Simpan',
-                                            cancelButtonText: 'Batalkan',
-                                            customClass: {
-                                                popup: 'rounded-2xl',
-                                                title: 'text-amber-900 font-black',
-                                                confirmButton: 'rounded-lg text-xs uppercase font-bold tracking-widest',
-                                                cancelButton: 'rounded-lg text-xs uppercase font-bold tracking-widest'
-                                            }
-                                        }).then((result) => {
-                                            if (result.isConfirmed) {
-                                                this.save(bebanId, true);
-                                            }
-                                        });
-                                    } else {
-                                        Swal.fire({
-                                            icon: 'error',
-                                            title: 'Gagal Simpan',
-                                            text: data.message || 'Gagal menyimpan jadwal.',
-                                            confirmButtonColor: '#4f46e5',
-                                        });
-                                    }
-                                })
-                                .catch(err => {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Koneksi Terputus',
-                                        text: 'Gagal koneksi ke server. Periksa jaringan Anda.',
-                                        confirmButtonColor: '#4f46e5',
-                                    });
-                                });
                         }
                     }));
                 });
@@ -1099,5 +1242,6 @@
                     }
                 }
             </style>
+    </div>
     @endif
 @endsection

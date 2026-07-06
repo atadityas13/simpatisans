@@ -92,24 +92,57 @@ class JadwalController extends Controller
         ];
 
         // Ambil data beban mengajar per kelas UNTUK SEMESTER TERPILIH
+        $bebanCounts = $jadwals->groupBy('beban_mengajar_id')->map->count();
         $bebanPerKelas = BebanMengajar::where('semester_id', $semesterId)
             ->where('is_satminkal', 1)
-            ->with(['guru', 'mapel'])
+            ->with(['guru', 'mapel', 'kelas'])
             ->get()
-            ->map(function ($b) {
+            ->map(function ($b) use ($bebanCounts) {
                 return [
                     'id' => $b->id,
                     'kelas_id' => $b->kelas_id,
+                    'guru_id' => $b->guru_id,
                     'kg' => $b->guru->kode_guru,
                     'guru' => $b->guru->nama_guru,
-                    'mapel' => $b->mapel->nama_mapel
+                    'mapel' => $b->mapel->nama_mapel,
+                    'jtm' => (int) $b->jtm,
+                    'placed' => (int) ($bebanCounts->get($b->id, 0)),
                 ];
             })
             ->groupBy('kelas_id');
 
+        $slotData = [];
+        foreach ($jadwals as $j) {
+            if (!$j->bebanMengajar) {
+                continue;
+            }
+            $h = ucfirst(strtolower(trim($j->hari)));
+            $slotData[$h][$j->jam_ke][$j->bebanMengajar->kelas_id] = [
+                'beban_id' => $j->beban_mengajar_id,
+                'kg' => $j->bebanMengajar->guru->kode_guru,
+                'guru_id' => $j->bebanMengajar->guru_id,
+                'guru' => $j->bebanMengajar->guru->nama_guru,
+                'mapel' => $j->bebanMengajar->mapel->nama_mapel,
+                'kelas_id' => $j->bebanMengajar->kelas_id,
+                'kelas' => $j->bebanMengajar->kelas->nama_kelas,
+            ];
+        }
+
+        $kelasFlat = $kelasList->flatten()->map(fn ($k) => [
+            'id' => $k->id,
+            'nama' => $k->nama_kelas,
+            'tingkat' => $k->tingkat,
+        ])->values();
+
         // DATA GURU & CONSTRAINTS
         $gurus = Guru::orderBy('nama_guru')->get();
         $constraints = GuruConstraint::get()->groupBy('guru_id');
+
+        $guruList = $gurus->map(fn ($g) => [
+            'id' => $g->id,
+            'kode' => $g->kode_guru,
+            'nama' => $g->nama_guru,
+        ])->values();
 
         // LOGIKA ANALISA JADWAL (DELEGATED TO SERVICE)
         $analisa = $this->jadwalService->analisaPenuh($semesterId);
@@ -118,7 +151,7 @@ class JadwalController extends Controller
         $hasWarnings = $totalWarnings > 0;
         $hasCriticalWarnings = $criticalWarnings > 0;
 
-        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
+        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'slotData', 'kelasFlat', 'guruList', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
     }
 
     public function toggleConstraint(Request $request)
