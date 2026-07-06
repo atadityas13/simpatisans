@@ -1089,7 +1089,7 @@
 
                         async submitSlots(slots, force = false) {
                             try {
-                                const res = await fetch('{{ route('jadwal.update-slots-batch') }}', {
+                                const res = await fetch('{{ url('jadwal/update-slots-batch') }}', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                                     body: JSON.stringify({
