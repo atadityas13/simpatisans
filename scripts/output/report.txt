@@ -1,0 +1,3 @@
+Terisi: 792/792
+File: D:\BACKUP HOSTING\Source\sipasti\simpatisans/scripts/output/jadwal_semester_1.sql
+Status: SUKSES — siap import ke database
