@@ -50,6 +50,7 @@ Route::group(['middleware' => 'auth'], function () {
             Route::get('jadwal', [JadwalController::class, 'index'])->name('jadwal.index');
             Route::post('jadwal/generate', [JadwalController::class, 'generate'])->name('jadwal.generate');
             Route::post('jadwal/update-slot', [JadwalController::class, 'updateSlot'])->name('jadwal.update-slot');
+            Route::post('jadwal/update-slots-batch', [JadwalController::class, 'updateSlotsBatch'])->name('jadwal.update-slots-batch');
             Route::delete('jadwal/clear', [JadwalController::class, 'clear'])->name('jadwal.clear');
             Route::post('jadwal/toggle-constraint', [JadwalController::class, 'toggleConstraint'])->name('jadwal.toggle-constraint');
 

@@ -254,6 +254,239 @@ class JadwalService
         return $analisa;
     }
 
+    /**
+     * Validasi penempatan slot (batch) — mirror aturan analisa.
+     *
+     * @param  array<int, array{hari: string, jam_ke: int, kelas_id: int, beban_mengajar_id: int}>  $placements
+     * @return array{warnings: array<int, array{level: string, code: string, message: string}>, has_critical: bool}
+     */
+    public function validatePlacements(int $semesterId, array $placements): array
+    {
+        $warnings = [];
+        $seen = [];
+
+        if (empty($placements)) {
+            return ['warnings' => [], 'has_critical' => false];
+        }
+
+        $beban = BebanMengajar::with(['guru', 'mapel', 'kelas'])->find($placements[0]['beban_mengajar_id'] ?? null);
+        if (!$beban) {
+            return [
+                'warnings' => [['level' => 'critical', 'code' => 'invalid', 'message' => 'Beban mengajar tidak ditemukan.']],
+                'has_critical' => true,
+            ];
+        }
+
+        $coordKeys = [];
+        foreach ($placements as $p) {
+            $h = $this->normalizeHari($p['hari']);
+            $coordKeys["{$h}-{$p['jam_ke']}-{$p['kelas_id']}"] = true;
+        }
+
+        $existingBebanJadwals = Jadwal::where('semester_id', $semesterId)
+            ->where('beban_mengajar_id', $beban->id)
+            ->with('bebanMengajar')
+            ->get();
+
+        $removedFromBeban = $existingBebanJadwals->filter(function ($j) use ($coordKeys) {
+            $key = $this->normalizeHari($j->hari) . "-{$j->jam_ke}-{$j->bebanMengajar->kelas_id}";
+            return isset($coordKeys[$key]);
+        });
+
+        $newCount = $existingBebanJadwals->count() - $removedFromBeban->count() + count($placements);
+        $prefix = "Mapel {$beban->mapel->nama_mapel} ({$beban->guru->kode_guru}) di {$beban->kelas->nama_kelas}";
+
+        if ($newCount > $beban->jtm) {
+            $this->pushWarning($warnings, $seen, 'critical', 'kelebihan_jtm',
+                "{$prefix}: melebihi JTM ({$newCount}/{$beban->jtm} jam di kelas ini).");
+        }
+
+        $blockedLookup = [];
+        foreach (GuruConstraint::where('guru_id', $beban->guru_id)->where('type', 0)->get() as $c) {
+            $blockedLookup[$this->normalizeHari($c->hari) . "-{$c->jam_ke}"] = true;
+        }
+
+        foreach ($placements as $p) {
+            $hari = $this->normalizeHari($p['hari']);
+            $jam = (int) $p['jam_ke'];
+            $kelasId = (int) $p['kelas_id'];
+            $maxJam = $this->strukturHari[$hari] ?? 10;
+
+            if ($jam > $maxJam) {
+                $this->pushWarning($warnings, $seen, 'critical', 'invalid_slot',
+                    "Jam ke-{$jam} di {$hari} di luar jam operasional (maks {$maxJam}).");
+            }
+
+            if (isset($blockedLookup["{$hari}-{$jam}"])) {
+                $this->pushWarning($warnings, $seen, 'info', 'preset',
+                    "Guru [{$beban->guru->kode_guru}] preset DIBLOKIR di {$hari} jam ke-{$jam}.");
+            }
+
+            $bentrok = Jadwal::where('semester_id', $semesterId)
+                ->where('hari', $hari)
+                ->where('jam_ke', $jam)
+                ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $beban->guru_id))
+                ->whereHas('bebanMengajar', fn ($q) => $q->where('kelas_id', '!=', $kelasId))
+                ->with('bebanMengajar.kelas')
+                ->first();
+
+            if ($bentrok) {
+                $this->pushWarning($warnings, $seen, 'critical', 'bentrok',
+                    "Guru [{$beban->guru->kode_guru}] bentrok: juga mengajar di {$bentrok->bebanMengajar->kelas->nama_kelas} pada {$hari} jam ke-{$jam}.");
+            }
+        }
+
+        // Simulasi slot beban setelah penempatan
+        $simulated = $existingBebanJadwals->reject(function ($j) use ($coordKeys) {
+            $key = $this->normalizeHari($j->hari) . "-{$j->jam_ke}-{$j->bebanMengajar->kelas_id}";
+            return isset($coordKeys[$key]);
+        })->map(fn ($j) => ['hari' => $this->normalizeHari($j->hari), 'jam_ke' => (int) $j->jam_ke]);
+
+        foreach ($placements as $p) {
+            $simulated->push([
+                'hari' => $this->normalizeHari($p['hari']),
+                'jam_ke' => (int) $p['jam_ke'],
+            ]);
+        }
+
+        $hGroups = $simulated->groupBy('hari');
+        $dist = $hGroups->map->count()->values()->sort()->reverse()->values()->toArray();
+        $jtm = (int) $beban->jtm;
+
+        $distOk = match ($jtm) {
+            1 => $dist === [1],
+            2 => $dist === [2],
+            3 => $dist === [3] || $dist === [2, 1],
+            4 => $dist === [2, 2],
+            5 => $dist === [3, 2] || $dist === [2, 2, 1],
+            6 => $dist === [3, 3] || $dist === [2, 2, 2],
+            default => true,
+        };
+
+        if (!$distOk && $newCount > 0) {
+            $msg = match ($jtm) {
+                2 => "{$prefix}: JTM 2 HARUS digabung 2 jam (tidak boleh split hari).",
+                3 => "{$prefix}: JTM 3 harus dipecah 3 jam atau 2+1.",
+                4 => "{$prefix}: JTM 4 HARUS dipecah 2+2 jam.",
+                5 => "{$prefix}: JTM 5 harus dipecah 3+2 atau 2+2+1.",
+                6 => "{$prefix}: JTM 6 harus dipecah 3+3 atau 2+2+2.",
+                default => "{$prefix}: struktur pembagian JTM belum sesuai.",
+            };
+            $this->pushWarning($warnings, $seen, 'info', 'struktur_jtm', $msg);
+        } else {
+            foreach ($hGroups as $hari => $items) {
+                if ($items->count() <= 1) {
+                    continue;
+                }
+                $jams = $items->pluck('jam_ke')->sort()->values()->toArray();
+                for ($i = 0; $i < count($jams) - 1; $i++) {
+                    if ($jams[$i + 1] - $jams[$i] > 1) {
+                        $this->pushWarning($warnings, $seen, 'info', 'struktur_jtm',
+                            "{$prefix} di {$hari} terpisah jam (tidak blok).");
+                        break;
+                    }
+                }
+            }
+        }
+
+        // BTQ
+        if ($this->isMapelBtq($beban->mapel->nama_mapel ?? '')) {
+            $ok = $simulated->count() === $jtm
+                && $simulated->every(fn ($s) => $s['hari'] === 'Jumat')
+                && $simulated->max('jam_ke') === 5
+                && $simulated->pluck('jam_ke')->sort()->values()->toArray() === range(6 - $jtm, 5);
+
+            if (!$ok && $newCount > 0) {
+                $this->pushWarning($warnings, $seen, 'critical', 'btq',
+                    "{$prefix}: BTQ wajib di hari Jumat jam ke-5 (jam pelajaran terakhir).");
+            }
+        }
+
+        // Kelelahan guru per hari yang terdampak
+        $affectedDays = collect($placements)->map(fn ($p) => $this->normalizeHari($p['hari']))->unique();
+        foreach ($affectedDays as $hari) {
+            $jams = Jadwal::where('semester_id', $semesterId)
+                ->where('hari', $hari)
+                ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $beban->guru_id))
+                ->with('bebanMengajar')
+                ->get()
+                ->map(fn ($j) => [
+                    'jam' => (int) $j->jam_ke,
+                    'kelas_id' => $j->bebanMengajar->kelas_id,
+                ]);
+
+            foreach ($placements as $p) {
+                if ($this->normalizeHari($p['hari']) !== $hari) {
+                    continue;
+                }
+                $jams = $jams->reject(fn ($item) => $item['jam'] === (int) $p['jam_ke'] && $item['kelas_id'] === (int) $p['kelas_id']);
+                $jams->push(['jam' => (int) $p['jam_ke'], 'kelas_id' => (int) $p['kelas_id']]);
+            }
+
+            $maxJam = $this->strukturHari[$hari] ?? 10;
+            $validHours = $jams->pluck('jam')->unique()->filter(fn ($j) => $j <= $maxJam)->count();
+
+            if ($validHours >= 8) {
+                $this->pushWarning($warnings, $seen, 'info', 'fatigue',
+                    "Guru [{$beban->guru->kode_guru}] mengajar {$validHours} jam di {$hari} (≥8 jam/hari).");
+            }
+        }
+
+        $hasCritical = collect($warnings)->contains(fn ($w) => $w['level'] === 'critical');
+
+        return ['warnings' => array_values($warnings), 'has_critical' => $hasCritical];
+    }
+
+    /**
+     * Terapkan penempatan slot batch (dalam transaksi).
+     *
+     * @param  array<int, array{hari: string, jam_ke: int, kelas_id: int, beban_mengajar_id: int}>  $placements
+     */
+    public function applyPlacements(int $semesterId, array $placements): void
+    {
+        \DB::transaction(function () use ($semesterId, $placements) {
+            foreach ($placements as $p) {
+                $hari = $this->normalizeHari($p['hari']);
+                $jam = (int) $p['jam_ke'];
+                $kelasId = (int) $p['kelas_id'];
+                $bebanId = (int) $p['beban_mengajar_id'];
+
+                $jadwal = Jadwal::where('semester_id', $semesterId)
+                    ->where('hari', $hari)
+                    ->where('jam_ke', $jam)
+                    ->whereHas('bebanMengajar', fn ($q) => $q->where('kelas_id', $kelasId))
+                    ->first();
+
+                if ($jadwal) {
+                    $jadwal->update(['beban_mengajar_id' => $bebanId]);
+                } else {
+                    Jadwal::create([
+                        'semester_id' => $semesterId,
+                        'hari' => $hari,
+                        'jam_ke' => $jam,
+                        'beban_mengajar_id' => $bebanId,
+                    ]);
+                }
+            }
+        });
+    }
+
+    private function normalizeHari(string $hari): string
+    {
+        return ucfirst(strtolower(trim($hari)));
+    }
+
+    /** @param  array<int, array{level: string, code: string, message: string}>  $warnings */
+    private function pushWarning(array &$warnings, array &$seen, string $level, string $code, string $message): void
+    {
+        $key = $level . ':' . $code . ':' . $message;
+        if (isset($seen[$key])) {
+            return;
+        }
+        $seen[$key] = true;
+        $warnings[] = ['level' => $level, 'code' => $code, 'message' => $message];
+    }
+
     private function isMapelBtq(?string $namaMapel): bool
     {
         if ($namaMapel === null || $namaMapel === '') {

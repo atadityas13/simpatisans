@@ -251,6 +251,36 @@ class JadwalController extends Controller
         ]);
     }
 
+    public function updateSlotsBatch(Request $request)
+    {
+        $request->validate([
+            'semester_id' => 'required|exists:semesters,id',
+            'slots' => 'required|array|min:1',
+            'slots.*.hari' => 'required|string',
+            'slots.*.jam_ke' => 'required|integer|min:1',
+            'slots.*.kelas_id' => 'required|integer',
+            'slots.*.beban_mengajar_id' => 'required|exists:beban_mengajars,id',
+        ]);
+
+        $slots = $request->input('slots');
+
+        if (!$request->boolean('force')) {
+            $result = $this->jadwalService->validatePlacements((int) $request->semester_id, $slots);
+            if (!empty($result['warnings'])) {
+                return response()->json([
+                    'success' => false,
+                    'has_warnings' => true,
+                    'has_critical' => $result['has_critical'],
+                    'warnings' => $result['warnings'],
+                ]);
+            }
+        }
+
+        $this->jadwalService->applyPlacements((int) $request->semester_id, $slots);
+
+        return response()->json(['success' => true, 'message' => 'Jadwal disimpan.']);
+    }
+
     public function generate(Request $request, JadwalSAOService $saoService)
     {
         @ini_set('memory_limit', '512M');
