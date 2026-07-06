@@ -54,18 +54,7 @@
 
         <div x-data="{
             guruSearch: '',
-            guruSearchBlobs: @json($gurus->map(fn ($g) => strtolower(implode(' ', array_filter([
-                $g->kode_guru,
-                $g->nama_guru,
-                $g->gelar_depan,
-                $g->gelar_belakang,
-                $g->username,
-                $g->nuptk,
-                $g->jabatan,
-                $g->golongan,
-                $g->mapelSertifikasi?->nama_mapel,
-                $g->status_sertifikasi ? 'sertifikasi' : 'belum sertifikasi',
-            ]))))->values()),
+            guruSearchBlobs: @json($guruSearchBlobs ?? []),
             rowMatches(blob) {
                 const q = this.guruSearch.trim().toLowerCase();
                 return !q || blob.includes(q);
@@ -80,9 +69,7 @@
                 return q && this.guruMatchCount() === 0;
             }
         }" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/80">
-            @include('partials.guru-search-bar', ['mode' => 'client'])
-        </div>
+            @include('partials.guru-search-bar')
 
             <table class="w-full whitespace-nowrap text-sm">
                 <thead>
@@ -98,21 +85,8 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse($gurus as $i => $guru)
-                        @php
-                            $m = $rows[$i];
-                            $searchBlob = strtolower(implode(' ', array_filter([
-                                $guru->kode_guru,
-                                $guru->nama_guru,
-                                $guru->gelar_depan,
-                                $guru->gelar_belakang,
-                                $guru->username,
-                                $guru->nuptk,
-                                $guru->jabatan,
-                                $guru->mapelSertifikasi?->nama_mapel,
-                                $guru->status_sertifikasi ? 'sertifikasi' : 'belum sertifikasi',
-                            ])));
-                        @endphp
-                        <tr class="hover:bg-gray-50 transition" data-search="{{ e($searchBlob) }}" x-show="rowMatches($el.dataset.search)">
+                        @php $m = $rows[$i]; @endphp
+                        <tr class="hover:bg-gray-50 transition" data-search="{{ e($guruSearchBlobs[$i] ?? '') }}" x-show="rowMatches($el.dataset.search)">
                             <td class="px-5 py-4">
                                 <p class="font-bold text-gray-900">{{ $guru->nama_lengkap }}</p>
                                 <p class="text-[11px] text-indigo-600 font-black mt-0.5 uppercase tracking-wide">{{ $guru->kode_guru }}</p>

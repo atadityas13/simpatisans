@@ -9,20 +9,18 @@ use Illuminate\Http\Request;
 
 class GuruController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $search = trim($request->get('q', ''));
-
         $gurus = Guru::with(['mapelIjazah', 'rumpunIjazah', 'mapelSertifikasi', 'mapelDiampu'])
-            ->search($search)
             ->orderedByDuk()
-            ->paginate(10)
-            ->withQueryString();
+            ->get();
+
+        $guruSearchBlobs = $gurus->map(fn (Guru $g) => $g->searchBlob())->values()->all();
 
         $mapels = Mapel::orderBy('id')->get();
         $rumpuns = Rumpun::orderBy('nama_rumpun')->get();
 
-        return view('guru.index', compact('gurus', 'mapels', 'rumpuns', 'search'));
+        return view('guru.index', compact('gurus', 'mapels', 'rumpuns', 'guruSearchBlobs'));
     }
 
     public function create()

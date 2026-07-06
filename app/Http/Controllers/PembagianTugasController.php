@@ -34,7 +34,8 @@ class PembagianTugasController extends Controller
             $selectedSemester = null;
             $gurus = collect([]);
             $rows = [];
-            return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester'));
+            $guruSearchBlobs = [];
+            return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester', 'guruSearchBlobs'));
         }
 
         $selectedSemester = Semester::findOrFail($semesterId);
@@ -54,7 +55,18 @@ class PembagianTugasController extends Controller
             $rows[] = $this->guruService->hitungMetrik($guru, $semesterId);
         }
 
-        return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester'));
+        $guruSearchBlobs = $this->buildGuruSearchBlobs($gurus);
+
+        return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester', 'guruSearchBlobs'));
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Guru>  $gurus
+     * @return array<int, string>
+     */
+    private function buildGuruSearchBlobs($gurus): array
+    {
+        return $gurus->map(fn (Guru $g) => $g->searchBlob())->values()->all();
     }
 
     public function show(Request $request, $id)

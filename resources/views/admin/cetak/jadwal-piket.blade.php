@@ -196,8 +196,8 @@
                     $stempelURL = $hasNewStempel ? asset('storage/presets/stempel.png') : asset('img/stempel_ttd_kepala.png');
                     $ttdURL = $hasNewTTD ? asset('storage/presets/ttd_kepala.png') : null;
                 @endphp
-                <p>Cingambul, {{ $printMonth }} {{ $printYear }}</p>
-                <p style="margin-top: -20px;">Plt. Kepala Madrasah,</p>
+                <p>{{ $cetakTanggalLokasi ?? 'Cingambul, ' . date('j F Y') }}</p>
+                <p style="margin-top: -20px;">{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }},</p>
 
                 <div style="position: relative; height: 80px; margin-top: 10px;">
                     @if($hasNewTTD)

@@ -125,9 +125,50 @@
                     </button>
                 </div>
 
-                <div class="p-6 md:p-10 bg-white">
+                <div class="p-6 md:p-10 bg-white space-y-8">
+                    {{-- Pengaturan tanggal & pejabat --}}
+                    <form action="{{ route('cetak.presets.store') }}" method="POST" class="bg-slate-50 rounded-3xl p-6 border border-slate-100">
+                        @csrf
+                        <h4 class="text-sm font-black text-gray-800 uppercase tracking-wide mb-4">Titimangsa & Pejabat Penandatangan</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="tanggal_cetak" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Tanggal Cetak Dokumen</label>
+                                <input type="date" name="tanggal_cetak" id="tanggal_cetak"
+                                    value="{{ $cetakSettings['tanggal_cetak'] ?? now()->format('Y-m-d') }}"
+                                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-800 bg-white focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-400">
+                                <p class="mt-1.5 text-[10px] text-gray-400">Dipakai di semua dokumen bertanda tangan (jadwal, lampiran SK, piket).</p>
+                            </div>
+                            <div>
+                                <span class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Pejabat Penandatangan</span>
+                                <div class="space-y-2">
+                                    <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'kepala' ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300' }}">
+                                        <input type="radio" name="pejabat_penandatangan" value="kepala" class="text-indigo-600 focus:ring-indigo-500"
+                                            {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'kepala' ? 'checked' : '' }}>
+                                        <span class="text-sm font-bold text-gray-800">Kepala Madrasah</span>
+                                    </label>
+                                    <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'plt_kepala' ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300' }}">
+                                        <input type="radio" name="pejabat_penandatangan" value="plt_kepala" class="text-indigo-600 focus:ring-indigo-500"
+                                            {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'plt_kepala' ? 'checked' : '' }}>
+                                        <span class="text-sm font-bold text-gray-800">Plt. Kepala Madrasah</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+                            <p class="text-[10px] text-gray-500">
+                                Pratinjau: <span class="font-bold text-indigo-700">{{ $cetakTanggalLokasi ?? '' }}</span>
+                                · <span class="font-bold text-indigo-700">{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }}</span>
+                            </p>
+                            <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-colors shadow-sm">
+                                Simpan Pengaturan
+                            </button>
+                        </div>
+                    </form>
+
+                    {{-- Upload TTD & stempel --}}
                     <form action="{{ route('cetak.presets.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
+                        <h4 class="text-sm font-black text-gray-800 uppercase tracking-wide mb-4">Tanda Tangan & Stempel</h4>
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
                             
                             {{-- 1. TTD KEPALA CARD --}}

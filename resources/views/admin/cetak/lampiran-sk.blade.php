@@ -364,10 +364,7 @@
         <div class="signature-section">
             <div class="signature-box">
                 @php
-                    $yearParts = explode('/', $activeSemester->nama_tahun);
-                    $printYear = $activeSemester->tipe === 'Ganjil' ? ($yearParts[0] ?? date('Y')) : ($yearParts[1] ?? (isset($yearParts[0]) ? $yearParts[0] + 1 : date('Y')));
-                    $printMonth = $activeSemester->tipe === 'Ganjil' ? 'Juli' : 'Januari';
-                    $tanggalCetak = $activeSemester->tipe === 'Ganjil' ? '01 Juli ' . $printYear : '01 Januari ' . $printYear;
+                    $tanggalCetak = $cetakTanggal ?? date('j F Y');
                 @endphp
                 
                 <table style="border: none !important; margin-bottom: 5px; width: auto !important;">
@@ -383,7 +380,7 @@
                     </tr>
                 </table>
 
-                <p style="margin-top: 5px;">Plt. Kepala,</p>
+                <p style="margin-top: 5px;">{{ $cetakPejabatLabelSingkat ?? 'Kepala' }},</p>
                 
                 <div style="position: relative; height: 70px; margin-top: 5px;">
                     <div class="adjustable-wrapper" data-adjustable-id="sk_ttd_kepala" style="position: absolute; left: 0; top: 0; z-index: 1;">

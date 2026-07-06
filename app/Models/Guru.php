@@ -144,6 +144,34 @@ class Guru extends Model
     }
 
     /**
+     * Teks pencarian untuk filter client-side (KG, nama, NIP, mapel, dll.).
+     */
+    public function searchBlob(): string
+    {
+        $parts = [
+            $this->kode_guru,
+            $this->nama_guru,
+            $this->gelar_depan,
+            $this->gelar_belakang,
+            $this->username,
+            $this->nuptk,
+            $this->jabatan,
+            $this->golongan,
+            $this->mapelSertifikasi?->nama_mapel,
+            $this->mapelIjazah?->nama_mapel,
+            $this->rumpunIjazah?->nama_rumpun,
+            $this->status_sertifikasi ? 'sertifikasi tersertifikasi' : 'belum sertifikasi',
+            $this->status_pegawai,
+        ];
+
+        if ($this->relationLoaded('mapelDiampu')) {
+            $parts[] = $this->mapelDiampu->pluck('nama_mapel')->join(' ');
+        }
+
+        return strtolower(implode(' ', array_filter($parts)));
+    }
+
+    /**
      * Urutan resmi Daftar Urut Kepegawaian (DUK).
      * Guru tanpa nomor DUK ditempatkan di akhir, diurutkan nama.
      */

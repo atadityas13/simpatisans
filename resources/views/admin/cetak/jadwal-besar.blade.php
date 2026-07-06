@@ -374,7 +374,7 @@
                                             @endphp
 
                                             <div class="signature-box" style="margin-top: 15pt; position: relative;">
-                                                <p>Cingambul, {{ strtoupper($activeSemester->tipe) == 'GANJIL' ? 'Juli' : 'Januari' }} {{ $printYear }}</p>
+                                                <p>{{ $cetakTanggalLokasi ?? 'Cingambul, ' . date('j F Y') }}</p>
                                                 <p>Wakil Kepala Bid. Kurikulum</p>
                                                 
                                                 <div style="height: 35pt; position: relative;">
@@ -392,7 +392,7 @@
 
                                             <div class="signature-box" style="margin-top: 10pt; position: relative;">
                                                 <p>Mengetahui,</p>
-                                                <p>Plt. Kepala Madrasah</p>
+                                                <p>{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }}</p>
 
                                                 <div style="height: 35pt; position: relative;">
                                                     @if($hasNewTTD_Kepala)

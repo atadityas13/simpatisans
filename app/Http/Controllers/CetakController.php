@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\TugasTambahan;
 use App\Models\Guru;
+use App\Services\CetakPresetService;
 use App\Services\SemesterService;
 use App\Models\Jadwal;
 use App\Models\Kelas;
@@ -12,10 +13,12 @@ use Illuminate\Http\Request;
 class CetakController extends Controller
 {
     protected $semesterService;
+    protected $cetakPresetService;
 
-    public function __construct(SemesterService $semesterService)
+    public function __construct(SemesterService $semesterService, CetakPresetService $cetakPresetService)
     {
         $this->semesterService = $semesterService;
+        $this->cetakPresetService = $cetakPresetService;
     }
 
     /**
@@ -24,14 +27,17 @@ class CetakController extends Controller
     public function index()
     {
         $activeSemester = $this->semesterService->getActiveSemester();
-        
+
         $presets = [
             'ttd_kepala' => \Illuminate\Support\Facades\Storage::disk('public')->exists('presets/ttd_kepala.png') ? asset('storage/presets/ttd_kepala.png') : null,
             'ttd_waka' => \Illuminate\Support\Facades\Storage::disk('public')->exists('presets/ttd_waka.png') ? asset('storage/presets/ttd_waka.png') : null,
             'stempel' => \Illuminate\Support\Facades\Storage::disk('public')->exists('presets/stempel.png') ? asset('storage/presets/stempel.png') : null,
         ];
-        
-        return view('admin.cetak.index', compact('activeSemester', 'presets'));
+
+        return view('admin.cetak.index', array_merge(
+            compact('activeSemester', 'presets'),
+            $this->cetakPresetService->viewData()
+        ));
     }
 
     /**
@@ -40,34 +46,29 @@ class CetakController extends Controller
     public function jadwalPelajaran()
     {
         $activeSemester = $this->semesterService->getActiveSemester();
-        
+
         if (!$activeSemester) {
             return redirect()->back()->with('error', 'Tidak ada semester aktif.');
         }
 
         $semesterId = $activeSemester->id;
 
-        // 1. Get classes grouped by level (for table columns)
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
             ->get()
             ->groupBy('tingkat');
 
-        // 2. Map all classes for easier grid building
         $allKelas = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
             ->get();
 
-        // 3. Get all schedule items
         $jadwals = Jadwal::where('semester_id', $semesterId)
             ->with(['bebanMengajar.guru', 'bebanMengajar.mapel'])
             ->get();
 
-        // 6. Get all mapels for legend and create a mapping for the grid
         $mapels = \App\Models\Mapel::orderBy('id')->get();
-        $mapelNoMap = $mapels->pluck('id')->flip()->map(fn($v) => str_pad($v + 1, 2, '0', STR_PAD_LEFT));
+        $mapelNoMap = $mapels->pluck('id')->flip()->map(fn ($v) => str_pad($v + 1, 2, '0', STR_PAD_LEFT));
 
-        // 4. Build the grid [hari][jam_ke][kelas_id]
         $grid = [];
         foreach ($jadwals as $j) {
             if ($j && $j->bebanMengajar && $j->bebanMengajar->guru && $j->bebanMengajar->mapel) {
@@ -77,44 +78,44 @@ class CetakController extends Controller
             }
         }
 
-        // 5. Get all gurus for legend (urut DUK)
         $gurus = Guru::orderedByDuk()->get();
 
-        // 7. Get Signatories (Kepala and Waka Kurikulum)
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
               ->where('semester_id', $semesterId);
         })->first();
 
-        $wakaKurikulum = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
+        $wakaKurikulum = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
             $q->where('tugas_tambahan_id', TugasTambahan::WAKA_ID)
               ->where('detail', 'LIKE', '%Kurikulum%')
               ->where('semester_id', $semesterId);
         })->first();
 
-        return view('admin.cetak.jadwal-pelajaran', compact(
-            'activeSemester',
-            'kelasList',
-            'allKelas',
-            'grid',
-            'gurus',
-            'mapels',
-            'kepalaMadrasah',
-            'wakaKurikulum'
+        return view('admin.cetak.jadwal-pelajaran', array_merge(
+            compact(
+                'activeSemester',
+                'kelasList',
+                'allKelas',
+                'grid',
+                'gurus',
+                'mapels',
+                'kepalaMadrasah',
+                'wakaKurikulum'
+            ),
+            $this->cetakPresetService->viewData()
         ));
     }
 
     public function jadwalBesar()
     {
         $activeSemester = $this->semesterService->getActiveSemester();
-        
+
         if (!$activeSemester) {
             return redirect()->back()->with('error', 'Tidak ada semester aktif.');
         }
 
         $semesterId = $activeSemester->id;
 
-        // Same data as jadwalPelajaran
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
             ->get()
@@ -129,7 +130,7 @@ class CetakController extends Controller
             ->get();
 
         $mapels = \App\Models\Mapel::orderBy('id')->get();
-        $mapelNoMap = $mapels->pluck('id')->flip()->map(fn($v) => str_pad($v + 1, 2, '0', STR_PAD_LEFT));
+        $mapelNoMap = $mapels->pluck('id')->flip()->map(fn ($v) => str_pad($v + 1, 2, '0', STR_PAD_LEFT));
 
         $grid = [];
         foreach ($jadwals as $j) {
@@ -140,30 +141,31 @@ class CetakController extends Controller
             }
         }
 
-        // 5. Get all gurus for legend (urut DUK)
         $gurus = Guru::orderedByDuk()->get();
 
-        // Signatories
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
               ->where('semester_id', $semesterId);
         })->first();
 
-        $wakaKurikulum = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
+        $wakaKurikulum = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
             $q->where('tugas_tambahan_id', TugasTambahan::WAKA_ID)
               ->where('detail', 'LIKE', '%Kurikulum%')
               ->where('semester_id', $semesterId);
         })->first();
 
-        return view('admin.cetak.jadwal-besar', compact(
-            'activeSemester',
-            'kelasList',
-            'allKelas',
-            'grid',
-            'gurus',
-            'mapels',
-            'kepalaMadrasah',
-            'wakaKurikulum'
+        return view('admin.cetak.jadwal-besar', array_merge(
+            compact(
+                'activeSemester',
+                'kelasList',
+                'allKelas',
+                'grid',
+                'gurus',
+                'mapels',
+                'kepalaMadrasah',
+                'wakaKurikulum'
+            ),
+            $this->cetakPresetService->viewData()
         ));
     }
 
@@ -173,101 +175,88 @@ class CetakController extends Controller
     public function jadwalPiket()
     {
         $activeSemester = $this->semesterService->getActiveSemester();
-        
+
         if (!$activeSemester) {
             return redirect()->back()->with('error', 'Tidak ada semester aktif.');
         }
 
         $semesterId = $activeSemester->id;
 
-        // Fetch teachers with picket duty (tugas_tambahan_id = 4)
-        $piketData = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
+        $piketData = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
             $q->where('tugas_tambahan_id', TugasTambahan::GURU_PIKET_ID)
               ->where('semester_id', $semesterId);
         })->get();
 
-        // Organize schedule by day
         $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
         $schedule = array_fill_keys($days, []);
 
         foreach ($piketData as $guru) {
-            // Get the specific picket task for this guru in this semester
             $tugas = $guru->tugasTambahans()
                 ->where('tugas_tambahan_id', TugasTambahan::GURU_PIKET_ID)
                 ->where('semester_id', $semesterId)
                 ->first();
-                
+
             if ($tugas && $tugas->pivot->hari) {
                 $schedule[$tugas->pivot->hari][] = $guru;
             }
         }
 
-        // Signatory (Kepala Madrasah)
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
               ->where('semester_id', $semesterId);
         })->first();
 
-        return view('admin.cetak.jadwal-piket', compact(
-            'activeSemester',
-            'schedule',
-            'days',
-            'kepalaMadrasah'
+        return view('admin.cetak.jadwal-piket', array_merge(
+            compact('activeSemester', 'schedule', 'days', 'kepalaMadrasah'),
+            $this->cetakPresetService->viewData()
         ));
     }
 
     public function lampiranSk()
     {
         $activeSemester = $this->semesterService->getActiveSemester();
-        
+
         if (!$activeSemester) {
             return redirect()->back()->with('error', 'Tidak ada semester aktif.');
         }
 
         $semesterId = $activeSemester->id;
 
-        // 1. Get all classes grouped by level for the table columns
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
             ->get()
             ->groupBy('tingkat');
 
-        // 2. Map classes for the grid headers
         $allKelas = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
             ->get();
 
-        // 3. Get all teachers with their workload and additional duties for this semester
         $gurus = Guru::with([
-            'bebanMengajars' => function($q) use ($semesterId) {
+            'bebanMengajars' => function ($q) use ($semesterId) {
                 $q->where('semester_id', $semesterId)->with(['mapel.rumpuns', 'kelas']);
             },
-            'tugasTambahans' => function($q) use ($semesterId) {
+            'tugasTambahans' => function ($q) use ($semesterId) {
                 $q->where('semester_id', $semesterId)
                   ->orderByPivot('is_ekuivalen', 'desc');
             },
-            'mapelSertifikasi'
+            'mapelSertifikasi',
         ])
         ->orderedByDuk()
         ->get();
 
-        // 4. Signatory (Kepala Madrasah)
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
               ->where('semester_id', $semesterId);
         })->first();
 
-        return view('admin.cetak.lampiran-sk', compact(
-            'activeSemester',
-            'kelasList',
-            'allKelas',
-            'gurus',
-            'kepalaMadrasah'
+        return view('admin.cetak.lampiran-sk', array_merge(
+            compact('activeSemester', 'kelasList', 'allKelas', 'gurus', 'kepalaMadrasah'),
+            $this->cetakPresetService->viewData()
         ));
     }
 
     /**
-     * Store print presets (signatures and stamp).
+     * Store print presets (signatures, stamp, tanggal & pejabat).
      */
     public function storePresets(Request $request)
     {
@@ -275,7 +264,16 @@ class CetakController extends Controller
             'ttd_kepala' => 'nullable|image|mimes:png,jpg,jpeg|max:2048',
             'ttd_waka' => 'nullable|image|mimes:png,jpg,jpeg|max:2048',
             'stempel' => 'nullable|image|mimes:png,jpg,jpeg|max:2048',
+            'tanggal_cetak' => 'nullable|date',
+            'pejabat_penandatangan' => 'nullable|in:kepala,plt_kepala',
         ]);
+
+        if ($request->filled('tanggal_cetak') || $request->filled('pejabat_penandatangan')) {
+            $this->cetakPresetService->saveSettings([
+                'tanggal_cetak' => $request->input('tanggal_cetak', $this->cetakPresetService->getSettings()['tanggal_cetak']),
+                'pejabat_penandatangan' => $request->input('pejabat_penandatangan', 'kepala'),
+            ]);
+        }
 
         if ($request->hasFile('ttd_kepala')) {
             $request->file('ttd_kepala')->storeAs('presets', 'ttd_kepala.png', 'public');
@@ -287,6 +285,10 @@ class CetakController extends Controller
             $request->file('stempel')->storeAs('presets', 'stempel.png', 'public');
         }
 
-        return redirect()->back()->with('success', 'Preset cetak (TTD & Stempel) berhasil diperbarui.');
+        $message = $request->filled('tanggal_cetak') || $request->filled('pejabat_penandatangan')
+            ? 'Pengaturan cetak berhasil disimpan.'
+            : 'Preset cetak (TTD & Stempel) berhasil diperbarui.';
+
+        return redirect()->back()->with('success', $message);
     }
 }

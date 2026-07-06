@@ -25,6 +25,21 @@
             mapel_sertifikasi_id: '',
             mapel_diampu: []
         },
+        guruSearch: '',
+        guruSearchBlobs: @json($guruSearchBlobs ?? []),
+        rowMatches(blob) {
+            const q = this.guruSearch.trim().toLowerCase();
+            return !q || blob.includes(q);
+        },
+        guruMatchCount() {
+            const q = this.guruSearch.trim().toLowerCase();
+            if (!q) return this.guruSearchBlobs.length;
+            return this.guruSearchBlobs.filter(b => b.includes(q)).length;
+        },
+        guruFilterEmpty() {
+            const q = this.guruSearch.trim().toLowerCase();
+            return q && this.guruMatchCount() === 0;
+        },
         openAdd() {
             this.isEdit = false;
             this.activeTab = 'identitas';
@@ -88,20 +103,8 @@
             </button>
         </div>
 
-        @include('partials.guru-search-bar', [
-            'mode' => 'server',
-            'value' => $search ?? '',
-            'action' => route('guru.index'),
-            'wrapperClass' => 'mb-4 flex flex-wrap items-center gap-2',
-        ])
-
-        @if(!empty($search))
-            <p class="mb-4 text-xs text-indigo-700 font-bold">
-                Hasil pencarian untuk &ldquo;{{ $search }}&rdquo; — {{ $gurus->total() }} guru ditemukan
-            </p>
-        @endif
-
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            @include('partials.guru-search-bar')
             <div class="overflow-x-auto main-scrollbar">
                 <table class="w-full whitespace-nowrap text-sm">
                     <thead>
@@ -116,8 +119,8 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        @forelse($gurus as $guru)
-                            <tr class="hover:bg-gray-50 transition-colors">
+                        @forelse($gurus as $i => $guru)
+                            <tr class="hover:bg-gray-50 transition-colors" data-search="{{ e($guruSearchBlobs[$i] ?? '') }}" x-show="rowMatches($el.dataset.search)">
                                 <td class="px-4 py-4 text-center">
                                     <div class="font-black text-indigo-700 mb-2 truncate">{{ strtoupper($guru->kode_guru) }}</div>
                                     <div class="flex items-center justify-center space-x-1">
@@ -190,14 +193,14 @@
                                 <td colspan="7" class="px-5 py-10 text-center text-gray-400 italic">Belum ada data guru.</td>
                             </tr>
                         @endforelse
+                        <tr x-show="guruFilterEmpty()" x-cloak>
+                            <td colspan="7" class="px-5 py-10 text-center text-gray-500 italic">
+                                Tidak ada guru yang cocok dengan &ldquo;<span x-text="guruSearch"></span>&rdquo;
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
-            @if($gurus->hasPages())
-                <div class="px-5 py-4 border-t border-gray-100 bg-gray-50">
-                    {{ $gurus->links() }}
-                </div>
-            @endif
         </div>
 
         {{-- MODAL DATA GURU --}}
