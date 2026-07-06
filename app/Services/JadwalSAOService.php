@@ -82,10 +82,14 @@ class JadwalSAOService
             }
         }
 
+        $gridCsp = $this->salinGrid($this->gridTerbaik);
+        $terisiCsp = $this->terisiTerbaik;
+        $unitCsp = $this->unitLengkapTerbaik;
+
         if (!$this->semuaJamLengkap()) {
             $this->grid = $this->salinGrid($this->gridTerbaik);
             $this->rebuildOcc();
-            $this->perbaikiKonflik();
+            $this->perbaikiKonflik(false);
             $this->simpanTerbaik();
         }
 
@@ -94,9 +98,15 @@ class JadwalSAOService
             $this->grid = $this->salinGrid($this->gridTerbaik);
             $this->rebuildOcc();
             $this->isiPaksaSisa();
-            $this->perbaikiKonflik();
+            $this->perbaikiKonflik(true);
             $this->isiPaksaSisa();
             $this->simpanTerbaik();
+        }
+
+        if ($this->terisiTerbaik < $terisiCsp) {
+            $this->gridTerbaik = $gridCsp;
+            $this->terisiTerbaik = $terisiCsp;
+            $this->unitLengkapTerbaik = $unitCsp;
         }
 
         if ($this->terisiTerbaik === 0) {
@@ -204,25 +214,35 @@ class JadwalSAOService
 
     // ─── Perbaikan konflik (geser mapel penghalang) ───────────────────────
 
-    private function perbaikiKonflik(): void
+    private function perbaikiKonflik(bool $paksa): void
     {
-        for ($round = 0; $round < 500; $round++) {
+        for ($round = 0; $round < ($paksa ? 300 : 200); $round++) {
             if ($this->waktuHabis()) {
                 break;
             }
 
-            $pending = array_values(array_filter($this->units, fn($u) => !$this->lengkap($u)));
+            $pending = array_values(array_filter(
+                $this->units,
+                fn($u) => $paksa ? $this->sisaJam($u) > 0 : !$this->lengkap($u)
+            ));
             if (empty($pending)) {
                 break;
             }
 
             usort($pending, fn($a, $b) => $this->sisaJam($b) <=> $this->sisaJam($a));
             $progress = false;
+            $terisiAwal = $this->hitungTerisi();
 
             foreach ($pending as $unit) {
-                if ($this->cobaPasangDenganEviksi($unit, 0)) {
-                    $progress = true;
-                    $this->simpanTerbaik();
+                $snap = $this->salinGrid($this->grid);
+                if ($this->cobaPasangDenganEviksi($unit)) {
+                    if ($this->hitungTerisi() >= $terisiAwal) {
+                        $progress = true;
+                        $this->simpanTerbaik();
+                        break;
+                    }
+                    $this->grid = $snap;
+                    $this->rebuildOcc();
                 }
             }
 
@@ -253,15 +273,17 @@ class JadwalSAOService
 
             $progress = false;
             foreach ($pending as $unit) {
-                if ($this->cobaPasangSatuJam($unit)) {
-                    $progress = true;
-                    $this->simpanTerbaik();
-                    break;
-                }
-                if ($this->cobaPasangDenganEviksi($unit, 0)) {
-                    $progress = true;
-                    $this->simpanTerbaik();
-                    break;
+                $snap = $this->salinGrid($this->grid);
+                $terisiAwal = $this->hitungTerisi();
+
+                if ($this->cobaPasangSatuJam($unit) || $this->cobaPasangDenganEviksi($unit)) {
+                    if ($this->hitungTerisi() > $terisiAwal) {
+                        $progress = true;
+                        $this->simpanTerbaik();
+                        break;
+                    }
+                    $this->grid = $snap;
+                    $this->rebuildOcc();
                 }
             }
 
@@ -290,7 +312,7 @@ class JadwalSAOService
         return false;
     }
 
-    private function cobaPasangDenganEviksi(array $unit, int $depth): bool
+    private function cobaPasangDenganEviksi(array $unit): bool
     {
         if ($this->lengkap($unit)) {
             return true;
@@ -319,27 +341,10 @@ class JadwalSAOService
             if ($this->bisaTaruh($unit, $blok)) {
                 $this->taruh($unit, $blok);
                 if ($this->lengkap($unit)) {
-                    $ok = true;
                     foreach ($evicted as $e) {
-                        if (!$this->cobaPasangDenganEviksi($e, $depth + 1) && !$this->pasangGreedy($e)) {
-                            $ok = false;
-                            break;
-                        }
+                        $this->pasangGreedy($e);
                     }
-                    if ($ok) {
-                        return true;
-                    }
-                } elseif ($depth < 2 && $this->cobaPasangDenganEviksi($unit, $depth + 1)) {
-                    $ok = true;
-                    foreach ($evicted as $e) {
-                        if (!$this->cobaPasangDenganEviksi($e, $depth + 1) && !$this->pasangGreedy($e)) {
-                            $ok = false;
-                            break;
-                        }
-                    }
-                    if ($ok) {
-                        return true;
-                    }
+                    return true;
                 }
                 $this->batalTaruh($unit, $blok);
             }
@@ -384,16 +389,6 @@ class JadwalSAOService
 
         foreach ($blok as $b) {
             for ($j = $b['start']; $j < $b['start'] + $b['size']; $j++) {
-                if ($this->prioritasIsiPenuh) {
-                    $s = $this->grid[$b['hari']][$j][$kid] ?? null;
-                    if ($s !== null && ($s['beban_mengajar_id'] ?? null) != $unit['bmId']) {
-                        $bm = $s['beban_mengajar_id'];
-                        if (isset($this->unitByBm[$bm]) && empty($this->unitByBm[$bm]['btq'])) {
-                            $out[$bm] = $this->unitByBm[$bm];
-                        }
-                    }
-                }
-
                 foreach ($this->kelasIds as $kId) {
                     if ($kId === $kid) {
                         continue;
@@ -784,8 +779,11 @@ class JadwalSAOService
     {
         $unitLengkap = $this->hitungUnitJamLengkap();
         $t = $this->hitungTerisi();
-        if ($unitLengkap > $this->unitLengkapTerbaik
-            || ($unitLengkap === $this->unitLengkapTerbaik && $t > $this->terisiTerbaik)) {
+
+        $lebihBaik = $t > $this->terisiTerbaik
+            || ($t === $this->terisiTerbaik && $unitLengkap > $this->unitLengkapTerbaik);
+
+        if ($lebihBaik) {
             $this->unitLengkapTerbaik = $unitLengkap;
             $this->terisiTerbaik = $t;
             $this->gridTerbaik = $this->salinGrid($this->grid);
