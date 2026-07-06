@@ -992,9 +992,28 @@
                             return s;
                         },
 
-                        onGuruSelectKelas() {
-                            this.applyGuruMapelSelection(this.editor.selectedGuruId, this.editor.kelasId);
+                        onGuruSelectFromDropdown() {
+                            if (!this.editor) return;
+                            const id = this.editor.selectedGuruId;
+                            if (!id) {
+                                this.editor.guruKgQuery = '';
+                                this.editor.selectedBebanId = null;
+                                this.editor.selectedMapel = '';
+                                this.editor.mapelFullMessage = '';
+                                this.editor.guruKgDropdownOpen = false;
+                                return;
+                            }
+                            const g = this.guruOptionsForKelasInput(this.editor.kelasId, id)
+                                .find(x => x.guru_id == id);
+                            if (!g) return;
+                            this.editor.guruKgQuery = g.kg;
+                            this.applyGuruMapelSelection(id, this.editor.kelasId);
                             this.editor.blockHours = 1;
+                            this.editor.guruKgDropdownOpen = false;
+                        },
+
+                        onGuruSelectKelas() {
+                            this.onGuruSelectFromDropdown();
                         },
 
                         normalizeKgQuery(raw) {

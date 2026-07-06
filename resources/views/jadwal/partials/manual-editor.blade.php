@@ -299,7 +299,7 @@
 
             {{-- Per Kelas & Per Hari: Guru → Mapel --}}
             <div x-show="editor && (editor.context === 'kelas' || editor.context === 'hari')" class="space-y-4">
-                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru — ketik KG'])
+                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru'])
 
                 <div x-show="editor.mapelFullMessage"
                     class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-bold">
@@ -401,7 +401,7 @@
 
             {{-- Matriks: KG → Mapel → Blok Jam --}}
             <div x-show="editor && editor.context === 'matrix'" class="space-y-4">
-                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru (KG)'])
+                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru'])
 
                 <div x-show="editor.mapelFullMessage"
                     class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-bold">
