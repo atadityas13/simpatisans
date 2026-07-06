@@ -102,24 +102,25 @@
     <!-- PRESET MODAL -->
     <template x-teleport="body">
         <div x-show="showPresets"
+             x-cloak
              x-transition:enter="transition ease-out duration-200"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             class="fixed inset-0 z-[9999] bg-slate-900/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-             @keydown.escape.window="showPresets = false"
-             style="display: none;">
+             class="fixed inset-0 z-[9999] bg-slate-900/50 flex items-center justify-center p-4"
+             @keydown.escape.window="showPresets = false">
 
             <div @click.away="showPresets = false"
-                 class="bg-white w-full sm:max-w-lg sm:rounded-2xl shadow-2xl border border-gray-100 flex flex-col max-h-[92vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-b-2xl overflow-hidden">
+                 class="bg-white w-full rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden"
+                 style="max-width: 24rem;">
 
                 {{-- Header --}}
-                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
                     <div class="min-w-0 pr-2">
-                        <h3 class="text-base font-black text-gray-900 truncate">Preset Cetak</h3>
-                        <p class="text-[11px] text-gray-500 truncate">Tanggal, pejabat, TTD & stempel</p>
+                        <h3 class="text-base font-black text-gray-900">Preset Cetak</h3>
+                        <p class="text-[11px] text-gray-500">Tanggal, pejabat, TTD & stempel</p>
                     </div>
                     <button type="button" @click="showPresets = false"
                         class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg shrink-0">
@@ -127,8 +128,8 @@
                     </button>
                 </div>
 
-                {{-- Body scroll --}}
-                <div class="overflow-y-auto flex-1 px-4 py-4 space-y-4">
+                {{-- Body --}}
+                <div class="overflow-y-auto px-4 py-4 space-y-4" style="max-height: min(80vh, 32rem);">
 
                     @if(session('success'))
                         <div class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
@@ -173,52 +174,52 @@
                     {{-- TTD & Stempel --}}
                     <form action="{{ route('cetak.presets.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
-                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">TTD & Stempel</p>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">TTD & Stempel</p>
                         <p class="text-[10px] text-gray-400 mb-3">Ketuk kotak untuk unggah PNG transparan</p>
 
-                        <div class="grid grid-cols-3 gap-2">
+                        <div class="flex justify-between gap-2">
                             {{-- Kepala --}}
-                            <div class="group text-center">
+                            <div class="flex flex-col items-center flex-1 min-w-0">
                                 <button type="button" onclick="document.getElementById('input_ttd_kepala_new').click()"
-                                    class="w-full aspect-square max-h-24 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors relative">
+                                    class="w-20 h-20 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden hover:border-indigo-300 hover:bg-indigo-50/40 transition-colors relative shrink-0">
                                     @if($presets['ttd_kepala'])
-                                        <img src="{{ $presets['ttd_kepala'] }}?v={{ time() }}" alt="TTD Kepala" class="max-w-full max-h-full object-contain p-1">
-                                        <span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <img src="{{ $presets['ttd_kepala'] }}?v={{ time() }}" alt="TTD Kepala" class="w-full h-full object-contain p-1">
+                                        <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
                                     @else
-                                        <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+                                        <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                     @endif
                                 </button>
-                                <p class="mt-1 text-[9px] font-bold text-gray-500 leading-tight">Kepala</p>
+                                <p class="mt-1.5 text-[10px] font-bold text-gray-500 text-center">Kepala</p>
                                 <input type="file" name="ttd_kepala" id="input_ttd_kepala_new" class="hidden" accept="image/*" onchange="this.form.submit()">
                             </div>
 
                             {{-- Waka --}}
-                            <div class="group text-center">
+                            <div class="flex flex-col items-center flex-1 min-w-0">
                                 <button type="button" onclick="document.getElementById('input_ttd_waka_new').click()"
-                                    class="w-full aspect-square max-h-24 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden hover:border-blue-300 hover:bg-blue-50/30 transition-colors relative">
+                                    class="w-20 h-20 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden hover:border-blue-300 hover:bg-blue-50/40 transition-colors relative shrink-0">
                                     @if($presets['ttd_waka'])
-                                        <img src="{{ $presets['ttd_waka'] }}?v={{ time() }}" alt="TTD Waka" class="max-w-full max-h-full object-contain p-1">
-                                        <span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <img src="{{ $presets['ttd_waka'] }}?v={{ time() }}" alt="TTD Waka" class="w-full h-full object-contain p-1">
+                                        <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
                                     @else
-                                        <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+                                        <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                     @endif
                                 </button>
-                                <p class="mt-1 text-[9px] font-bold text-gray-500 leading-tight">Waka Kur.</p>
+                                <p class="mt-1.5 text-[10px] font-bold text-gray-500 text-center">Waka Kur.</p>
                                 <input type="file" name="ttd_waka" id="input_ttd_waka_new" class="hidden" accept="image/*" onchange="this.form.submit()">
                             </div>
 
                             {{-- Stempel --}}
-                            <div class="group text-center">
+                            <div class="flex flex-col items-center flex-1 min-w-0">
                                 <button type="button" onclick="document.getElementById('input_stempel_new').click()"
-                                    class="w-full aspect-square max-h-24 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden hover:border-purple-300 hover:bg-purple-50/30 transition-colors relative">
+                                    class="w-20 h-20 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center overflow-hidden hover:border-purple-300 hover:bg-purple-50/40 transition-colors relative shrink-0">
                                     @if($presets['stempel'])
-                                        <img src="{{ $presets['stempel'] }}?v={{ time() }}" alt="Stempel" class="max-w-full max-h-full object-contain p-1">
-                                        <span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <img src="{{ $presets['stempel'] }}?v={{ time() }}" alt="Stempel" class="w-full h-full object-contain p-1">
+                                        <span class="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
                                     @else
-                                        <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+                                        <svg class="w-7 h-7 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
                                     @endif
                                 </button>
-                                <p class="mt-1 text-[9px] font-bold text-gray-500 leading-tight">Stempel</p>
+                                <p class="mt-1.5 text-[10px] font-bold text-gray-500 text-center">Stempel</p>
                                 <input type="file" name="stempel" id="input_stempel_new" class="hidden" accept="image/*" onchange="this.form.submit()">
                             </div>
                         </div>
