@@ -1,5 +1,10 @@
-{{-- Tab mode tampilan manual scheduling --}}
+{{-- Tab mode tampilan manual scheduling — Matriks Lengkap pertama --}}
 <div class="print:hidden mb-4 flex flex-wrap gap-2">
+    <button type="button" @click="viewMode = 'matrix'"
+        :class="viewMode === 'matrix' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'"
+        class="px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all">
+        Matriks Lengkap
+    </button>
     <button type="button" @click="viewMode = 'kelas'"
         :class="viewMode === 'kelas' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'"
         class="px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all">
@@ -14,11 +19,6 @@
         :class="viewMode === 'hari' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'"
         class="px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all">
         Per Hari
-    </button>
-    <button type="button" @click="viewMode = 'matrix'"
-        :class="viewMode === 'matrix' ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'"
-        class="px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all">
-        Matriks Lengkap
     </button>
 </div>
 
@@ -244,7 +244,7 @@
     </div>
 </div>
 
-{{-- Modal Editor Unified: KG + Dropdown Mapel + Autocomplete --}}
+{{-- Modal Editor — kontekstual per mode --}}
 <div x-show="showEditorModal" x-cloak
     class="fixed inset-0 z-[8000] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
     @keydown.escape.window="closeEditor()">
@@ -254,66 +254,126 @@
             <div>
                 <h3 class="text-white font-black text-sm uppercase tracking-wide">Edit Slot Jadwal</h3>
                 <p class="text-indigo-200 text-[10px] font-bold mt-0.5"
-                    x-text="editor ? (editor.hari + ' · Jam ' + editor.jam + (editor.kelasId ? ' · Kelas ' + kelasName(editor.kelasId) : '')) : ''"></p>
+                    x-text="editorSubtitle()"></p>
             </div>
             <button type="button" @click="closeEditor()" class="text-indigo-200 hover:text-white text-xl leading-none">&times;</button>
         </div>
 
         <div class="p-5 space-y-4" x-show="editor">
-            <div class="flex gap-1 bg-gray-100 p-1 rounded-lg">
-                <button type="button" @click="editorInputMode = 'kg'"
-                    :class="editorInputMode === 'kg' ? 'bg-white shadow text-indigo-700' : 'text-gray-500'"
-                    class="flex-1 py-1.5 rounded-md text-[10px] font-black uppercase transition-all">Ketik KG</button>
-                <button type="button" @click="editorInputMode = 'mapel'"
-                    :class="editorInputMode === 'mapel' ? 'bg-white shadow text-indigo-700' : 'text-gray-500'"
-                    class="flex-1 py-1.5 rounded-md text-[10px] font-black uppercase transition-all">Pilih Mapel</button>
-                <button type="button" @click="editorInputMode = 'cari'"
-                    :class="editorInputMode === 'cari' ? 'bg-white shadow text-indigo-700' : 'text-gray-500'"
-                    class="flex-1 py-1.5 rounded-md text-[10px] font-black uppercase transition-all">Cari</button>
-            </div>
 
-            {{-- Mode KG --}}
-            <div x-show="editorInputMode === 'kg'">
-                <label class="text-[10px] font-black uppercase text-gray-400 tracking-widest">Kode Guru (KG)</label>
-                <input type="text" x-ref="editorKgInput" x-model="editor.kg" @input.debounce.100ms="searchEditor"
-                    @keydown.enter.prevent="saveFromEditor()"
-                    class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold uppercase focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Contoh: MAT">
-                <p class="text-[9px] text-gray-400 mt-1 italic">Enter = simpan · Kosongkan = hapus slot</p>
-            </div>
-
-            {{-- Mode Mapel dropdown --}}
-            <div x-show="editorInputMode === 'mapel'">
-                <label class="text-[10px] font-black uppercase text-gray-400 tracking-widest">Pilih Mapel</label>
-                <select x-model.number="editor.bebanId" @change="onBebanSelect()"
-                    class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500">
-                    <option value="">— Pilih mapel —</option>
-                    <template x-for="b in bebanListForEditor()" :key="b.id">
-                        <option :value="b.id"
-                            x-text="'[' + b.kg + '] ' + b.mapel + ' (' + b.placed + '/' + b.jtm + ')' + (editor.fromGuru ? ' · ' + kelasName(b.kelas_id) : '')"></option>
-                    </template>
-                </select>
-            </div>
-
-            {{-- Mode Cari / autocomplete --}}
-            <div x-show="editorInputMode === 'cari'">
-                <label class="text-[10px] font-black uppercase text-gray-400 tracking-widest">Cari KG / Mapel / Guru</label>
-                <input type="text" x-model="editorSearchQuery" @input.debounce.100ms="searchEditor"
-                    class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    placeholder="Ketik untuk mencari...">
-                <div class="mt-2 max-h-40 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-50">
-                    <template x-for="item in searchResults" :key="'sr-' + item.id">
-                        <button type="button" @click="pickSearchResult(item)"
-                            class="w-full text-left p-2.5 hover:bg-indigo-50 transition-colors">
-                            <div class="font-bold text-indigo-700 text-xs" x-text="'[' + item.kg + '] ' + item.mapel"></div>
-                            <div class="text-[10px] text-gray-500" x-text="item.guru + (editor.fromGuru ? '' : '')"></div>
-                            <div class="text-[9px] text-amber-600 font-mono" x-text="item.placed + '/' + item.jtm + ' jam'"></div>
-                        </button>
-                    </template>
-                    <div x-show="editorSearchQuery && searchResults.length === 0"
-                        class="p-3 text-[10px] text-red-500 italic text-center">Tidak ditemukan</div>
+            {{-- Per Kelas & Per Hari: Mapel → Guru --}}
+            <template x-if="editor && (editor.context === 'kelas' || editor.context === 'hari')">
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest">1. Pilih Mapel</label>
+                        <select x-model="editor.selectedMapel" @change="onMapelSelectKelas()"
+                            class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500">
+                            <option value="">— Pilih mapel —</option>
+                            <template x-for="mg in mapelGroupsForKelas(editor.kelasId)" :key="mg.mapel">
+                                <option :value="mg.mapel" :disabled="mg.isFull"
+                                    x-text="mg.mapel + ' (' + mg.placed + '/' + mg.total + ' jam)' + (mg.isFull ? ' — PENUH' : '')"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div x-show="editor.selectedMapel && guruOptionsForKelasMapel(editor.kelasId, editor.selectedMapel).length > 1">
+                        <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest">2. Pilih Guru</label>
+                        <select x-model.number="editor.selectedBebanId"
+                            class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500">
+                            <option value="">— Pilih guru —</option>
+                            <template x-for="b in guruOptionsForKelasMapel(editor.kelasId, editor.selectedMapel)" :key="b.id">
+                                <option :value="b.id"
+                                    x-text="'[' + b.kg + '] ' + b.guru + ' (' + b.placed + '/' + b.jtm + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div x-show="editor.selectedMapel && guruOptionsForKelasMapel(editor.kelasId, editor.selectedMapel).length === 1"
+                        class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-xs text-indigo-800">
+                        <span class="font-black">Guru:</span>
+                        <span x-text="'[' + (guruOptionsForKelasMapel(editor.kelasId, editor.selectedMapel)[0]?.kg || '') + '] ' + (guruOptionsForKelasMapel(editor.kelasId, editor.selectedMapel)[0]?.guru || '')"></span>
+                    </div>
                 </div>
-            </div>
+            </template>
+
+            {{-- Per Guru: Mapel → Kelas --}}
+            <template x-if="editor && editor.context === 'guru'">
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest">1. Pilih Mapel</label>
+                        <select x-model="editor.selectedMapel" @change="onMapelSelectGuru()"
+                            class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500">
+                            <option value="">— Pilih mapel —</option>
+                            <template x-for="mg in mapelGroupsForGuru(editor.guruId)" :key="mg.mapel">
+                                <option :value="mg.mapel"
+                                    x-text="mg.mapel + ' (' + mg.placed + '/' + mg.total + ' jam tersisa)'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div x-show="editor.selectedMapel && kelasOptionsForGuruMapel(editor.guruId, editor.selectedMapel).length > 1">
+                        <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest">2. Pilih Kelas</label>
+                        <select x-model.number="editor.selectedBebanId"
+                            class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500">
+                            <option value="">— Pilih kelas —</option>
+                            <template x-for="b in kelasOptionsForGuruMapel(editor.guruId, editor.selectedMapel)" :key="b.id">
+                                <option :value="b.id"
+                                    x-text="kelasName(b.kelas_id) + ' (' + b.placed + '/' + b.jtm + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div x-show="editor.selectedMapel && kelasOptionsForGuruMapel(editor.guruId, editor.selectedMapel).length === 1"
+                        class="bg-orange-50 border border-orange-100 rounded-lg p-3 text-xs text-orange-900">
+                        <span class="font-black">Kelas:</span>
+                        <span x-text="kelasName(kelasOptionsForGuruMapel(editor.guruId, editor.selectedMapel)[0]?.kelas_id)"></span>
+                    </div>
+                </div>
+            </template>
+
+            {{-- Matriks: KG → Mapel → Blok Jam --}}
+            <template x-if="editor && editor.context === 'matrix'">
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest">1. Pilih Guru (KG)</label>
+                        <select x-model.number="editor.selectedGuruId" @change="onMatrixKgSelect()"
+                            class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500">
+                            <option value="">— Pilih KG —</option>
+                            <template x-for="g in guruListForKelas(editor.kelasId, editor.selectedGuruId)" :key="g.guru_id">
+                                <option :value="g.guru_id" x-text="'[' + g.kg + '] ' + g.guru"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div x-show="editor.selectedGuruId && mapelOptionsForKelasGuru(editor.kelasId, editor.selectedGuruId).length > 1">
+                        <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest">2. Pilih Mapel</label>
+                        <select x-model.number="editor.selectedBebanId" @change="onMatrixMapelSelect()"
+                            class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500">
+                            <option value="">— Pilih mapel —</option>
+                            <template x-for="b in mapelOptionsForKelasGuru(editor.kelasId, editor.selectedGuruId)" :key="b.id">
+                                <option :value="b.id"
+                                    x-text="b.mapel + ' (' + b.placed + '/' + b.jtm + ')'"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div x-show="editor.selectedGuruId && mapelOptionsForKelasGuru(editor.kelasId, editor.selectedGuruId).length === 1"
+                        class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 text-xs text-indigo-800">
+                        <span class="font-black">Mapel:</span>
+                        <span x-text="mapelOptionsForKelasGuru(editor.kelasId, editor.selectedGuruId)[0]?.mapel"></span>
+                        <span class="font-mono text-amber-600 ml-1"
+                            x-text="'(' + (mapelOptionsForKelasGuru(editor.kelasId, editor.selectedGuruId)[0]?.placed || 0) + '/' + (mapelOptionsForKelasGuru(editor.kelasId, editor.selectedGuruId)[0]?.jtm || 0) + ')'"></span>
+                    </div>
+                    <div x-show="editor.selectedBebanId">
+                        <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest block mb-2">3. Isi Berapa Jam?</label>
+                        <div class="flex gap-2">
+                            <template x-for="h in [1, 2, 3]" :key="'bh-' + h">
+                                <button type="button" @click="editor.blockHours = h"
+                                    :disabled="maxBlockHours() < h"
+                                    :class="editor.blockHours === h ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'"
+                                    class="flex-1 py-2.5 rounded-lg border font-black text-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                    x-text="h + ' jam'"></button>
+                            </template>
+                        </div>
+                        <p class="text-[9px] text-gray-400 mt-1 italic"
+                            x-text="'Maks. ' + maxBlockHours() + ' jam berturut dari jam ke-' + editor.jam"></p>
+                    </div>
+                </div>
+            </template>
         </div>
 
         <div class="px-5 py-4 bg-gray-50 border-t flex justify-between gap-2">

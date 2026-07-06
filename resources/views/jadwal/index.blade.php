@@ -347,10 +347,10 @@
                         {{-- Mapel belum terisi (KRITIS) --}}
                         @if(count($analisa['belum_terisi'] ?? []) > 0)
                             <div>
-                                <h4 class="bg-orange-600 text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">📋
+                                <h4 class="bg-orange-600 !text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">📋
                                     MAPEL BELUM TERISI PENUH (Perlu Perhatian)</h4>
                                 <div class="border border-orange-600 border-t-0 rounded-b overflow-hidden bg-orange-50">
-                                    <ul class="text-[10px] space-y-1 p-3">
+                                    <ul class="text-[10px] space-y-1 p-3 text-orange-950">
                                         @foreach($analisa['belum_terisi'] as $b)
                                             <li class="flex items-start gap-2">
                                                 <span class="bg-white text-orange-600 font-black px-1 border border-orange-200 mt-0.5">!</span>
@@ -607,6 +607,7 @@
                     @foreach(['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'] as $hari)
                         @php
                             $jmlJam = $strukturHari[$hari];
+                            $dayTopBorder = $hari !== 'Senin' ? 'border-t-[4px] border-black' : '';
                             if ($hari === 'Senin') {
                                 $currentLabels = $jamLabels['Senin'];
                             } elseif ($hari === 'Jumat') {
@@ -643,7 +644,7 @@
                                 </td>
                             </tr>
                         @elseif($hari === 'Jumat')
-                            <tr>
+                            <tr class="{{ $dayTopBorder }}">
                                 <td class="border border-gray-800 font-bold p-0.5 text-center bg-gray-50 align-middle"
                                     rowspan="{{ $totalRowsForDay }}">
                                     <div class="writing-vertical mx-auto">{{ $hari }}</div>
@@ -704,7 +705,7 @@
                             @endif
 
                             <!-- Baris JTM -->
-                            <tr>
+                            <tr class="{{ (!in_array($hari, ['Senin', 'Jumat']) && $jam === 1) ? $dayTopBorder : '' }}">
                                 @if(!in_array($hari, ['Senin', 'Jumat']) && $jam === 1)
                                     <td class="border border-gray-800 font-bold p-0.5 text-center bg-gray-50 align-middle"
                                         rowspan="{{ $totalRowsForDay }}">
@@ -791,11 +792,9 @@
             <script>
                 document.addEventListener('alpine:init', () => {
                     Alpine.data('scheduler', () => ({
-                        viewMode: 'kelas',
+                        viewMode: 'matrix',
                         showEditorModal: false,
                         editor: null,
-                        editorInputMode: 'kg',
-                        editorSearchQuery: '',
                         slotData: @json($slotData ?? []),
                         strukturHari: @json($strukturHari ?? []),
                         jamLabels: @json($jamLabels ?? []),
@@ -836,8 +835,349 @@
                         selectionType: null, // 0: block, 1: preserve, 2: reset
                         constraints: @json($constraints),
                         bebanData: @json($bebanPerKelas ?? []),
-                        searchResults: [],
-                        highlightedIndex: 0,
+
+                        bebanForKelas(kelasId) {
+                            return this.bebanData[kelasId] || [];
+                        },
+
+                        findBebanById(id) {
+                            for (const kelasId in this.bebanData) {
+                                const b = this.bebanData[kelasId].find(x => x.id == id);
+                                if (b) return b;
+                            }
+                            return null;
+                        },
+
+                        mapelGroupsForKelas(kelasId) {
+                            const map = {};
+                            for (const b of this.bebanForKelas(kelasId)) {
+                                if (!map[b.mapel]) {
+                                    map[b.mapel] = { mapel: b.mapel, total: 0, placed: 0 };
+                                }
+                                map[b.mapel].total += b.jtm;
+                                map[b.mapel].placed += b.placed;
+                            }
+                            return Object.values(map).map(mg => ({
+                                ...mg,
+                                isFull: mg.placed >= mg.total,
+                            }));
+                        },
+
+                        guruOptionsForKelasMapel(kelasId, mapelName) {
+                            if (!mapelName) return [];
+                            return this.bebanForKelas(kelasId).filter(b => b.mapel === mapelName && b.placed < b.jtm);
+                        },
+
+                        mapelGroupsForGuru(guruId) {
+                            const map = {};
+                            for (const b of this.bebanListForGuruIncomplete(guruId)) {
+                                if (!map[b.mapel]) {
+                                    map[b.mapel] = { mapel: b.mapel, total: 0, placed: 0 };
+                                }
+                                map[b.mapel].total += b.jtm;
+                                map[b.mapel].placed += b.placed;
+                            }
+                            return Object.values(map);
+                        },
+
+                        kelasOptionsForGuruMapel(guruId, mapelName) {
+                            if (!mapelName) return [];
+                            return this.bebanListForGuruIncomplete(guruId).filter(b => b.mapel === mapelName);
+                        },
+
+                        guruListForKelas(kelasId, extraGuruId = null) {
+                            const seen = {};
+                            const out = [];
+                            for (const b of this.bebanForKelas(kelasId)) {
+                                const eligible = b.placed < b.jtm || b.guru_id == extraGuruId;
+                                if (eligible && !seen[b.guru_id]) {
+                                    seen[b.guru_id] = true;
+                                    out.push({ guru_id: b.guru_id, kg: b.kg, guru: b.guru });
+                                }
+                            }
+                            return out.sort((a, b) => a.kg.localeCompare(b.kg));
+                        },
+
+                        mapelOptionsForKelasGuru(kelasId, guruId) {
+                            if (!guruId) return [];
+                            return this.bebanForKelas(kelasId).filter(b => b.guru_id == guruId && b.placed < b.jtm);
+                        },
+
+                        editorSubtitle() {
+                            if (!this.editor) return '';
+                            let s = this.editor.hari + ' · Jam ' + this.editor.jam;
+                            if (this.editor.kelasId) s += ' · Kelas ' + this.kelasName(this.editor.kelasId);
+                            return s;
+                        },
+
+                        onMapelSelectKelas() {
+                            const opts = this.guruOptionsForKelasMapel(this.editor.kelasId, this.editor.selectedMapel);
+                            if (opts.length === 1) {
+                                this.editor.selectedBebanId = opts[0].id;
+                            } else {
+                                this.editor.selectedBebanId = null;
+                            }
+                        },
+
+                        onMapelSelectGuru() {
+                            const opts = this.kelasOptionsForGuruMapel(this.editor.guruId, this.editor.selectedMapel);
+                            if (opts.length === 1) {
+                                this.editor.selectedBebanId = opts[0].id;
+                                this.editor.kelasId = opts[0].kelas_id;
+                            } else {
+                                this.editor.selectedBebanId = null;
+                            }
+                        },
+
+                        onMatrixKgSelect() {
+                            const opts = this.mapelOptionsForKelasGuru(this.editor.kelasId, this.editor.selectedGuruId);
+                            const available = opts.filter(b => b.placed < b.jtm);
+                            if (available.length === 1) {
+                                this.editor.selectedBebanId = available[0].id;
+                                this.editor.selectedMapel = available[0].mapel;
+                            } else {
+                                this.editor.selectedBebanId = null;
+                                this.editor.selectedMapel = '';
+                            }
+                            this.editor.blockHours = 1;
+                        },
+
+                        onMatrixMapelSelect() {
+                            const b = this.findBebanById(this.editor.selectedBebanId);
+                            if (b) this.editor.selectedMapel = b.mapel;
+                            this.editor.blockHours = 1;
+                        },
+
+                        maxBlockHours() {
+                            if (!this.editor?.selectedBebanId) return 1;
+                            const beban = this.findBebanById(this.editor.selectedBebanId);
+                            const remaining = beban ? Math.max(0, beban.jtm - beban.placed) : 0;
+                            const maxJam = this.strukturHari[this.editor.hari] || 0;
+                            let consecutive = 0;
+                            for (let j = this.editor.jam; j <= maxJam; j++) {
+                                const slot = this.getSlot(this.editor.hari, j, this.editor.kelasId);
+                                if (slot && j !== this.editor.jam) break;
+                                if (slot && j === this.editor.jam && slot.beban_id != this.editor.selectedBebanId) break;
+                                consecutive++;
+                            }
+                            return Math.min(consecutive, remaining, 3) || 1;
+                        },
+
+                        resolveEditorContext() {
+                            if (this.viewMode === 'matrix') return 'matrix';
+                            if (this.viewMode === 'guru') return 'guru';
+                            if (this.viewMode === 'hari') return 'hari';
+                            return 'kelas';
+                        },
+
+                        openEditor(hari, jam, kelasId, slot = null, context = null) {
+                            if (!this.is_active) return;
+                            const ctx = context || this.resolveEditorContext();
+                            const s = slot || this.getSlot(hari, jam, kelasId);
+                            this.editor = {
+                                hari, jam, kelasId,
+                                context: ctx,
+                                selectedMapel: s?.mapel || '',
+                                selectedBebanId: s?.beban_id || null,
+                                selectedGuruId: s?.guru_id || null,
+                                guruId: null,
+                                blockHours: 1,
+                            };
+                            if (ctx === 'kelas' || ctx === 'hari') {
+                                if (s?.mapel) this.onMapelSelectKelas();
+                            } else if (ctx === 'matrix' && s) {
+                                this.editor.selectedGuruId = s.guru_id;
+                                this.onMatrixKgSelect();
+                            }
+                            this.showEditorModal = true;
+                        },
+
+                        openEditorFromGuru(hari, jam) {
+                            if (!this.is_active) return;
+                            const slot = this.findGuruSlot(this.selectedGuruIdView, hari, jam);
+                            if (slot) {
+                                this.editor = {
+                                    hari, jam,
+                                    kelasId: slot.kelas_id,
+                                    context: 'guru',
+                                    guruId: this.selectedGuruIdView,
+                                    selectedMapel: slot.mapel,
+                                    selectedBebanId: slot.beban_id,
+                                    selectedGuruId: null,
+                                    blockHours: 1,
+                                };
+                            } else {
+                                this.editor = {
+                                    hari, jam, kelasId: null,
+                                    context: 'guru',
+                                    guruId: this.selectedGuruIdView,
+                                    selectedMapel: '',
+                                    selectedBebanId: null,
+                                    selectedGuruId: null,
+                                    blockHours: 1,
+                                };
+                            }
+                            this.showEditorModal = true;
+                        },
+
+                        closeEditor() {
+                            this.showEditorModal = false;
+                            this.editor = null;
+                        },
+
+                        clearSlot() {
+                            if (!this.editor) return;
+                            const { hari, jam, kelasId } = this.editor;
+                            this.closeEditor();
+                            this.postSlotUpdate(hari, jam, kelasId, null, false);
+                        },
+
+                        saveFromEditor(force = false) {
+                            if (!this.editor && !force) return;
+
+                            let bebanId = this.editor.selectedBebanId;
+                            let kelasId = this.editor.kelasId;
+
+                            if (!bebanId && this.editor.selectedMapel) {
+                                if (this.editor.context === 'guru') {
+                                    const opts = this.kelasOptionsForGuruMapel(this.editor.guruId, this.editor.selectedMapel);
+                                    if (opts.length === 1) {
+                                        bebanId = opts[0].id;
+                                        kelasId = opts[0].kelas_id;
+                                    }
+                                } else if (this.editor.context === 'kelas' || this.editor.context === 'hari') {
+                                    const opts = this.guruOptionsForKelasMapel(kelasId, this.editor.selectedMapel);
+                                    if (opts.length === 1) bebanId = opts[0].id;
+                                }
+                            }
+
+                            if (!bebanId && this.editor.context === 'matrix') {
+                                Swal.fire({ icon: 'warning', title: 'Belum lengkap', text: 'Pilih KG dan mapel terlebih dahulu.', confirmButtonColor: '#4f46e5' });
+                                return;
+                            }
+
+                            if (!bebanId && this.editor.context !== 'matrix') {
+                                Swal.fire({ icon: 'warning', title: 'Belum lengkap', text: 'Pilih mapel (dan guru/kelas jika perlu).', confirmButtonColor: '#4f46e5' });
+                                return;
+                            }
+
+                            const beban = this.findBebanById(bebanId);
+                            if (beban && beban.placed >= beban.jtm) {
+                                Swal.fire({ icon: 'warning', title: 'Mapel penuh', text: 'Jam mapel ini sudah terpenuhi.', confirmButtonColor: '#4f46e5' });
+                                return;
+                            }
+
+                            if (beban) kelasId = beban.kelas_id;
+
+                            this.lastEditing = { hari: this.editor.hari, jam: this.editor.jam, kelasId };
+
+                            const blockHours = (this.editor.context === 'matrix') ? (this.editor.blockHours || 1) : 1;
+                            this.closeEditor();
+
+                            if (blockHours > 1) {
+                                this.postSlotUpdateBlock(this.lastEditing.hari, this.lastEditing.jam, kelasId, bebanId, blockHours, force);
+                            } else {
+                                this.postSlotUpdate(this.lastEditing.hari, this.lastEditing.jam, kelasId, bebanId, force);
+                            }
+                        },
+
+                        async postSlotUpdateBlock(hari, startJam, kelasId, bebanId, count, force = false) {
+                            for (let i = 0; i < count; i++) {
+                                const jam = startJam + i;
+                                const existing = this.getSlot(hari, jam, kelasId);
+                                if (existing && i > 0) {
+                                    Swal.fire({ icon: 'error', title: 'Slot terisi', text: `Jam ke-${jam} sudah terisi.`, confirmButtonColor: '#4f46e5' });
+                                    return;
+                                }
+                                try {
+                                    const res = await fetch('{{ route('jadwal.update-slot') }}', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                                        body: JSON.stringify({
+                                            hari, jam_ke: jam, kelas_id: kelasId,
+                                            beban_mengajar_id: bebanId,
+                                            semester_id: this.semester_id,
+                                            force: force ? 1 : 0,
+                                            _token: '{{ csrf_token() }}'
+                                        })
+                                    });
+                                    const data = await res.json();
+                                    if (data.has_conflict && !force) {
+                                        Swal.fire({
+                                            icon: 'warning', title: 'Guru Bentrok!',
+                                            html: `<div class="text-sm text-left">${data.message}</div>`,
+                                            showCancelButton: true,
+                                            confirmButtonText: 'Lanjutkan',
+                                            cancelButtonText: 'Batalkan',
+                                            confirmButtonColor: '#4f46e5',
+                                        }).then(r => {
+                                            if (r.isConfirmed) this.postSlotUpdateBlock(hari, startJam, kelasId, bebanId, count, true);
+                                        });
+                                        return;
+                                    }
+                                    if (!res.ok || !data.success) {
+                                        Swal.fire({ icon: 'error', title: 'Gagal', text: data.message || 'Gagal menyimpan.', confirmButtonColor: '#4f46e5' });
+                                        return;
+                                    }
+                                } catch {
+                                    Swal.fire({ icon: 'error', title: 'Koneksi Terputus', confirmButtonColor: '#4f46e5' });
+                                    return;
+                                }
+                            }
+                            location.reload();
+                        },
+
+                        postSlotUpdate(hari, jam, kelasId, bebanId, force = false) {
+                            const payload = {
+                                hari, jam_ke: jam, kelas_id: kelasId,
+                                beban_mengajar_id: bebanId,
+                                semester_id: this.semester_id,
+                                force: force ? 1 : 0,
+                                _token: '{{ csrf_token() }}'
+                            };
+
+                            fetch('{{ route('jadwal.update-slot') }}', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                                body: JSON.stringify(payload)
+                            })
+                                .then(async res => {
+                                    const data = await res.json();
+                                    if (res.ok && data.success) {
+                                        location.reload();
+                                    } else if (data.has_conflict) {
+                                        Swal.fire({
+                                            icon: 'warning',
+                                            title: 'Guru Bentrok!',
+                                            html: `<div class="text-sm border-l-4 border-amber-500 pl-3 bg-amber-50 py-2 text-amber-800 text-left font-bold">${data.message}</div><p class="text-xs text-gray-500 mt-3 italic">*Apakah Anda ingin tetap menyimpan jadwal ini?</p>`,
+                                            showCancelButton: true,
+                                            confirmButtonColor: '#4f46e5',
+                                            cancelButtonColor: '#6b7280',
+                                            confirmButtonText: 'Lanjutkan Simpan',
+                                            cancelButtonText: 'Batalkan',
+                                        }).then((result) => {
+                                            if (result.isConfirmed) {
+                                                this.postSlotUpdate(hari, jam, kelasId, bebanId, true);
+                                            }
+                                        });
+                                    } else {
+                                        Swal.fire({
+                                            icon: 'error',
+                                            title: 'Gagal Simpan',
+                                            text: data.message || 'Gagal menyimpan jadwal.',
+                                            confirmButtonColor: '#4f46e5',
+                                        });
+                                    }
+                                })
+                                .catch(() => {
+                                    Swal.fire({
+                                        icon: 'error',
+                                        title: 'Koneksi Terputus',
+                                        text: 'Gagal koneksi ke server.',
+                                        confirmButtonColor: '#4f46e5',
+                                    });
+                                });
+                        },
 
                         getSlot(hari, jam, kelasId) {
                             return this.slotData?.[hari]?.[jam]?.[kelasId] ?? null;
@@ -929,172 +1269,6 @@
                             return (this.constraints[guruId] || []).some(c => c.hari == hari && c.jam_ke == jam && c.type == type);
                         },
 
-                        bebanListForEditor() {
-                            if (this.editor?.fromGuru) {
-                                return this.bebanListForGuruIncomplete(this.editor.guruId);
-                            }
-                            return this.bebanData[this.editor?.kelasId] || [];
-                        },
-
-                        openEditor(hari, jam, kelasId, slot = null) {
-                            if (!this.is_active) return;
-                            const s = slot || this.getSlot(hari, jam, kelasId);
-                            this.editor = {
-                                hari, jam, kelasId,
-                                kg: s?.kg || '',
-                                bebanId: s?.beban_id || null,
-                                fromGuru: false,
-                                guruId: null,
-                            };
-                            this.editorInputMode = 'kg';
-                            this.editorSearchQuery = '';
-                            this.showEditorModal = true;
-                            this.searchEditor();
-                            this.$nextTick(() => this.$refs.editorKgInput?.focus());
-                        },
-
-                        openEditorFromGuru(hari, jam) {
-                            if (!this.is_active) return;
-                            const slot = this.findGuruSlot(this.selectedGuruIdView, hari, jam);
-                            if (slot) {
-                                this.openEditor(hari, jam, slot.kelas_id, slot);
-                                return;
-                            }
-                            this.editor = {
-                                hari, jam, kelasId: null,
-                                kg: '', bebanId: null,
-                                fromGuru: true,
-                                guruId: this.selectedGuruIdView,
-                            };
-                            this.editorInputMode = 'mapel';
-                            this.editorSearchQuery = '';
-                            this.showEditorModal = true;
-                        },
-
-                        closeEditor() {
-                            this.showEditorModal = false;
-                            this.editor = null;
-                            this.searchResults = [];
-                        },
-
-                        onBebanSelect() {
-                            const b = this.bebanListForEditor().find(x => x.id == this.editor.bebanId);
-                            if (b) {
-                                this.editor.kg = b.kg;
-                                this.editor.kelasId = b.kelas_id;
-                            }
-                        },
-
-                        pickSearchResult(item) {
-                            this.editor.bebanId = item.id;
-                            this.editor.kg = item.kg;
-                            this.editor.kelasId = item.kelas_id;
-                            this.saveFromEditor();
-                        },
-
-                        searchEditor() {
-                            if (!this.editor) return;
-                            const query = (this.editorInputMode === 'cari' ? this.editorSearchQuery : this.editor.kg).toLowerCase();
-                            const list = this.bebanListForEditor();
-                            this.searchResults = list.filter(b =>
-                                b.kg.toLowerCase().includes(query) ||
-                                b.mapel.toLowerCase().includes(query) ||
-                                b.guru.toLowerCase().includes(query)
-                            );
-                            this.highlightedIndex = 0;
-                        },
-
-                        clearSlot() {
-                            if (!this.editor) return;
-                            this.editor.kg = '';
-                            this.editor.bebanId = null;
-                            this.saveFromEditor();
-                        },
-
-                        saveFromEditor(force = false) {
-                            if (!this.editor && !force) return;
-
-                            let bebanId = this.editor?.bebanId || null;
-                            const kelasId = this.editor?.kelasId;
-
-                            if (!force && !bebanId && this.editor?.kg) {
-                                const match = this.bebanListForEditor().find(b => b.kg.toLowerCase() === this.editor.kg.toLowerCase());
-                                if (match) {
-                                    bebanId = match.id;
-                                    this.editor.kelasId = match.kelas_id;
-                                } else if (this.editor.kg.trim()) {
-                                    Swal.fire({ icon: 'warning', title: 'KG tidak ditemukan', text: 'Periksa kode guru atau pilih dari dropdown mapel.', confirmButtonColor: '#4f46e5' });
-                                    return;
-                                }
-                            }
-
-                            if (!kelasId && bebanId) {
-                                const b = this.bebanListForEditor().find(x => x.id == bebanId);
-                                if (b) this.editor.kelasId = b.kelas_id;
-                            }
-
-                            this.lastEditing = {
-                                hari: this.editor.hari,
-                                jam: this.editor.jam,
-                                kelasId: this.editor.kelasId,
-                            };
-
-                            this.postSlotUpdate(this.editor.hari, this.editor.jam, this.editor.kelasId, bebanId, force);
-                            this.closeEditor();
-                        },
-
-                        postSlotUpdate(hari, jam, kelasId, bebanId, force = false) {
-                            const payload = {
-                                hari, jam_ke: jam, kelas_id: kelasId,
-                                beban_mengajar_id: bebanId,
-                                semester_id: this.semester_id,
-                                force: force ? 1 : 0,
-                                _token: '{{ csrf_token() }}'
-                            };
-
-                            fetch('{{ route('jadwal.update-slot') }}', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                                body: JSON.stringify(payload)
-                            })
-                                .then(async res => {
-                                    const data = await res.json();
-                                    if (res.ok && data.success) {
-                                        location.reload();
-                                    } else if (data.has_conflict) {
-                                        Swal.fire({
-                                            icon: 'warning',
-                                            title: 'Guru Bentrok!',
-                                            html: `<div class="text-sm border-l-4 border-amber-500 pl-3 bg-amber-50 py-2 text-amber-800 text-left font-bold">${data.message}</div><p class="text-xs text-gray-500 mt-3 italic">*Apakah Anda ingin tetap menyimpan jadwal ini?</p>`,
-                                            showCancelButton: true,
-                                            confirmButtonColor: '#4f46e5',
-                                            cancelButtonColor: '#6b7280',
-                                            confirmButtonText: 'Lanjutkan Simpan',
-                                            cancelButtonText: 'Batalkan',
-                                        }).then((result) => {
-                                            if (result.isConfirmed) {
-                                                this.postSlotUpdate(hari, jam, kelasId, bebanId, true);
-                                            }
-                                        });
-                                    } else {
-                                        Swal.fire({
-                                            icon: 'error',
-                                            title: 'Gagal Simpan',
-                                            text: data.message || 'Gagal menyimpan jadwal.',
-                                            confirmButtonColor: '#4f46e5',
-                                        });
-                                    }
-                                })
-                                .catch(() => {
-                                    Swal.fire({
-                                        icon: 'error',
-                                        title: 'Koneksi Terputus',
-                                        text: 'Gagal koneksi ke server.',
-                                        confirmButtonColor: '#4f46e5',
-                                    });
-                                });
-                        },
-
                         hasConstraint(hari, jam, type) {
                             if (!this.selectedGuruId || !this.constraints[this.selectedGuruId]) return false;
                             return (this.constraints[this.selectedGuruId] || []).some(c => c.hari == hari && c.jam_ke == jam && c.type == type);
@@ -1158,18 +1332,8 @@
 
                         editCell(hari, jam, kelasId, currentKg, event) {
                             const slot = this.getSlot(hari, jam, kelasId);
-                            this.openEditor(hari, jam, kelasId, slot || (currentKg ? { kg: currentKg, beban_id: null } : null));
+                            this.openEditor(hari, jam, kelasId, slot, 'matrix');
                         },
-
-                        search() {
-                            this.searchEditor();
-                        },
-
-                        save(bebanId = null, force = false) {
-                            if (force && this.lastEditing) {
-                                this.postSlotUpdate(this.lastEditing.hari, this.lastEditing.jam, this.lastEditing.kelasId, bebanId, true);
-                            }
-                        }
                     }));
                 });
             </script>
@@ -1187,6 +1351,10 @@
                 .row-lkd { background-color: #42b419 !important; color: white !important; }
                 .row-pramuka { background-color: #4b54b5 !important; color: white !important; }
                 .cell-jumat-5 { background-color: #354c29 !important; color: white !important; }
+
+                .border-t-\[4px\] {
+                    border-top-width: 4px !important;
+                }
 
                 .writing-vertical {
                     writing-mode: vertical-rl;
