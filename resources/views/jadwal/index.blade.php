@@ -3,6 +3,11 @@
 @section('header', 'MANAJEMEN PENJADWALAN')
 
 @section('content')
+    @php
+        $jadwalUpdateSlotsBatchUrl = Route::has('jadwal.update-slots-batch')
+            ? route('jadwal.update-slots-batch')
+            : url('jadwal/update-slots-batch');
+    @endphp
     @if(!$selectedSemester)
         <div class="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-8 flex flex-col items-center justify-center text-center space-y-4 mb-8">
             <svg class="w-16 h-16 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -1292,7 +1297,7 @@
 
                         async submitSlots(slots, force = false) {
                             try {
-                                const res = await fetch('{{ route('jadwal.update-slots-batch') }}', {
+                                const res = await fetch('{{ $jadwalUpdateSlotsBatchUrl }}', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                                     body: JSON.stringify({
