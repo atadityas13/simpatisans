@@ -300,7 +300,7 @@
                     </div>
                 </div>
                 <div class="p-6 border-t bg-gray-50 text-right flex justify-between items-center shrink-0">
-                    <p class="text-[10px] text-gray-400 font-bold italic">*Preset akan diterapkan saat Generate</p>
+                    <p class="text-[10px] text-gray-400 font-bold italic">*Preset hanya penanda kualitas di Laporan Analisa, tidak memblokir Generate</p>
                     <button @click="showConstraintModal = false"
                         class="bg-gray-900 hover:bg-black text-white px-8 py-3 rounded-xl font-black text-xs uppercase shadow-xl transition-all active:scale-95">Selesai
                         & Keluar</button>
