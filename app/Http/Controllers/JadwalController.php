@@ -238,17 +238,18 @@ class JadwalController extends Controller
             $presetViolations = count($analisa['pelanggaran_ketentuan'] ?? []);
 
             if ($result['status'] === 'partial') {
-                $msg = "<b>Jadwal disimpan sebagian.</b><br>Jam Terisi: {$terisi}/{$target} ({$kosong} belum terisi)<br>Masalah analisa: {$totalWarnings}";
+                $belum = count($analisa['belum_terisi'] ?? []);
+                $msg = "<b>Jadwal disimpan sebagian.</b><br>Jam Terisi: {$terisi}/{$target} ({$kosong} slot kosong, {$belum} mapel belum penuh)<br>Masalah analisa: {$totalWarnings}";
                 if ($presetViolations > 0) {
-                    $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — sesuaikan manual di Laporan Analisa.";
+                    $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — penanda saja, sesuaikan manual di Laporan Analisa.";
                 }
-                $msg .= '<br><small>Sistem sudah mencoba mengabaikan preset blokir bila perlu. Periksa mapel belum terisi dan sesuaikan preset/beban mengajar.</small>';
+                $msg .= '<br><small>Prioritas: semua mapel teralokasi. Periksa mapel belum terisi di Laporan Analisa — mungkin beban guru melebihi kapasitas (max 7 jam/hari).</small>';
                 return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('error', $msg);
             }
 
             $msg = "<b>Penjadwalan Otomatis Selesai!</b><br>Jam Terisi: {$terisi}/{$target}<br>Masalah: {$totalWarnings}";
             if ($presetViolations > 0) {
-                $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — sesuaikan manual (lihat Laporan Analisa).";
+                $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — penanda saja, sesuaikan manual (Laporan Analisa).";
             } elseif ($totalWarnings > 0) {
                 $msg .= '<br><small>Beberapa aturan belum sempurna — periksa Laporan Analisa.</small>';
             }
