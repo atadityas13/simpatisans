@@ -38,10 +38,13 @@
                 <div class="h-8 w-px bg-gray-200 mx-1"></div>
 
                 <button @click="showAnalysis = true"
-                    class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 {{ $hasWarnings ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse' : 'bg-emerald-600 hover:bg-emerald-700 text-white' }}">
-                    @if($hasWarnings)
+                    class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 {{ ($hasCriticalWarnings ?? false) ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse' : (($hasWarnings ?? false) ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white') }}">
+                    @if($hasCriticalWarnings ?? false)
                         <span>⚠</span>
-                        <span>PERIKSA ANALISA ({{ $totalWarnings }})</span>
+                        <span>PERLU PERHATIAN ({{ $criticalWarnings ?? 0 }})</span>
+                    @elseif($hasWarnings ?? false)
+                        <span>ℹ</span>
+                        <span>PENANDA KUALITAS ({{ $analisa['summary']['info_warnings'] ?? 0 }})</span>
                     @else
                         <span>✓</span>
                         <span>ANALISA (OK)</span>
@@ -317,19 +320,55 @@
                         class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
                 </div>
                 <div class="flex-1 overflow-y-auto p-4 space-y-6">
-                    @if(!$hasWarnings && count($analisa['over_blocked']) === 0)
+                    @php
+                        $crit = $analisa['summary']['critical_warnings'] ?? 0;
+                        $info = $analisa['summary']['info_warnings'] ?? 0;
+                        $terisiAnalisa = ($jadwals ?? collect())->count();
+                    @endphp
+                    @if($crit === 0 && $info === 0 && count($analisa['over_blocked']) === 0)
                         <div class="flex flex-col items-center justify-center py-10 text-emerald-600">
                             <span class="text-6xl mb-4">✓</span>
                             <p class="font-bold">Jadwal aman dan sudah sesuai aturan!</p>
                         </div>
                     @else
+                        <div class="rounded-lg border p-3 text-xs space-y-1 {{ $crit > 0 ? 'bg-orange-50 border-orange-300' : 'bg-blue-50 border-blue-300' }}">
+                            <p class="font-black uppercase tracking-wide {{ $crit > 0 ? 'text-orange-800' : 'text-blue-800' }}">
+                                Ringkasan Analisa
+                            </p>
+                            <p><b>Slot terisi:</b> {{ $terisiAnalisa }}/792</p>
+                            <p><b>Perlu perhatian (kritis):</b> {{ $crit }} — mapel belum penuh, bentrok, BTQ salah</p>
+                            <p><b>Penanda kualitas (info):</b> {{ $info }} — preset, struktur JTM, kelelahan guru</p>
+                            @if($info > 0 && $crit === 0)
+                                <p class="text-blue-700 mt-1">Semua mapel sudah teralokasi. Item di bawah hanya saran perapian manual.</p>
+                            @endif
+                        </div>
+                    @endif
+                    @if($crit > 0 || $info > 0 || count($analisa['over_blocked']) > 0)
+                        {{-- Mapel belum terisi (KRITIS) --}}
+                        @if(count($analisa['belum_terisi'] ?? []) > 0)
+                            <div>
+                                <h4 class="bg-orange-600 text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">📋
+                                    MAPEL BELUM TERISI PENUH (Perlu Perhatian)</h4>
+                                <div class="border border-orange-600 border-t-0 rounded-b overflow-hidden bg-orange-50">
+                                    <ul class="text-[10px] space-y-1 p-3">
+                                        @foreach($analisa['belum_terisi'] as $b)
+                                            <li class="flex items-start gap-2">
+                                                <span class="bg-white text-orange-600 font-black px-1 border border-orange-200 mt-0.5">!</span>
+                                                <span><b>{{ $b['mapel'] }}</b> ({{ $b['guru'] }}) di {{ $b['kelas'] }}: {{ $b['aktual'] }}/{{ $b['standar'] }} jam</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </div>
+                        @endif
+
                         {{-- Bagian Pelanggaran Blokir --}}
                         @if(count($analisa['pelanggaran_ketentuan']) > 0)
                             <div>
                                 <h4 class="bg-red-600 text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">🚨
-                                    PRESET BLOKIR DILANGGAR (Sesuaikan Manual)</h4>
+                                    PRESET BLOKIR (Penanda Kualitas)</h4>
                                 <p class="text-[10px] px-3 pt-2 text-red-800 bg-red-50 border-x border-red-600">
-                                    Preset hanya penanda — generator tidak menghalangi penempatan di slot blokir. Pindahkan slot berikut secara manual bila perlu sesuai preset guru.
+                                    Bukan kegagalan generate — slot ini dipilih agar semua jam terisi. Pindahkan manual bila perlu.
                                 </p>
                                 <div class="border border-red-600 border-t-0 rounded-b overflow-hidden bg-red-50">
                                     <ul class="text-xs space-y-1 p-3">
@@ -350,7 +389,10 @@
                         @if(count($analisa['struktur_jtm']) > 0)
                             <div>
                                 <h4 class="bg-indigo-600 text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">🧮
-                                    PEMBAGIAN JAM (STRUKTUR JTM)</h4>
+                                    STRUKTUR JTM (Penanda Kualitas)</h4>
+                                <p class="text-[10px] px-3 pt-2 text-indigo-800 bg-indigo-50 border-x border-indigo-600">
+                                    Pembagian blok jam (2+2, 3+2, dll.) belum rapi — sesuaikan manual jika diperlukan.
+                                </p>
                                 <div class="border border-indigo-600 border-t-0 rounded-b overflow-hidden bg-indigo-50">
                                     <ul class="text-[10px] space-y-1 p-3">
                                         @foreach($analisa['struktur_jtm'] as $msg)
@@ -376,24 +418,6 @@
                                             <li class="flex items-start gap-2">
                                                 <span class="bg-white text-emerald-700 font-black px-1 border border-emerald-200 mt-0.5">!</span>
                                                 <span class="leading-relaxed">{!! $msg !!}</span>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            </div>
-                        @endif
-
-                        {{-- Mapel belum terisi --}}
-                        @if(count($analisa['belum_terisi'] ?? []) > 0)
-                            <div>
-                                <h4 class="bg-orange-600 text-white p-2 rounded-t font-black text-xs uppercase tracking-widest">📋
-                                    MAPEL BELUM TERISI PENUH</h4>
-                                <div class="border border-orange-600 border-t-0 rounded-b overflow-hidden bg-orange-50">
-                                    <ul class="text-[10px] space-y-1 p-3">
-                                        @foreach($analisa['belum_terisi'] as $b)
-                                            <li class="flex items-start gap-2">
-                                                <span class="bg-white text-orange-600 font-black px-1 border border-orange-200 mt-0.5">!</span>
-                                                <span><b>{{ $b['mapel'] }}</b> ({{ $b['guru'] }}) di {{ $b['kelas'] }}: {{ $b['aktual'] }}/{{ $b['standar'] }} jam</span>
                                             </li>
                                         @endforeach
                                     </ul>
@@ -469,7 +493,7 @@
                             <div>
                                 <h4
                                     class="bg-purple-50 text-purple-700 p-2 rounded font-bold text-sm mb-2 uppercase italic tracking-widest">
-                                    ⚠ KELELAHAN GURU (>= 8 Jam/Hari)</h4>
+                                    ⚠ KELELAHAN GURU (Penanda Kualitas, >= 8 Jam/Hari)</h4>
                                 <ul class="text-xs space-y-1 pl-4 list-disc bg-white p-3 border rounded">
                                     @foreach($analisa['fatigue'] as $f)
                                         <li>Guru <span class="font-bold">[{{ $f['guru'] }}]</span> mengajar sebanyak <span

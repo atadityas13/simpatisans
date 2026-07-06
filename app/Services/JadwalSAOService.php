@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BebanMengajar;
+use App\Models\GuruConstraint;
 use App\Models\Jadwal;
 use App\Models\Kelas;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ class JadwalSAOService
     private const BTQ_HARI = 'Jumat';
     private const BTQ_JAM_AKHIR = 5;
 
+    private const MAX_KANDIDAT = 80;
+
     private array $strukturHari = ['Senin' => 9, 'Selasa' => 10, 'Rabu' => 10, 'Kamis' => 10, 'Jumat' => 5];
 
     private array $guruOcc = [];
@@ -25,6 +28,8 @@ class JadwalSAOService
     private array $unitByBm = [];
     private array $kelasIds = [];
     private array $guruLoad = [];
+    /** @var array<int, array<string, array<int, true>>> */
+    private array $presetBlokir = [];
 
     private int $deadline = 0;
     private int $terisiTerbaik = 0;
@@ -53,6 +58,7 @@ class JadwalSAOService
             $this->guruLoad[$b->guru_id] = ($this->guruLoad[$b->guru_id] ?? 0) + (int) $b->jtm;
         }
 
+        $this->loadPresetBlokir();
         $this->units = $this->buatUnits($beban);
         $this->unitByBm = [];
         foreach ($this->units as $u) {
@@ -129,7 +135,7 @@ class JadwalSAOService
                 continue;
             }
             while ($this->sisaJam($unit) > 0 && !$this->waktuHabis()) {
-                if (!$this->tempatkanSatuJam($unit)) {
+                if (!$this->tempatkanLangkah($unit)) {
                     break;
                 }
             }
@@ -155,7 +161,7 @@ class JadwalSAOService
                 $snapGrid = $this->salinGrid($this->grid);
                 $terisiAwal = $this->hitungTerisi();
 
-                $ok = $this->tempatkanSatuJam($unit) || $this->tempatkanDenganEviksi($unit);
+                $ok = $this->tempatkanLangkah($unit) || $this->tempatkanDenganEviksi($unit);
 
                 if ($ok && $this->hitungTerisi() > $terisiAwal) {
                     $progress = true;
@@ -172,25 +178,17 @@ class JadwalSAOService
         }
     }
 
-    private function tempatkanSatuJam(array $unit): bool
+    private function tempatkanLangkah(array $unit): bool
     {
         if ($this->sisaJam($unit) <= 0) {
             return true;
         }
 
-        if (!empty($unit['btq'])) {
-            foreach ($this->kandidatBtq($unit, $this->sisaJam($unit)) as $blok) {
-                if ($this->bisaTaruh($unit, $blok)) {
-                    $this->taruh($unit, $blok);
-                    return true;
-                }
+        foreach ($this->kandidatPenempatan($unit) as $blok) {
+            if ($this->bisaTaruh($unit, $blok)) {
+                $this->taruh($unit, $blok);
+                return true;
             }
-            return false;
-        }
-
-        foreach ($this->kandidatJam($unit) as $blok) {
-            $this->taruh($unit, $blok);
-            return true;
         }
 
         return false;
@@ -202,11 +200,7 @@ class JadwalSAOService
             return true;
         }
 
-        $kandidat = !empty($unit['btq'])
-            ? $this->kandidatBtq($unit, $this->sisaJam($unit))
-            : $this->kandidatJam($unit);
-
-        foreach ($kandidat as $blok) {
+        foreach ($this->kandidatPenempatan($unit) as $blok) {
             $evicted = $this->kumpulkanPenghalang($unit, $blok);
             if (empty($evicted)) {
                 continue;
@@ -232,6 +226,64 @@ class JadwalSAOService
     // ─── Kandidat penempatan ──────────────────────────────────────────────
 
     /** @return list<list<array{hari:string,start:int,size:int}>> */
+    private function kandidatPenempatan(array $unit): array
+    {
+        $sisa = $this->sisaJam($unit);
+        if ($sisa <= 0) {
+            return [];
+        }
+
+        if (!empty($unit['btq'])) {
+            return $this->kandidatBtq($unit, $sisa);
+        }
+
+        $hasil = [];
+        $hariTerpakai = $this->hariUnit($unit);
+
+        foreach ($this->polaJtm($sisa) as $potongan) {
+            $this->kumpulBlok($unit, $potongan, 0, [], $hariTerpakai, $hasil);
+            if (count($hasil) >= self::MAX_KANDIDAT) {
+                break;
+            }
+        }
+
+        foreach ($this->kandidatJamTunggal($unit) as $blok) {
+            $hasil[] = $blok;
+        }
+
+        usort($hasil, fn($a, $b) => $this->skorBlok($unit, $a) <=> $this->skorBlok($unit, $b));
+
+        return $hasil;
+    }
+
+    private function kumpulBlok(array $unit, array $potongan, int $idx, array $pilih, array $hariTerpakai, array &$hasil): void
+    {
+        if (count($hasil) >= self::MAX_KANDIDAT) {
+            return;
+        }
+        if ($idx >= count($potongan)) {
+            $hasil[] = $pilih;
+            return;
+        }
+
+        $ukuran = $potongan[$idx];
+        $exclude = array_unique(array_merge($hariTerpakai, array_column($pilih, 'hari')));
+
+        foreach ($this->strukturHari as $hari => $max) {
+            if (in_array($hari, $exclude, true)) {
+                continue;
+            }
+            for ($start = 1; $start <= $max - $ukuran + 1; $start++) {
+                $segmen = array_merge($pilih, [['hari' => $hari, 'start' => $start, 'size' => $ukuran]]);
+                if (!$this->bisaTaruh($unit, $segmen)) {
+                    continue;
+                }
+                $this->kumpulBlok($unit, $potongan, $idx + 1, $segmen, $hariTerpakai, $hasil);
+            }
+        }
+    }
+
+    /** @return list<list<array{hari:string,start:int,size:int}>> */
     private function kandidatBtq(array $unit, int $sisa): array
     {
         $start = self::BTQ_JAM_AKHIR - $sisa + 1;
@@ -243,7 +295,7 @@ class JadwalSAOService
     }
 
     /** @return list<list<array{hari:string,start:int,size:int}>> */
-    private function kandidatJam(array $unit): array
+    private function kandidatJamTunggal(array $unit): array
     {
         $scored = [];
         $gid = $unit['guruId'];
@@ -253,7 +305,7 @@ class JadwalSAOService
             for ($j = 1; $j <= $max; $j++) {
                 $blok = [['hari' => $hari, 'start' => $j, 'size' => 1]];
                 if ($this->bisaTaruh($unit, $blok)) {
-                    $scored[] = ['blok' => $blok, 'skor' => $bebanHari];
+                    $scored[] = ['blok' => $blok, 'skor' => $this->skorBlok($unit, $blok)];
                 }
             }
         }
@@ -261,6 +313,64 @@ class JadwalSAOService
         usort($scored, fn($a, $b) => $a['skor'] <=> $b['skor']);
 
         return array_map(fn($s) => $s['blok'], $scored);
+    }
+
+    private function skorBlok(array $unit, array $blok): int
+    {
+        $skor = 0;
+        $gid = $unit['guruId'];
+        foreach ($blok as $b) {
+            $skor += $this->bebanGuruHari($gid, $b['hari']) * 10;
+            $skor -= $b['size'] * 8;
+            for ($j = $b['start']; $j < $b['start'] + $b['size']; $j++) {
+                if ($this->isPresetBlokir($gid, $b['hari'], $j)) {
+                    $skor += 50;
+                }
+            }
+        }
+        return $skor;
+    }
+
+    private function polaJtm(int $jtm): array
+    {
+        return match ($jtm) {
+            1 => [[1]],
+            2 => [[2]],
+            3 => [[3], [2, 1]],
+            4 => [[2, 2]],
+            5 => [[3, 2], [2, 2, 1]],
+            6 => [[3, 3], [2, 2, 2]],
+            default => [array_fill(0, (int) ceil($jtm / 2), 2)],
+        };
+    }
+
+    private function hariUnit(array $unit): array
+    {
+        $days = [];
+        foreach (array_keys($this->strukturHari) as $hari) {
+            for ($j = 1; $j <= $this->strukturHari[$hari]; $j++) {
+                $s = $this->grid[$hari][$j][$unit['kelasId']] ?? null;
+                if ($s !== null && ($s['beban_mengajar_id'] ?? null) == $unit['bmId']) {
+                    $days[$hari] = true;
+                    break;
+                }
+            }
+        }
+        return array_keys($days);
+    }
+
+    private function loadPresetBlokir(): void
+    {
+        $this->presetBlokir = [];
+        foreach (GuruConstraint::where('type', 0)->get() as $c) {
+            $h = ucfirst(strtolower(trim($c->hari)));
+            $this->presetBlokir[$c->guru_id][$h][$c->jam_ke] = true;
+        }
+    }
+
+    private function isPresetBlokir(int $guruId, string $hari, int $jam): bool
+    {
+        return isset($this->presetBlokir[$guruId][$hari][$jam]);
     }
 
     private function bisaTaruh(array $unit, array $blok): bool
@@ -394,7 +504,7 @@ class JadwalSAOService
             if ($placed >= $target) {
                 continue;
             }
-            foreach ($this->kandidatJam($unit) as $blok) {
+            foreach ($this->kandidatPenempatan($unit) as $blok) {
                 $this->taruh($unit, $blok);
                 if ($this->hitungJamUnit($unit) >= $target) {
                     break;

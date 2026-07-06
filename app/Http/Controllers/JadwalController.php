@@ -114,9 +114,11 @@ class JadwalController extends Controller
         // LOGIKA ANALISA JADWAL (DELEGATED TO SERVICE)
         $analisa = $this->jadwalService->analisaPenuh($semesterId);
         $totalWarnings = $analisa['summary']['total_warnings'] ?? 0;
+        $criticalWarnings = $analisa['summary']['critical_warnings'] ?? 0;
         $hasWarnings = $totalWarnings > 0;
+        $hasCriticalWarnings = $criticalWarnings > 0;
 
-        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'totalWarnings', 'hasWarnings'));
+        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
     }
 
     public function toggleConstraint(Request $request)
@@ -231,28 +233,29 @@ class JadwalController extends Controller
             $result = $saoService->generate($semesterId);
 
             $analisa = $this->jadwalService->analisaPenuh($semesterId);
-            $totalWarnings = $analisa['summary']['total_warnings'] ?? 0;
+            $criticalWarnings = $analisa['summary']['critical_warnings'] ?? 0;
+            $infoWarnings = $analisa['summary']['info_warnings'] ?? 0;
             $terisi = $result['total_slot_terisi'];
             $target = $result['total_target'] ?? $terisi;
             $kosong = $result['slot_kosong'] ?? 0;
-
             $presetViolations = count($analisa['pelanggaran_ketentuan'] ?? []);
 
             if ($result['status'] === 'partial') {
                 $belum = count($analisa['belum_terisi'] ?? []);
-                $msg = "<b>Jadwal disimpan sebagian.</b><br>Jam Terisi: {$terisi}/{$target} ({$kosong} slot kosong, {$belum} mapel belum penuh)<br>Masalah analisa: {$totalWarnings}";
+                $msg = "<b>Jadwal disimpan sebagian.</b><br>Jam Terisi: {$terisi}/{$target} ({$kosong} slot kosong, {$belum} mapel belum penuh)";
+                $msg .= "<br>Perlu perhatian: {$criticalWarnings} | Penanda kualitas: {$infoWarnings}";
                 if ($presetViolations > 0) {
-                    $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — penanda saja, sesuaikan manual.";
+                    $msg .= "<br>Preset dilanggar: {$presetViolations} slot (penanda, bukan error generate).";
                 }
-                $msg .= '<br><small>Generate: hanya bentrok guru/kelas + BTQ Jumat jam 5. Preset, JTM, kelelahan → Laporan Analisa.</small>';
                 return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('error', $msg);
             }
 
-            $msg = "<b>Penjadwalan Otomatis Selesai!</b><br>Jam Terisi: {$terisi}/{$target}<br>Masalah analisa: {$totalWarnings}";
-            if ($presetViolations > 0) {
-                $msg .= "<br><b>Preset blokir dilanggar: {$presetViolations} slot</b> — sesuaikan manual bila perlu.";
-            } elseif ($totalWarnings > 0) {
-                $msg .= '<br><small>Semua slot terisi. Periksa struktur JTM / kelelahan di Laporan Analisa.</small>';
+            $msg = "<b>Penjadwalan Selesai!</b><br>Jam Terisi: {$terisi}/{$target}";
+            if ($criticalWarnings === 0) {
+                $msg .= '<br>Semua mapel teralokasi.';
+            }
+            if ($infoWarnings > 0) {
+                $msg .= "<br>Penanda kualitas (preset/JTM/kelelahan): {$infoWarnings} — sesuaikan manual bila perlu.";
             }
 
             return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('success', $msg);

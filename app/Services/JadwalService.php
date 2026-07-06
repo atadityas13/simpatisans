@@ -32,8 +32,10 @@ class JadwalService
             'invalid_slots' => [],
             'summary' => [
                 'total_warnings' => 0,
+                'critical_warnings' => 0,
+                'info_warnings' => 0,
                 'health_score' => 100,
-                'unassigned_kelas_mapel' => 0
+                'unassigned_kelas_mapel' => 0,
             ]
         ];
 
@@ -135,13 +137,14 @@ class JadwalService
             }
         }
 
-        // 6. Deteksi Pelanggaran Struktur JTM - ELITE SYNC
+        // 6. Deteksi Pelanggaran Struktur JTM
+        $strukturDistSalah = [];
         foreach ($bebanUsage as $bmId => $items) {
             $beban = $items->first()->bebanMengajar;
             $jtm = $beban->jtm;
             $hGroups = $items->groupBy('hari');
             $dist = [];
-            foreach ($hGroups as $hari => $hItems) {
+            foreach ($hGroups as $hItems) {
                 $dist[] = count($hItems);
             }
             rsort($dist);
@@ -151,28 +154,43 @@ class JadwalService
             $guruName = $beban->guru->kode_guru;
             $errorPrefix = "Mapel <b>{$mapelName}</b> ({$guruName}) di <b>{$kelasName}</b>";
 
-            if ($jtm == 1 && $dist != [1]) {
-                $analisa['struktur_jtm'][] = "{$errorPrefix} JTM 1 harus 1 jam.";
-            } elseif ($jtm == 2 && $dist != [2]) {
-                $analisa['struktur_jtm'][] = "{$errorPrefix} JTM 2 <b>HARUS</b> digabung 2 jam (Tidak boleh split hari).";
-            } elseif ($jtm == 3 && $dist != [3] && $dist != [2, 1]) {
-                $analisa['struktur_jtm'][] = "{$errorPrefix} JTM 3 harus dipecah 3 jam atau 2+1.";
-            } elseif ($jtm == 4 && $dist != [2, 2]) {
-                $analisa['struktur_jtm'][] = "{$errorPrefix} JTM 4 <b>HARUS</b> dipecah 2+2 jam.";
-            } elseif ($jtm == 5 && $dist != [3, 2] && $dist != [2, 2, 1]) {
-                $analisa['struktur_jtm'][] = "{$errorPrefix} JTM 5 harus dipecah 3+2 atau 2+2+1.";
-            } elseif ($jtm == 6 && $dist != [3, 3] && $dist != [2, 2, 2]) {
-                $analisa['struktur_jtm'][] = "{$errorPrefix} JTM 6 harus dipecah 3+3 atau 2+2+2.";
+            $distOk = match ($jtm) {
+                1 => $dist === [1],
+                2 => $dist === [2],
+                3 => $dist === [3] || $dist === [2, 1],
+                4 => $dist === [2, 2],
+                5 => $dist === [3, 2] || $dist === [2, 2, 1],
+                6 => $dist === [3, 3] || $dist === [2, 2, 2],
+                default => true,
+            };
+
+            if (!$distOk) {
+                $msg = match ($jtm) {
+                    1 => "{$errorPrefix} JTM 1 harus 1 jam.",
+                    2 => "{$errorPrefix} JTM 2 <b>HARUS</b> digabung 2 jam (Tidak boleh split hari).",
+                    3 => "{$errorPrefix} JTM 3 harus dipecah 3 jam atau 2+1.",
+                    4 => "{$errorPrefix} JTM 4 <b>HARUS</b> dipecah 2+2 jam.",
+                    5 => "{$errorPrefix} JTM 5 harus dipecah 3+2 atau 2+2+1.",
+                    6 => "{$errorPrefix} JTM 6 harus dipecah 3+3 atau 2+2+2.",
+                    default => "{$errorPrefix} struktur JTM tidak sesuai.",
+                };
+                $analisa['struktur_jtm'][] = $msg;
+                $strukturDistSalah[$bmId] = true;
             }
 
-            // Check Kontiguitas (Bebas Split di hari yang sama)
+            if (isset($strukturDistSalah[$bmId])) {
+                continue;
+            }
+
             foreach ($hGroups as $hari => $hItems) {
-                if (count($hItems) > 1) {
-                    $jams = $hItems->pluck('jam_ke')->sort()->values()->toArray();
-                    for ($i = 0; $i < count($jams) - 1; $i++) {
-                        if ($jams[$i+1] - $jams[$i] > 1) {
-                            $analisa['struktur_jtm'][] = "{$errorPrefix} di hari <b>{$hari}</b> terpisah jam (Tidak Blok).";
-                        }
+                if (count($hItems) <= 1) {
+                    continue;
+                }
+                $jams = $hItems->pluck('jam_ke')->sort()->values()->toArray();
+                for ($i = 0; $i < count($jams) - 1; $i++) {
+                    if ($jams[$i + 1] - $jams[$i] > 1) {
+                        $analisa['struktur_jtm'][] = "{$errorPrefix} di hari <b>{$hari}</b> terpisah jam (Tidak Blok).";
+                        break;
                     }
                 }
             }
@@ -220,12 +238,18 @@ class JadwalService
             }
         }
 
-        // 7. Calculate Summary
-        $totalProblems = count($analisa['bentrok']) + count($analisa['kelebihan_jtm']) + count($analisa['fatigue'])
-            + count($analisa['pelanggaran_ketentuan']) + count($analisa['struktur_jtm']) + count($analisa['aturan_btq'])
-            + count($analisa['belum_terisi']) + count($analisa['invalid_slots']);
-        $analisa['summary']['total_warnings'] = $totalProblems;
-        $analisa['summary']['health_score'] = max(0, 100 - ($totalProblems * 5));
+        // 7. Ringkasan: pisah masalah kritis vs penanda kualitas
+        $critical = count($analisa['bentrok']) + count($analisa['kelebihan_jtm'])
+            + count($analisa['belum_terisi']) + count($analisa['invalid_slots'])
+            + count($analisa['aturan_btq']);
+        $info = count($analisa['pelanggaran_ketentuan']) + count($analisa['struktur_jtm'])
+            + count($analisa['fatigue']);
+
+        $analisa['summary']['critical_warnings'] = $critical;
+        $analisa['summary']['info_warnings'] = $info;
+        $analisa['summary']['total_warnings'] = $critical + $info;
+        $analisa['summary']['unassigned_kelas_mapel'] = count($analisa['belum_terisi']);
+        $analisa['summary']['health_score'] = max(0, 100 - ($critical * 8) - min($info, 20));
 
         return $analisa;
     }
