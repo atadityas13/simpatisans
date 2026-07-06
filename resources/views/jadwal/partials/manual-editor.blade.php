@@ -20,6 +20,10 @@
         class="px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wide transition-all">
         Per Hari
     </button>
+    <span class="text-[9px] text-gray-500 font-bold ml-auto self-center hidden sm:inline">
+        <span class="inline-block w-3 h-3 rounded-sm slot-issue-critical align-middle mr-1"></span> Masalah kritis
+        <span class="inline-block w-3 h-3 rounded-sm slot-issue-info align-middle mx-1 ml-3"></span> Penanda kualitas — hover sel untuk detail
+    </span>
 </div>
 
 {{-- PER KELAS --}}
@@ -81,8 +85,16 @@
                                 <td class="border border-gray-200 p-1 text-center text-[9px] text-gray-500"
                                     x-text="getJamLabel(hari, jam)"></td>
                                 <td @dblclick="is_active && openEditor(hari, jam, selectedKelasId)"
-                                    class="border border-gray-200 p-2 cursor-pointer min-h-[36px] transition-colors"
-                                    :class="getSlot(hari, jam, selectedKelasId) ? 'bg-indigo-50' : 'bg-white hover:bg-amber-50'">
+                                    class="border border-gray-200 p-2 cursor-pointer min-h-[36px] transition-colors relative"
+                                    :class="{
+                                        'slot-issue-critical': getSlotIssueLevel(hari, jam, selectedKelasId) === 'critical',
+                                        'slot-issue-info': getSlotIssueLevel(hari, jam, selectedKelasId) === 'info',
+                                        'bg-indigo-50': getSlot(hari, jam, selectedKelasId) && !getSlotIssueLevel(hari, jam, selectedKelasId) && !isBtqOnlySlot(hari, jam),
+                                        'bg-white hover:bg-amber-50': !getSlot(hari, jam, selectedKelasId) && !getSlotIssueLevel(hari, jam, selectedKelasId) && !isBtqOnlySlot(hari, jam),
+                                        'bg-emerald-100 hover:bg-emerald-200 ring-1 ring-emerald-400': isBtqOnlySlot(hari, jam) && !getSlot(hari, jam, selectedKelasId) && !getSlotIssueLevel(hari, jam, selectedKelasId),
+                                        'cell-jumat-5': isBtqOnlySlot(hari, jam) && getSlot(hari, jam, selectedKelasId) && !getSlotIssueLevel(hari, jam, selectedKelasId)
+                                    }"
+                                    :title="slotIssueTooltip(hari, jam, selectedKelasId) || null">
                                     <template x-if="getSlot(hari, jam, selectedKelasId)">
                                         <div>
                                             <span class="font-black text-indigo-700"
@@ -91,7 +103,9 @@
                                                 x-text="getSlot(hari, jam, selectedKelasId).mapel"></span>
                                         </div>
                                     </template>
-                                    <span x-show="!getSlot(hari, jam, selectedKelasId)"
+                                    <span x-show="!getSlot(hari, jam, selectedKelasId) && isBtqOnlySlot(hari, jam)"
+                                        class="text-emerald-700 italic text-[10px] font-bold">BTQ — double klik</span>
+                                    <span x-show="!getSlot(hari, jam, selectedKelasId) && !isBtqOnlySlot(hari, jam)"
                                         class="text-gray-300 italic text-[10px]">kosong — double klik</span>
                                 </td>
                             </tr>
@@ -160,14 +174,18 @@
                                 <td class="border border-gray-200 p-1 text-center font-mono font-bold" x-text="jam"></td>
                                 <td class="border border-gray-200 p-1 text-center text-[9px] text-gray-500"
                                     x-text="getJamLabel(hari, jam)"></td>
-                                <td @dblclick="is_active && openEditorFromGuru(hari, jam)"
-                                    class="border border-gray-200 p-2 cursor-pointer min-h-[36px]"
+                                <td @dblclick="is_active && canEditGuruSlot(hari, jam) && openEditorFromGuru(hari, jam)"
+                                    class="border border-gray-200 p-2 min-h-[36px] relative"
                                     :class="{
-                                        'bg-red-100 ring-1 ring-red-300': hasConstraintForGuru(selectedGuruIdView, hari, jam, 0),
-                                        'bg-orange-100 ring-1 ring-orange-300': hasConstraintForGuru(selectedGuruIdView, hari, jam, 1),
-                                        'bg-indigo-50': findGuruSlot(selectedGuruIdView, hari, jam) && !hasConstraintForGuru(selectedGuruIdView, hari, jam, 0) && !hasConstraintForGuru(selectedGuruIdView, hari, jam, 1),
-                                        'hover:bg-amber-50': !findGuruSlot(selectedGuruIdView, hari, jam)
-                                    }">
+                                        'slot-issue-critical': getGuruSlotIssueLevel(hari, jam, selectedGuruIdView) === 'critical',
+                                        'slot-issue-info': getGuruSlotIssueLevel(hari, jam, selectedGuruIdView) === 'info',
+                                        'bg-red-100 ring-1 ring-red-300': !getGuruSlotIssueLevel(hari, jam, selectedGuruIdView) && hasConstraintForGuru(selectedGuruIdView, hari, jam, 0),
+                                        'bg-orange-100 ring-1 ring-orange-300': !getGuruSlotIssueLevel(hari, jam, selectedGuruIdView) && hasConstraintForGuru(selectedGuruIdView, hari, jam, 1),
+                                        'bg-indigo-50 cursor-pointer': findGuruSlot(selectedGuruIdView, hari, jam) && !getGuruSlotIssueLevel(hari, jam, selectedGuruIdView) && !hasConstraintForGuru(selectedGuruIdView, hari, jam, 0) && !hasConstraintForGuru(selectedGuruIdView, hari, jam, 1) && canEditGuruSlot(hari, jam),
+                                        'hover:bg-amber-50 cursor-pointer': !findGuruSlot(selectedGuruIdView, hari, jam) && canEditGuruSlot(hari, jam) && !getGuruSlotIssueLevel(hari, jam, selectedGuruIdView),
+                                        'bg-gray-100 opacity-50 cursor-not-allowed': !canEditGuruSlot(hari, jam)
+                                    }"
+                                    :title="guruSlotIssueTooltip(hari, jam, selectedGuruIdView) || null">
                                     <template x-if="findGuruSlot(selectedGuruIdView, hari, jam)">
                                         <div>
                                             <span class="font-black text-indigo-700"
@@ -176,8 +194,10 @@
                                                 x-text="findGuruSlot(selectedGuruIdView, hari, jam).mapel"></span>
                                         </div>
                                     </template>
-                                    <span x-show="!findGuruSlot(selectedGuruIdView, hari, jam) && !hasConstraintForGuru(selectedGuruIdView, hari, jam, 0) && !hasConstraintForGuru(selectedGuruIdView, hari, jam, 1)"
+                                    <span x-show="!findGuruSlot(selectedGuruIdView, hari, jam) && !hasConstraintForGuru(selectedGuruIdView, hari, jam, 0) && !hasConstraintForGuru(selectedGuruIdView, hari, jam, 1) && canEditGuruSlot(hari, jam)"
                                         class="text-gray-300 italic text-[10px]">kosong</span>
+                                    <span x-show="!canEditGuruSlot(hari, jam)"
+                                        class="text-[9px] font-bold text-gray-500 uppercase">Slot BTQ</span>
                                     <span x-show="hasConstraintForGuru(selectedGuruIdView, hari, jam, 0)"
                                         class="text-[9px] font-bold text-red-600 uppercase">Blokir</span>
                                     <span x-show="hasConstraintForGuru(selectedGuruIdView, hari, jam, 1)"
@@ -225,8 +245,16 @@
                             x-text="getJamLabel(selectedHariView, jam)"></td>
                         <template x-for="k in kelasFlat" :key="'hc-' + k.id + '-' + jam">
                             <td @dblclick="is_active && openEditor(selectedHariView, jam, k.id)"
-                                class="border border-gray-200 p-1 cursor-pointer text-center min-h-[28px] align-middle"
-                                :class="getSlot(selectedHariView, jam, k.id) ? 'bg-indigo-50' : 'hover:bg-amber-50'">
+                                class="border border-gray-200 p-1 cursor-pointer text-center min-h-[28px] align-middle relative"
+                                :class="{
+                                    'slot-issue-critical': getSlotIssueLevel(selectedHariView, jam, k.id) === 'critical',
+                                    'slot-issue-info': getSlotIssueLevel(selectedHariView, jam, k.id) === 'info',
+                                    'bg-indigo-50': getSlot(selectedHariView, jam, k.id) && !getSlotIssueLevel(selectedHariView, jam, k.id) && !isBtqOnlySlot(selectedHariView, jam),
+                                    'hover:bg-amber-50': !getSlot(selectedHariView, jam, k.id) && !getSlotIssueLevel(selectedHariView, jam, k.id) && !isBtqOnlySlot(selectedHariView, jam),
+                                    'bg-emerald-100 hover:bg-emerald-200': isBtqOnlySlot(selectedHariView, jam) && !getSlot(selectedHariView, jam, k.id) && !getSlotIssueLevel(selectedHariView, jam, k.id),
+                                    'cell-jumat-5': isBtqOnlySlot(selectedHariView, jam) && getSlot(selectedHariView, jam, k.id) && !getSlotIssueLevel(selectedHariView, jam, k.id)
+                                }"
+                                :title="slotIssueTooltip(selectedHariView, jam, k.id) || null">
                                 <template x-if="getSlot(selectedHariView, jam, k.id)">
                                     <div>
                                         <div class="font-black text-indigo-700 leading-tight"
@@ -264,6 +292,11 @@
 
         <div class="p-5 space-y-4 bg-white relative z-10" x-show="editor">
 
+            <div x-show="editor && isBtqOnlySlot(editor.hari, editor.jam)"
+                class="bg-emerald-50 border border-emerald-300 rounded-lg p-3 text-xs text-emerald-900 font-bold">
+                Slot khusus BTQ — hanya guru pengampu BTQ di kelas ini
+            </div>
+
             {{-- Per Kelas & Per Hari: Guru → Mapel --}}
             <div x-show="editor && (editor.context === 'kelas' || editor.context === 'hari')" class="space-y-4">
                 <div>
@@ -276,6 +309,10 @@
                                 x-text="'[' + g.kg + '] ' + g.guru + (g.isFull ? ' — PENUH' : '')"></option>
                         </template>
                     </select>
+                    <p x-show="editor && isBtqOnlySlot(editor.hari, editor.jam) && guruOptionsForKelasInput(editor.kelasId, editor.selectedGuruId).length === 0"
+                        class="mt-2 text-xs text-emerald-800 font-bold italic">
+                        Tidak ada guru pengampu BTQ di kelas ini
+                    </p>
                 </div>
 
                 <div x-show="editor.mapelFullMessage"
@@ -388,6 +425,10 @@
                                 x-text="'[' + g.kg + '] ' + g.guru + (g.isFull ? ' — PENUH' : '')"></option>
                         </template>
                     </select>
+                    <p x-show="editor && isBtqOnlySlot(editor.hari, editor.jam) && guruOptionsForKelasInput(editor.kelasId, editor.selectedGuruId).length === 0"
+                        class="mt-2 text-xs text-emerald-800 font-bold italic">
+                        Tidak ada guru pengampu BTQ di kelas ini
+                    </p>
                 </div>
 
                 <div x-show="editor.mapelFullMessage"

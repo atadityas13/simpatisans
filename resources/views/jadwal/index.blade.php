@@ -727,33 +727,31 @@
 
                                             $guruId = $slot ? $slot->bebanMengajar->guru_id : null;
 
-                                            // Deteksi Bentrok Visual
-                                            $isBentrok = false;
-                                            if ($kg) {
-                                                foreach ($analisa['bentrok'] as $b) {
-                                                    if ($b['hari'] == $hari && $b['jam'] == $jam && $b['guru'] == $kg) {
-                                                        $isBentrok = true;
-                                                        break;
-                                                    }
-                                                }
-                                            }
+                                            $issueKey = "{$hari}|{$jam}|{$kItem->id}";
+                                            $slotIssues = $slotIssueMap[$issueKey] ?? [];
+                                            $issueCritical = collect($slotIssues)->contains(fn ($i) => $i['level'] === 'critical');
+                                            $issueInfo = !$issueCritical && collect($slotIssues)->contains(fn ($i) => $i['level'] === 'info');
+                                            $issueTooltip = collect($slotIssues)->map(function ($i) {
+                                                $prefix = $i['level'] === 'critical' ? '⚠ ' : '● ';
+                                                return $prefix . $i['message'];
+                                            })->implode("\n");
 
                                             $colorIndex = $guruId ? ($guruId % 7) : -1;
                                             $bgColors = ['bg-red-50', 'bg-blue-50', 'bg-green-50', 'bg-yellow-50', 'bg-purple-50', 'bg-pink-50', 'bg-indigo-50'];
                                             $bg = $colorIndex >= 0 ? $bgColors[$colorIndex] : 'bg-white';
-                                            if ($isBentrok)
-                                                $bg = 'bg-red-600 text-white'; // HIGHLIGHT MERAH JIKA BENTROK
-                                            
-                                            // Force Dark Green for Friday 5th period
-                                            if ($hari === 'Jumat' && $jam === 5 && !$isBentrok) {
+                                            if ($issueCritical) {
+                                                $bg = 'slot-issue-critical';
+                                            } elseif ($issueInfo) {
+                                                $bg = 'slot-issue-info';
+                                            } elseif ($hari === 'Jumat' && $jam === 5) {
                                                 $bg = 'cell-jumat-5';
                                             }
                                         @endphp
-                                        <td class="border border-gray-800 p-0 text-center font-bold {{ $bg }} {{ $isBentrok ? 'shadow-[inset_0_0_4px_rgba(0,0,0,0.5)]' : ($selectedSemester->is_active ? 'hover:bg-indigo-200 cursor-pointer' : 'cursor-default opacity-80') }} transition-colors leading-tight relative"
+                                        <td class="border border-gray-800 p-0 text-center font-bold {{ $bg }} {{ $issueCritical ? 'shadow-[inset_0_0_4px_rgba(239,68,68,0.5)]' : ($issueInfo ? 'shadow-[inset_0_0_3px_rgba(234,179,8,0.5)]' : '') }} {{ $selectedSemester->is_active ? 'hover:bg-indigo-200 cursor-pointer' : 'cursor-default opacity-80' }} transition-colors leading-tight relative"
                                             @if($selectedSemester->is_active)
                                                 @dblclick="editCell('{{ $hari }}', {{ $jam }}, {{ $kItem->id }}, '{{ $kg }}', $event)"
                                             @endif
-                                            title="{{ $slot ? "[$kg] $tName - $mName" : 'Kosong' }}{{ $isBentrok ? ' (BENTROK!)' : '' }}">
+                                            @if($issueTooltip) title="{{ e($issueTooltip) }}" @elseif($slot) title="[{{ $kg }}] {{ e($tName) }} - {{ e($mName) }}" @else title="Kosong" @endif>
                                             {{ $kg }}
                                         </td>
                                     @endforeach
@@ -797,6 +795,7 @@
                         showEditorModal: false,
                         editor: null,
                         slotData: @json($slotData ?? []),
+                        slotIssueMap: @json($slotIssueMap ?? []),
                         strukturHari: @json($strukturHari ?? []),
                         jamLabels: @json($jamLabels ?? []),
                         kelasFlat: @json($kelasFlat ?? []),
@@ -841,6 +840,41 @@
                             return this.bebanData[kelasId] || [];
                         },
 
+                        isMapelBtq(mapelOrBeban) {
+                            if (typeof mapelOrBeban === 'object' && mapelOrBeban?.is_btq !== undefined) {
+                                return !!mapelOrBeban.is_btq;
+                            }
+                            const n = String(mapelOrBeban || '').toLowerCase();
+                            return n.includes('btq') || n.includes('baca tulis');
+                        },
+
+                        isBtqOnlySlot(hari, jam) {
+                            return hari === 'Jumat' && jam === 5;
+                        },
+
+                        guruTeachesBtq(guruId) {
+                            for (const kelasId in this.bebanData) {
+                                for (const b of this.bebanData[kelasId]) {
+                                    if (b.guru_id == guruId && this.isMapelBtq(b)) return true;
+                                }
+                            }
+                            return false;
+                        },
+
+                        filterBebanForSlot(bebanList, hari, jam) {
+                            if (this.isBtqOnlySlot(hari, jam)) {
+                                return bebanList.filter(b => this.isMapelBtq(b));
+                            }
+                            return bebanList.filter(b => !this.isMapelBtq(b));
+                        },
+
+                        canEditGuruSlot(hari, jam) {
+                            if (this.isBtqOnlySlot(hari, jam) && !this.guruTeachesBtq(this.selectedGuruIdView)) {
+                                return false;
+                            }
+                            return true;
+                        },
+
                         findBebanById(id) {
                             for (const kelasId in this.bebanData) {
                                 const b = this.bebanData[kelasId].find(x => x.id == id);
@@ -850,6 +884,8 @@
                         },
 
                         guruOptionsForKelasInput(kelasId, currentGuruId = null) {
+                            const slotHari = this.editor?.hari;
+                            const slotJam = this.editor?.jam;
                             const map = {};
                             for (const b of this.bebanForKelas(kelasId)) {
                                 if (!map[b.guru_id]) {
@@ -858,16 +894,25 @@
                                 map[b.guru_id].bebanItems.push(b);
                             }
                             return Object.values(map).map(g => {
-                                const available = g.bebanItems.filter(b => b.placed < b.jtm);
+                                let items = g.bebanItems;
+                                if (slotHari && slotJam) {
+                                    items = this.filterBebanForSlot(g.bebanItems, slotHari, slotJam);
+                                }
+                                const available = items.filter(b => b.placed < b.jtm);
                                 return {
                                     ...g,
+                                    bebanItems: items,
                                     available,
                                     isFull: available.length === 0 && g.guru_id != currentGuruId,
                                 };
-                            }).sort((a, b) => a.kg.localeCompare(b.kg));
+                            })
+                            .filter(g => g.bebanItems.length > 0 || g.guru_id == currentGuruId)
+                            .sort((a, b) => a.kg.localeCompare(b.kg));
                         },
 
                         kelasOptionsForGuruInput(guruId, currentKelasId = null) {
+                            const slotHari = this.editor?.hari;
+                            const slotJam = this.editor?.jam;
                             const map = {};
                             for (const kelasId in this.bebanData) {
                                 for (const b of this.bebanData[kelasId]) {
@@ -879,25 +924,40 @@
                                 }
                             }
                             return Object.values(map).map(k => {
-                                const available = k.bebanItems.filter(b => b.placed < b.jtm);
+                                let items = k.bebanItems;
+                                if (slotHari && slotJam) {
+                                    items = this.filterBebanForSlot(k.bebanItems, slotHari, slotJam);
+                                }
+                                const available = items.filter(b => b.placed < b.jtm);
                                 return {
                                     ...k,
+                                    bebanItems: items,
                                     available,
                                     isFull: available.length === 0 && k.kelas_id != currentKelasId,
                                 };
-                            }).sort((a, b) => this.kelasName(a.kelas_id).localeCompare(this.kelasName(b.kelas_id)));
+                            })
+                            .filter(k => k.bebanItems.length > 0 || k.kelas_id == currentKelasId)
+                            .sort((a, b) => this.kelasName(a.kelas_id).localeCompare(this.kelasName(b.kelas_id)));
                         },
 
                         mapelOptionsForSelectedGuruKelas() {
                             if (!this.editor?.selectedGuruId || !this.editor?.kelasId) return [];
-                            return this.bebanForKelas(this.editor.kelasId)
+                            let list = this.bebanForKelas(this.editor.kelasId)
                                 .filter(b => b.guru_id == this.editor.selectedGuruId && b.placed < b.jtm);
+                            if (this.editor.hari && this.editor.jam) {
+                                list = this.filterBebanForSlot(list, this.editor.hari, this.editor.jam);
+                            }
+                            return list;
                         },
 
                         mapelOptionsForSelectedKelasGuru() {
                             if (!this.editor?.selectedKelasId || !this.editor?.guruId) return [];
-                            return this.bebanForKelas(this.editor.selectedKelasId)
+                            let list = this.bebanForKelas(this.editor.selectedKelasId)
                                 .filter(b => b.guru_id == this.editor.guruId && b.placed < b.jtm);
+                            if (this.editor.hari && this.editor.jam) {
+                                list = this.filterBebanForSlot(list, this.editor.hari, this.editor.jam);
+                            }
+                            return list;
                         },
 
                         applyGuruMapelSelection(guruId, kelasId) {
@@ -980,6 +1040,7 @@
 
                         maxBlockHours() {
                             if (!this.editor?.selectedBebanId) return 1;
+                            if (this.isBtqOnlySlot(this.editor.hari, this.editor.jam)) return 1;
                             const beban = this.findBebanById(this.editor.selectedBebanId);
                             const remaining = beban ? Math.max(0, beban.jtm - beban.placed) : 0;
                             const maxJam = this.strukturHari[this.editor.hari] || 0;
@@ -1018,11 +1079,15 @@
                             if ((ctx === 'kelas' || ctx === 'hari' || ctx === 'matrix') && s?.guru_id) {
                                 this.applyGuruMapelSelection(s.guru_id, kelasId);
                             }
+                            if (this.isBtqOnlySlot(hari, jam) && this.guruOptionsForKelasInput(kelasId).length === 0 && !s?.guru_id) {
+                                this.editor.mapelFullMessage = 'Tidak ada guru pengampu BTQ di kelas ini';
+                            }
                             this.showEditorModal = true;
                         },
 
                         openEditorFromGuru(hari, jam) {
                             if (!this.is_active) return;
+                            if (!this.canEditGuruSlot(hari, jam)) return;
                             const slot = this.findGuruSlot(this.selectedGuruIdView, hari, jam);
                             if (slot) {
                                 this.editor = {
@@ -1189,6 +1254,45 @@
 
                         getSlot(hari, jam, kelasId) {
                             return this.slotData?.[hari]?.[jam]?.[kelasId] ?? null;
+                        },
+
+                        slotIssueKey(hari, jam, kelasId) {
+                            return `${hari}|${jam}|${kelasId}`;
+                        },
+
+                        getSlotIssues(hari, jam, kelasId) {
+                            return this.slotIssueMap[this.slotIssueKey(hari, jam, kelasId)] || [];
+                        },
+
+                        getSlotIssueLevel(hari, jam, kelasId) {
+                            const issues = this.getSlotIssues(hari, jam, kelasId);
+                            if (issues.some(i => i.level === 'critical')) return 'critical';
+                            if (issues.some(i => i.level === 'info')) return 'info';
+                            return null;
+                        },
+
+                        slotIssueTooltip(hari, jam, kelasId) {
+                            const issues = this.getSlotIssues(hari, jam, kelasId);
+                            if (!issues.length) return '';
+                            return issues.map(i => (i.level === 'critical' ? '⚠ ' : '● ') + i.message).join('\n');
+                        },
+
+                        getGuruSlotIssues(hari, jam, guruId) {
+                            const slot = this.findGuruSlot(guruId, hari, jam);
+                            if (!slot) return [];
+                            return this.getSlotIssues(hari, jam, slot.kelas_id);
+                        },
+
+                        getGuruSlotIssueLevel(hari, jam, guruId) {
+                            const slot = this.findGuruSlot(guruId, hari, jam);
+                            if (!slot) return null;
+                            return this.getSlotIssueLevel(hari, jam, slot.kelas_id);
+                        },
+
+                        guruSlotIssueTooltip(hari, jam, guruId) {
+                            const slot = this.findGuruSlot(guruId, hari, jam);
+                            if (!slot) return '';
+                            return this.slotIssueTooltip(hari, jam, slot.kelas_id);
                         },
 
                         getJamLabel(hari, jam) {
@@ -1359,6 +1463,8 @@
                 .row-lkd { background-color: #42b419 !important; color: white !important; }
                 .row-pramuka { background-color: #4b54b5 !important; color: white !important; }
                 .cell-jumat-5 { background-color: #354c29 !important; color: white !important; }
+                .slot-issue-critical { background-color: #fecaca !important; color: #7f1d1d !important; box-shadow: inset 0 0 0 2px #ef4444 !important; }
+                .slot-issue-info { background-color: #fef08a !important; color: #713f12 !important; box-shadow: inset 0 0 0 1px #eab308 !important; }
 
                 .border-t-\[4px\] {
                     border-top-width: 4px !important;

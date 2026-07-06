@@ -105,6 +105,7 @@ class JadwalController extends Controller
                     'kg' => $b->guru->kode_guru,
                     'guru' => $b->guru->nama_guru,
                     'mapel' => $b->mapel->nama_mapel,
+                    'is_btq' => $this->jadwalService->isMapelBtqName($b->mapel->nama_mapel ?? ''),
                     'jtm' => (int) $b->jtm,
                     'placed' => (int) ($bebanCounts->get($b->id, 0)),
                 ];
@@ -123,6 +124,7 @@ class JadwalController extends Controller
                 'guru_id' => $j->bebanMengajar->guru_id,
                 'guru' => $j->bebanMengajar->guru->nama_guru,
                 'mapel' => $j->bebanMengajar->mapel->nama_mapel,
+                'is_btq' => $this->jadwalService->isMapelBtqName($j->bebanMengajar->mapel->nama_mapel ?? ''),
                 'kelas_id' => $j->bebanMengajar->kelas_id,
                 'kelas' => $j->bebanMengajar->kelas->nama_kelas,
             ];
@@ -146,12 +148,13 @@ class JadwalController extends Controller
 
         // LOGIKA ANALISA JADWAL (DELEGATED TO SERVICE)
         $analisa = $this->jadwalService->analisaPenuh($semesterId);
+        $slotIssueMap = $this->jadwalService->buildSlotIssueMap($semesterId, $analisa);
         $totalWarnings = $analisa['summary']['total_warnings'] ?? 0;
         $criticalWarnings = $analisa['summary']['critical_warnings'] ?? 0;
         $hasWarnings = $totalWarnings > 0;
         $hasCriticalWarnings = $criticalWarnings > 0;
 
-        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'slotData', 'kelasFlat', 'guruList', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
+        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'slotData', 'slotIssueMap', 'kelasFlat', 'guruList', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
     }
 
     public function toggleConstraint(Request $request)
@@ -192,7 +195,21 @@ class JadwalController extends Controller
         $hariNormalized = ucfirst(strtolower(trim($request->hari)));
         $warning = null;
         if ($request->beban_mengajar_id) {
-            $beban = BebanMengajar::with('guru')->find($request->beban_mengajar_id);
+            $beban = BebanMengajar::with(['guru', 'mapel'])->find($request->beban_mengajar_id);
+
+            $isBtq = $this->jadwalService->isMapelBtqName($beban->mapel->nama_mapel ?? '');
+            if ($hariNormalized === 'Jumat' && (int) $request->jam_ke === 5 && !$isBtq) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Jumat jam ke-5 hanya untuk mapel BTQ.',
+                ], 422);
+            }
+            if ($isBtq && !($hariNormalized === 'Jumat' && (int) $request->jam_ke === 5)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Mapel BTQ hanya boleh di Jumat jam ke-5.',
+                ], 422);
+            }
 
             // CEK BENTROK GURU (Soft Warning) - Hanya di semester yang sama
             $bentrok = Jadwal::where('semester_id', $request->semester_id)

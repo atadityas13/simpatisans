@@ -334,6 +334,16 @@ class JadwalService
                 $this->pushWarning($warnings, $seen, 'critical', 'bentrok',
                     "Guru [{$beban->guru->kode_guru}] bentrok: juga mengajar di {$bentrok->bebanMengajar->kelas->nama_kelas} pada {$hari} jam ke-{$jam}.");
             }
+
+            $isBtq = $this->isMapelBtq($beban->mapel->nama_mapel ?? '');
+            if ($hari === 'Jumat' && $jam === 5 && !$isBtq) {
+                $this->pushWarning($warnings, $seen, 'critical', 'btq_slot',
+                    'Jumat jam ke-5 hanya boleh diisi mapel BTQ.');
+            }
+            if ($isBtq && !($hari === 'Jumat' && $jam === 5)) {
+                $this->pushWarning($warnings, $seen, 'critical', 'btq_wrong_slot',
+                    "Mapel BTQ ({$beban->mapel->nama_mapel}) hanya boleh di Jumat jam ke-5.");
+            }
         }
 
         // Simulasi slot beban setelah penempatan
@@ -485,6 +495,197 @@ class JadwalService
         }
         $seen[$key] = true;
         $warnings[] = ['level' => $level, 'code' => $code, 'message' => $message];
+    }
+
+    public function isMapelBtqName(?string $namaMapel): bool
+    {
+        return $this->isMapelBtq($namaMapel);
+    }
+
+    /**
+     * Peta masalah per slot untuk penanda visual di UI.
+     *
+     * @return array<string, array<int, array{level: string, code: string, message: string}>>
+     */
+    public function buildSlotIssueMap(int $semesterId, ?array $analisa = null): array
+    {
+        $analisa ??= $this->analisaPenuh($semesterId);
+
+        $jadwals = Jadwal::where('semester_id', $semesterId)
+            ->with(['bebanMengajar.guru', 'bebanMengajar.mapel', 'bebanMengajar.kelas'])
+            ->get();
+
+        $issues = [];
+        $push = function (string $hari, int $jam, int $kelasId, string $level, string $code, string $message) use (&$issues) {
+            $key = "{$hari}|{$jam}|{$kelasId}";
+            $issues[$key] ??= [];
+            foreach ($issues[$key] as $ex) {
+                if ($ex['code'] === $code && $ex['message'] === $message) {
+                    return;
+                }
+            }
+            $issues[$key][] = ['level' => $level, 'code' => $code, 'message' => $message];
+        };
+
+        $bebanUsage = $jadwals->filter(fn ($j) => $j->bebanMengajar)->groupBy('beban_mengajar_id');
+        $strukturMessages = $this->bebanStrukturIssueMessages($bebanUsage);
+
+        foreach ($analisa['bentrok'] as $b) {
+            $hari = $b['hari'];
+            $jam = (int) $b['jam'];
+            $kelasList = is_array($b['kelas']) ? $b['kelas'] : [$b['kelas']];
+            foreach ($jadwals as $j) {
+                if (!$j->bebanMengajar) {
+                    continue;
+                }
+                $h = ucfirst(strtolower(trim($j->hari)));
+                if ($h !== $hari || $j->jam_ke !== $jam || $j->bebanMengajar->guru->kode_guru !== $b['guru']) {
+                    continue;
+                }
+                $others = array_values(array_filter($kelasList, fn ($k) => $k !== $j->bebanMengajar->kelas->nama_kelas));
+                $otherText = $others ? implode(', ', $others) : 'kelas lain';
+                $push($hari, $jam, $j->bebanMengajar->kelas_id, 'critical', 'bentrok',
+                    "Bentrok: guru [{$b['guru']}] juga mengajar di {$otherText} pada jam yang sama");
+            }
+        }
+
+        foreach ($bebanUsage as $bmId => $items) {
+            $beban = $items->first()->bebanMengajar;
+            if ($items->count() > $beban->jtm) {
+                $msg = "Kelebihan JTM: {$beban->mapel->nama_mapel} ({$beban->guru->kode_guru}) — {$items->count()}/{$beban->jtm} jam";
+                foreach ($items as $j) {
+                    $h = ucfirst(strtolower(trim($j->hari)));
+                    $push($h, $j->jam_ke, $beban->kelas_id, 'critical', 'kelebihan_jtm', $msg);
+                }
+            }
+        }
+
+        foreach ($jadwals as $j) {
+            if (!$j->bebanMengajar) {
+                continue;
+            }
+            $h = ucfirst(strtolower(trim($j->hari)));
+            $beban = $j->bebanMengajar;
+            $isBtq = $this->isMapelBtq($beban->mapel->nama_mapel ?? '');
+
+            if ($h === 'Jumat' && $j->jam_ke === 5 && !$isBtq) {
+                $push($h, $j->jam_ke, $beban->kelas_id, 'critical', 'btq_slot', 'Jumat jam ke-5 hanya untuk mapel BTQ');
+            }
+            if ($isBtq && !($h === 'Jumat' && $j->jam_ke === 5)) {
+                $push($h, $j->jam_ke, $beban->kelas_id, 'critical', 'btq_wrong_slot',
+                    'Mapel BTQ hanya boleh di Jumat jam ke-5');
+            }
+
+            if (isset($strukturMessages[$bmId = $j->beban_mengajar_id])) {
+                foreach ($strukturMessages[$bmId] as $msg) {
+                    $push($h, $j->jam_ke, $beban->kelas_id, 'info', 'struktur_jtm', $msg);
+                }
+            }
+        }
+
+        foreach ($analisa['pelanggaran_ketentuan'] as $p) {
+            foreach ($jadwals as $j) {
+                if (!$j->bebanMengajar) {
+                    continue;
+                }
+                $h = ucfirst(strtolower(trim($j->hari)));
+                if ($h === $p['hari'] && $j->jam_ke === (int) $p['jam']
+                    && $j->bebanMengajar->guru->kode_guru === $p['guru']
+                    && $j->bebanMengajar->kelas->nama_kelas === $p['kelas']) {
+                    $push($h, $j->jam_ke, $j->bebanMengajar->kelas_id, 'info', 'pelanggaran_ketentuan',
+                        "Melanggar ketentuan: guru [{$p['guru']}] diblokir di slot ini");
+                }
+            }
+        }
+
+        foreach ($analisa['fatigue'] as $f) {
+            foreach ($jadwals as $j) {
+                if (!$j->bebanMengajar) {
+                    continue;
+                }
+                $h = ucfirst(strtolower(trim($j->hari)));
+                if ($h === $f['hari'] && $j->bebanMengajar->guru->kode_guru === $f['guru']) {
+                    $push($h, $j->jam_ke, $j->bebanMengajar->kelas_id, 'info', 'fatigue',
+                        "Kelelahan guru: [{$f['guru']}] mengajar {$f['jumlah']} jam di hari {$f['hari']} (≥8 jam)");
+                }
+            }
+        }
+
+        foreach ($analisa['invalid_slots'] as $inv) {
+            foreach ($jadwals as $j) {
+                if (!$j->bebanMengajar) {
+                    continue;
+                }
+                $h = ucfirst(strtolower(trim($j->hari)));
+                if ($h === $inv['hari'] && $j->jam_ke === (int) $inv['jam']
+                    && $j->bebanMengajar->kelas->nama_kelas === $inv['kelas']) {
+                    $push($h, $j->jam_ke, $j->bebanMengajar->kelas_id, 'critical', 'invalid_slot',
+                        "Slot invalid: jam ke-{$inv['jam']} di luar jam operasional hari {$inv['hari']}");
+                }
+            }
+        }
+
+        return $issues;
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, \Illuminate\Support\Collection<int, Jadwal>>  $bebanUsage
+     * @return array<int, array<int, string>>
+     */
+    private function bebanStrukturIssueMessages($bebanUsage): array
+    {
+        $messages = [];
+
+        foreach ($bebanUsage as $bmId => $items) {
+            $beban = $items->first()->bebanMengajar;
+            $jtm = $beban->jtm;
+            $hGroups = $items->groupBy(fn ($j) => ucfirst(strtolower(trim($j->hari))));
+            $dist = $hGroups->map->count()->values()->sort()->reverse()->values()->toArray();
+
+            $mapelName = $beban->mapel->nama_mapel;
+            $kelasName = $beban->kelas->nama_kelas;
+            $guruName = $beban->guru->kode_guru;
+            $prefix = "Mapel {$mapelName} ({$guruName}) di {$kelasName}";
+
+            $distOk = match ($jtm) {
+                1 => $dist === [1],
+                2 => $dist === [2],
+                3 => $dist === [3] || $dist === [2, 1],
+                4 => $dist === [2, 2],
+                5 => $dist === [3, 2] || $dist === [2, 2, 1],
+                6 => $dist === [3, 3] || $dist === [2, 2, 2],
+                default => true,
+            };
+
+            if (!$distOk) {
+                $msg = match ($jtm) {
+                    1 => "{$prefix}: JTM 1 harus 1 jam.",
+                    2 => "{$prefix}: JTM 2 harus digabung 2 jam (tidak boleh split hari).",
+                    3 => "{$prefix}: JTM 3 harus dipecah 3 jam atau 2+1.",
+                    4 => "{$prefix}: JTM 4 harus dipecah 2+2 jam.",
+                    5 => "{$prefix}: JTM 5 harus dipecah 3+2 atau 2+2+1.",
+                    6 => "{$prefix}: JTM 6 harus dipecah 3+3 atau 2+2+2.",
+                    default => "{$prefix}: struktur JTM tidak sesuai.",
+                };
+                $messages[$bmId][] = $msg;
+                continue;
+            }
+
+            foreach ($hGroups as $hari => $hItems) {
+                if ($hItems->count() <= 1) {
+                    continue;
+                }
+                $jams = $hItems->pluck('jam_ke')->sort()->values()->toArray();
+                for ($i = 0; $i < count($jams) - 1; $i++) {
+                    if ($jams[$i + 1] - $jams[$i] > 1) {
+                        $messages[$bmId][] = "{$prefix} di hari {$hari} terpisah jam (tidak blok).";
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $messages;
     }
 
     private function isMapelBtq(?string $namaMapel): bool
