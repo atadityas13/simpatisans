@@ -154,27 +154,9 @@ class JadwalService
             $guruName = $beban->guru->kode_guru;
             $errorPrefix = "Mapel <b>{$mapelName}</b> ({$guruName}) di <b>{$kelasName}</b>";
 
-            $distOk = match ($jtm) {
-                1 => $dist === [1],
-                2 => $dist === [2],
-                3 => $dist === [3] || $dist === [2, 1],
-                4 => $dist === [2, 2],
-                5 => $dist === [3, 2] || $dist === [2, 2, 1],
-                6 => $dist === [3, 3] || $dist === [2, 2, 2],
-                default => true,
-            };
-
-            if (!$distOk) {
-                $msg = match ($jtm) {
-                    1 => "{$errorPrefix} JTM 1 harus 1 jam.",
-                    2 => "{$errorPrefix} JTM 2 <b>HARUS</b> digabung 2 jam (Tidak boleh split hari).",
-                    3 => "{$errorPrefix} JTM 3 harus dipecah 3 jam atau 2+1.",
-                    4 => "{$errorPrefix} JTM 4 <b>HARUS</b> dipecah 2+2 jam.",
-                    5 => "{$errorPrefix} JTM 5 harus dipecah 3+2 atau 2+2+1.",
-                    6 => "{$errorPrefix} JTM 6 harus dipecah 3+3 atau 2+2+2.",
-                    default => "{$errorPrefix} struktur JTM tidak sesuai.",
-                };
-                $analisa['struktur_jtm'][] = $msg;
+            $struktur = $this->evaluateBebanJtmStructure($jtm, $dist, $items->count());
+            if (!$struktur['ok']) {
+                $analisa['struktur_jtm'][] = "{$errorPrefix} {$struktur['message']}";
                 $strukturDistSalah[$bmId] = true;
             }
 
@@ -363,38 +345,21 @@ class JadwalService
         $dist = $hGroups->map->count()->values()->sort()->reverse()->values()->toArray();
         $jtm = (int) $beban->jtm;
 
-        $distOk = match ($jtm) {
-            1 => $dist === [1],
-            2 => $dist === [2],
-            3 => $dist === [3] || $dist === [2, 1],
-            4 => $dist === [2, 2],
-            5 => $dist === [3, 2] || $dist === [2, 2, 1],
-            6 => $dist === [3, 3] || $dist === [2, 2, 2],
-            default => true,
-        };
+        $struktur = $this->evaluateBebanJtmStructure($jtm, $dist, $newCount);
+        if (!$struktur['ok'] && $newCount > 0) {
+            $this->pushWarning($warnings, $seen, 'info', 'struktur_jtm', "{$prefix}: {$struktur['message']}");
+        }
 
-        if (!$distOk && $newCount > 0) {
-            $msg = match ($jtm) {
-                2 => "{$prefix}: JTM 2 HARUS digabung 2 jam (tidak boleh split hari).",
-                3 => "{$prefix}: JTM 3 harus dipecah 3 jam atau 2+1.",
-                4 => "{$prefix}: JTM 4 HARUS dipecah 2+2 jam.",
-                5 => "{$prefix}: JTM 5 harus dipecah 3+2 atau 2+2+1.",
-                6 => "{$prefix}: JTM 6 harus dipecah 3+3 atau 2+2+2.",
-                default => "{$prefix}: struktur pembagian JTM belum sesuai.",
-            };
-            $this->pushWarning($warnings, $seen, 'info', 'struktur_jtm', $msg);
-        } else {
-            foreach ($hGroups as $hari => $items) {
-                if ($items->count() <= 1) {
-                    continue;
-                }
-                $jams = $items->pluck('jam_ke')->sort()->values()->toArray();
-                for ($i = 0; $i < count($jams) - 1; $i++) {
-                    if ($jams[$i + 1] - $jams[$i] > 1) {
-                        $this->pushWarning($warnings, $seen, 'info', 'struktur_jtm',
-                            "{$prefix} di {$hari} terpisah jam (tidak blok).");
-                        break;
-                    }
+        foreach ($hGroups as $hari => $items) {
+            if ($items->count() <= 1) {
+                continue;
+            }
+            $jams = $items->pluck('jam_ke')->sort()->values()->toArray();
+            for ($i = 0; $i < count($jams) - 1; $i++) {
+                if ($jams[$i + 1] - $jams[$i] > 1) {
+                    $this->pushWarning($warnings, $seen, 'info', 'struktur_jtm',
+                        "{$prefix} di {$hari} terpisah jam (tidak blok).");
+                    break;
                 }
             }
         }
@@ -647,27 +612,9 @@ class JadwalService
             $guruName = $beban->guru->kode_guru;
             $prefix = "Mapel {$mapelName} ({$guruName}) di {$kelasName}";
 
-            $distOk = match ($jtm) {
-                1 => $dist === [1],
-                2 => $dist === [2],
-                3 => $dist === [3] || $dist === [2, 1],
-                4 => $dist === [2, 2],
-                5 => $dist === [3, 2] || $dist === [2, 2, 1],
-                6 => $dist === [3, 3] || $dist === [2, 2, 2],
-                default => true,
-            };
-
-            if (!$distOk) {
-                $msg = match ($jtm) {
-                    1 => "{$prefix}: JTM 1 harus 1 jam.",
-                    2 => "{$prefix}: JTM 2 harus digabung 2 jam (tidak boleh split hari).",
-                    3 => "{$prefix}: JTM 3 harus dipecah 3 jam atau 2+1.",
-                    4 => "{$prefix}: JTM 4 harus dipecah 2+2 jam.",
-                    5 => "{$prefix}: JTM 5 harus dipecah 3+2 atau 2+2+1.",
-                    6 => "{$prefix}: JTM 6 harus dipecah 3+3 atau 2+2+2.",
-                    default => "{$prefix}: struktur JTM tidak sesuai.",
-                };
-                $messages[$bmId][] = $msg;
+            $struktur = $this->evaluateBebanJtmStructure($jtm, $dist, $items->count());
+            if (!$struktur['ok']) {
+                $messages[$bmId][] = "{$prefix}: {$struktur['message']}";
                 continue;
             }
 
@@ -686,6 +633,150 @@ class JadwalService
         }
 
         return $messages;
+    }
+
+    /**
+     * @return array{ok: bool, message: string|null}
+     */
+    private function evaluateBebanJtmStructure(int $jtm, array $dist, int $placedCount): array
+    {
+        if ($jtm <= 0 || $jtm > 6 || $placedCount <= 0) {
+            return ['ok' => true, 'message' => null];
+        }
+
+        $remaining = $jtm - $placedCount;
+        if ($remaining < 0) {
+            return ['ok' => false, 'message' => $this->jtmStructureRuleMessage($jtm)];
+        }
+
+        if ($this->canReachValidJtmDistribution($jtm, $dist, $remaining)) {
+            return ['ok' => true, 'message' => null];
+        }
+
+        return ['ok' => false, 'message' => $this->jtmStructureRuleMessage($jtm)];
+    }
+
+    /** @return array<int, array<int, int>> */
+    private function validJtmDistributions(int $jtm): array
+    {
+        return match ($jtm) {
+            1 => [[1]],
+            2 => [[2]],
+            3 => [[3], [2, 1]],
+            4 => [[2, 2]],
+            5 => [[3, 2], [2, 2, 1]],
+            6 => [[3, 3], [2, 2, 2]],
+            default => [],
+        };
+    }
+
+    /** @return array{max_days: int, max_single_days: int, max_hours_per_day: int} */
+    private function jtmStructureLimits(int $jtm): array
+    {
+        $valid = $this->validJtmDistributions($jtm);
+        if ($valid === []) {
+            return [
+                'max_days' => PHP_INT_MAX,
+                'max_single_days' => PHP_INT_MAX,
+                'max_hours_per_day' => PHP_INT_MAX,
+            ];
+        }
+
+        $maxSingle = 0;
+        foreach ($valid as $pattern) {
+            $maxSingle = max($maxSingle, count(array_filter($pattern, fn ($x) => $x === 1)));
+        }
+
+        return [
+            'max_days' => max(array_map('count', $valid)),
+            'max_single_days' => $maxSingle,
+            'max_hours_per_day' => max(array_map('max', $valid)),
+        ];
+    }
+
+    /** @param  array<int, int>  $dist */
+    private function sortDistDesc(array $dist): array
+    {
+        rsort($dist);
+
+        return array_values($dist);
+    }
+
+    /** @param  array<int, int>  $dist */
+    private function isValidJtmDist(int $jtm, array $dist): bool
+    {
+        $dist = $this->sortDistDesc($dist);
+        foreach ($this->validJtmDistributions($jtm) as $valid) {
+            if ($dist === $this->sortDistDesc($valid)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Apakah distribusi jam per hari saat ini masih bisa dilengkapi ke pola JTM valid?
+     *
+     * @param  array<int, int>  $dist
+     */
+    private function canReachValidJtmDistribution(int $jtm, array $dist, int $remaining, array &$memo = []): bool
+    {
+        if ($remaining === 0) {
+            return $this->isValidJtmDist($jtm, $dist);
+        }
+
+        $dist = $this->sortDistDesc($dist);
+        $limits = $this->jtmStructureLimits($jtm);
+
+        if (count($dist) > $limits['max_days']) {
+            return false;
+        }
+        if (count(array_filter($dist, fn ($x) => $x === 1)) > $limits['max_single_days']) {
+            return false;
+        }
+        if ($dist !== [] && max($dist) > $limits['max_hours_per_day']) {
+            return false;
+        }
+
+        $key = $jtm . '|' . implode(',', $dist) . '|' . $remaining;
+        if (isset($memo[$key])) {
+            return $memo[$key];
+        }
+
+        for ($i = 0; $i < count($dist); $i++) {
+            $next = $dist;
+            $next[$i]++;
+            if ($next[$i] > $limits['max_hours_per_day']) {
+                continue;
+            }
+            if ($this->canReachValidJtmDistribution($jtm, $next, $remaining - 1, $memo)) {
+                return $memo[$key] = true;
+            }
+        }
+
+        if (count($dist) < $limits['max_days']) {
+            $next = $dist;
+            $next[] = 1;
+            if ($this->canReachValidJtmDistribution($jtm, $next, $remaining - 1, $memo)) {
+                return $memo[$key] = true;
+            }
+        }
+
+        return $memo[$key] = false;
+    }
+
+    private function jtmStructureRuleMessage(int $jtm): string
+    {
+        return match ($jtm) {
+            1 => 'JTM 1 harus 1 jam.',
+            2 => 'JTM 2 HARUS digabung 2 jam (tidak boleh split hari).',
+            3 => 'JTM 3 harus dipecah 3 jam atau 2+1 (bukan 1+1+1).',
+            4 => 'JTM 4 HARUS dipecah 2+2 jam (tidak boleh ada 1 jam).',
+            5 => 'JTM 5 harus dipecah 3+2 atau 2+2+1 (bukan 2+1+1+1).',
+            6 => 'JTM 6 harus dipecah 3+3 atau 2+2+2.',
+            default => 'struktur pembagian JTM belum sesuai.',
+        };
     }
 
     private function isMapelBtq(?string $namaMapel): bool
