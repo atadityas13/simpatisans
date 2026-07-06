@@ -22,8 +22,7 @@
             x-ref="guruKgDropdownPanel"
             x-cloak
             :style="guruKgDropdownStyle()"
-            class="fixed bg-white border border-gray-200 rounded-lg shadow-2xl overflow-hidden"
-            style="z-index: 100001;">
+            class="bg-white border border-gray-200 rounded-lg shadow-2xl overflow-hidden">
 
             <div class="p-2 border-b border-gray-100 bg-gray-50">
                 <input type="text"

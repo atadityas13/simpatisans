@@ -1022,7 +1022,7 @@
 
                         guruKgDropdownStyle() {
                             const p = this.guruKgDropdownPos;
-                            return 'top:' + p.top + 'px;left:' + p.left + 'px;width:' + p.width + 'px;';
+                            return 'position:fixed;top:' + p.top + 'px;left:' + p.left + 'px;width:' + p.width + 'px;z-index:100010;';
                         },
 
                         handleGuruKgClickOutside(event) {
