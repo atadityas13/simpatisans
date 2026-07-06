@@ -992,6 +992,41 @@
                             return s;
                         },
 
+                        selectedGuruDisplayLabel() {
+                            if (!this.editor?.selectedGuruId || !this.editor?.kelasId) return '';
+                            const g = this.guruOptionsForKelasInput(this.editor.kelasId, this.editor.selectedGuruId)
+                                .find(x => x.guru_id == this.editor.selectedGuruId);
+                            return g ? (g.kg + ' — ' + g.guru) : '';
+                        },
+
+                        toggleGuruKgDropdown() {
+                            if (!this.editor) return;
+                            if (this.editor.guruKgDropdownOpen) {
+                                this.closeGuruKgDropdown();
+                            } else {
+                                this.openGuruKgDropdown();
+                            }
+                        },
+
+                        openGuruKgDropdown() {
+                            if (!this.editor) return;
+                            this.editor.guruKgDropdownOpen = true;
+                            this.editor.guruKgQuery = '';
+                            this.$nextTick(() => {
+                                const el = this.$refs.guruKgSearchInput;
+                                if (el) {
+                                    el.focus();
+                                    el.select();
+                                }
+                            });
+                        },
+
+                        closeGuruKgDropdown() {
+                            if (!this.editor) return;
+                            this.editor.guruKgDropdownOpen = false;
+                            this.editor.guruKgQuery = '';
+                        },
+
                         onGuruSelectFromDropdown() {
                             if (!this.editor) return;
                             const id = this.editor.selectedGuruId;
@@ -1000,16 +1035,15 @@
                                 this.editor.selectedBebanId = null;
                                 this.editor.selectedMapel = '';
                                 this.editor.mapelFullMessage = '';
-                                this.editor.guruKgDropdownOpen = false;
+                                this.closeGuruKgDropdown();
                                 return;
                             }
                             const g = this.guruOptionsForKelasInput(this.editor.kelasId, id)
                                 .find(x => x.guru_id == id);
                             if (!g) return;
-                            this.editor.guruKgQuery = g.kg;
                             this.applyGuruMapelSelection(id, this.editor.kelasId);
                             this.editor.blockHours = 1;
-                            this.editor.guruKgDropdownOpen = false;
+                            this.closeGuruKgDropdown();
                         },
 
                         onGuruSelectKelas() {
@@ -1037,49 +1071,21 @@
 
                         initGuruKgQuery() {
                             if (!this.editor) return;
-                            if (this.editor.selectedGuruId) {
-                                const g = this.guruOptionsForKelasInput(this.editor.kelasId, this.editor.selectedGuruId)
-                                    .find(x => x.guru_id == this.editor.selectedGuruId);
-                                this.editor.guruKgQuery = g ? g.kg : '';
-                            } else {
-                                this.editor.guruKgQuery = '';
-                            }
+                            this.editor.guruKgQuery = '';
                             this.editor.guruKgDropdownOpen = false;
                         },
 
                         onGuruKgInput() {
                             if (!this.editor) return;
                             this.editor.guruKgDropdownOpen = true;
-                            const q = this.normalizeKgQuery(this.editor.guruKgQuery);
-                            const list = this.guruOptionsForKelasInput(this.editor.kelasId, this.editor.selectedGuruId);
-                            if (!q) {
-                                this.editor.selectedGuruId = null;
-                                this.editor.selectedBebanId = null;
-                                this.editor.mapelFullMessage = '';
-                                return;
-                            }
-                            if (q.length >= 2) {
-                                const exact = list.find(g => g.kg.toUpperCase() === q);
-                                if (exact) {
-                                    this.selectGuruFromKgSearch(exact, false);
-                                    return;
-                                }
-                            }
-                            const sel = list.find(g => g.guru_id == this.editor.selectedGuruId);
-                            if (sel && q && sel.kg.toUpperCase() !== q && !sel.kg.toUpperCase().startsWith(q)) {
-                                this.editor.selectedGuruId = null;
-                                this.editor.selectedBebanId = null;
-                                this.editor.mapelFullMessage = '';
-                            }
                         },
 
                         selectGuruFromKgSearch(g, closeDropdown = true) {
                             if (!this.editor || !g) return;
                             this.editor.selectedGuruId = g.guru_id;
-                            this.editor.guruKgQuery = g.kg;
                             this.applyGuruMapelSelection(g.guru_id, this.editor.kelasId);
                             this.editor.blockHours = 1;
-                            if (closeDropdown) this.editor.guruKgDropdownOpen = false;
+                            if (closeDropdown) this.closeGuruKgDropdown();
                         },
 
                         confirmGuruKgFromQuery() {
