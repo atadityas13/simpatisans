@@ -88,6 +88,19 @@
             </button>
         </div>
 
+        @include('partials.guru-search-bar', [
+            'mode' => 'server',
+            'value' => $search ?? '',
+            'action' => route('guru.index'),
+            'wrapperClass' => 'mb-4 flex flex-wrap items-center gap-2',
+        ])
+
+        @if(!empty($search))
+            <p class="mb-4 text-xs text-indigo-700 font-bold">
+                Hasil pencarian untuk &ldquo;{{ $search }}&rdquo; — {{ $gurus->total() }} guru ditemukan
+            </p>
+        @endif
+
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <div class="overflow-x-auto main-scrollbar">
                 <table class="w-full whitespace-nowrap text-sm">

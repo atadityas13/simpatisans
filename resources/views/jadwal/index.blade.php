@@ -997,6 +997,90 @@
                             this.editor.blockHours = 1;
                         },
 
+                        normalizeKgQuery(raw) {
+                            let q = String(raw || '').trim().toUpperCase();
+                            const bracket = q.match(/^\[?\s*([A-Z]{2,})\s*\]?$/);
+                            if (bracket) return bracket[1];
+                            const letters = q.replace(/[^A-Z]/g, '');
+                            return letters;
+                        },
+
+                        filteredGuruOptionsForEditor() {
+                            if (!this.editor?.kelasId) return [];
+                            const list = this.guruOptionsForKelasInput(this.editor.kelasId, this.editor.selectedGuruId);
+                            const q = this.normalizeKgQuery(this.editor.guruKgQuery);
+                            if (!q) return list;
+                            return list.filter(g =>
+                                g.kg.toUpperCase().includes(q) ||
+                                g.guru.toUpperCase().includes(q)
+                            );
+                        },
+
+                        initGuruKgQuery() {
+                            if (!this.editor) return;
+                            if (this.editor.selectedGuruId) {
+                                const g = this.guruOptionsForKelasInput(this.editor.kelasId, this.editor.selectedGuruId)
+                                    .find(x => x.guru_id == this.editor.selectedGuruId);
+                                this.editor.guruKgQuery = g ? g.kg : '';
+                            } else {
+                                this.editor.guruKgQuery = '';
+                            }
+                            this.editor.guruKgDropdownOpen = false;
+                        },
+
+                        onGuruKgInput() {
+                            if (!this.editor) return;
+                            this.editor.guruKgDropdownOpen = true;
+                            const q = this.normalizeKgQuery(this.editor.guruKgQuery);
+                            const list = this.guruOptionsForKelasInput(this.editor.kelasId, this.editor.selectedGuruId);
+                            if (!q) {
+                                this.editor.selectedGuruId = null;
+                                this.editor.selectedBebanId = null;
+                                this.editor.mapelFullMessage = '';
+                                return;
+                            }
+                            if (q.length >= 2) {
+                                const exact = list.find(g => g.kg.toUpperCase() === q);
+                                if (exact) {
+                                    this.selectGuruFromKgSearch(exact, false);
+                                    return;
+                                }
+                            }
+                            const sel = list.find(g => g.guru_id == this.editor.selectedGuruId);
+                            if (sel && q && sel.kg.toUpperCase() !== q && !sel.kg.toUpperCase().startsWith(q)) {
+                                this.editor.selectedGuruId = null;
+                                this.editor.selectedBebanId = null;
+                                this.editor.mapelFullMessage = '';
+                            }
+                        },
+
+                        selectGuruFromKgSearch(g, closeDropdown = true) {
+                            if (!this.editor || !g) return;
+                            this.editor.selectedGuruId = g.guru_id;
+                            this.editor.guruKgQuery = g.kg;
+                            this.applyGuruMapelSelection(g.guru_id, this.editor.kelasId);
+                            this.editor.blockHours = 1;
+                            if (closeDropdown) this.editor.guruKgDropdownOpen = false;
+                        },
+
+                        confirmGuruKgFromQuery() {
+                            const filtered = this.filteredGuruOptionsForEditor();
+                            if (filtered.length === 0) return;
+                            const q = this.normalizeKgQuery(this.editor.guruKgQuery);
+                            const exact = filtered.find(g => g.kg.toUpperCase() === q);
+                            this.selectGuruFromKgSearch(exact || filtered[0]);
+                        },
+
+                        focusGuruKgOption(delta) {
+                            const opts = this.filteredGuruOptionsForEditor().filter(g => !g.isFull);
+                            if (!opts.length) return;
+                            const curIdx = opts.findIndex(g => g.guru_id == this.editor.selectedGuruId);
+                            let next = curIdx < 0 ? 0 : curIdx + delta;
+                            if (next < 0) next = opts.length - 1;
+                            if (next >= opts.length) next = 0;
+                            this.selectGuruFromKgSearch(opts[next], false);
+                        },
+
                         onKelasSelectGuru() {
                             this.editor.kelasId = this.editor.selectedKelasId;
                             const k = this.kelasOptionsForGuruInput(this.editor.guruId, this.editor.selectedKelasId)
@@ -1075,6 +1159,8 @@
                                 guruId: null,
                                 mapelFullMessage: '',
                                 blockHours: 1,
+                                guruKgQuery: '',
+                                guruKgDropdownOpen: false,
                             };
                             if ((ctx === 'kelas' || ctx === 'hari' || ctx === 'matrix') && s?.guru_id) {
                                 this.applyGuruMapelSelection(s.guru_id, kelasId);
@@ -1082,6 +1168,7 @@
                             if (this.isBtqOnlySlot(hari, jam) && this.guruOptionsForKelasInput(kelasId).length === 0 && !s?.guru_id) {
                                 this.editor.mapelFullMessage = 'Tidak ada guru pengampu BTQ di kelas ini';
                             }
+                            this.initGuruKgQuery();
                             this.showEditorModal = true;
                         },
 

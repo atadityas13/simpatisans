@@ -52,7 +52,38 @@
             </div>
         @endif
 
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div x-data="{
+            guruSearch: '',
+            guruSearchBlobs: @json($gurus->map(fn ($g) => strtolower(implode(' ', array_filter([
+                $g->kode_guru,
+                $g->nama_guru,
+                $g->gelar_depan,
+                $g->gelar_belakang,
+                $g->username,
+                $g->nuptk,
+                $g->jabatan,
+                $g->golongan,
+                $g->mapelSertifikasi?->nama_mapel,
+                $g->status_sertifikasi ? 'sertifikasi' : 'belum sertifikasi',
+            ]))))->values()),
+            rowMatches(blob) {
+                const q = this.guruSearch.trim().toLowerCase();
+                return !q || blob.includes(q);
+            },
+            guruMatchCount() {
+                const q = this.guruSearch.trim().toLowerCase();
+                if (!q) return this.guruSearchBlobs.length;
+                return this.guruSearchBlobs.filter(b => b.includes(q)).length;
+            },
+            guruFilterEmpty() {
+                const q = this.guruSearch.trim().toLowerCase();
+                return q && this.guruMatchCount() === 0;
+            }
+        }" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+            @include('partials.guru-search-bar', ['mode' => 'client'])
+        </div>
+
             <table class="w-full whitespace-nowrap text-sm">
                 <thead>
                     <tr
@@ -67,10 +98,24 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse($gurus as $i => $guru)
-                        @php $m = $rows[$i]; @endphp
-                        <tr class="hover:bg-gray-50 transition">
+                        @php
+                            $m = $rows[$i];
+                            $searchBlob = strtolower(implode(' ', array_filter([
+                                $guru->kode_guru,
+                                $guru->nama_guru,
+                                $guru->gelar_depan,
+                                $guru->gelar_belakang,
+                                $guru->username,
+                                $guru->nuptk,
+                                $guru->jabatan,
+                                $guru->mapelSertifikasi?->nama_mapel,
+                                $guru->status_sertifikasi ? 'sertifikasi' : 'belum sertifikasi',
+                            ])));
+                        @endphp
+                        <tr class="hover:bg-gray-50 transition" data-search="{{ e($searchBlob) }}" x-show="rowMatches($el.dataset.search)">
                             <td class="px-5 py-4">
                                 <p class="font-bold text-gray-900">{{ $guru->nama_lengkap }}</p>
+                                <p class="text-[11px] text-indigo-600 font-black mt-0.5 uppercase tracking-wide">{{ $guru->kode_guru }}</p>
                                 <p class="text-[11px] text-gray-500 mt-0.5">
                                     {{ $guru->status_sertifikasi ? 'Sertifikasi: ' . $guru->mapelSertifikasi?->nama_mapel : 'Belum Sertifikasi' }}
                                 </p>
@@ -124,6 +169,11 @@
                             <td colspan="7" class="px-5 py-10 text-center text-gray-400 italic">Belum ada data guru.</td>
                         </tr>
                     @endforelse
+                    <tr x-show="guruFilterEmpty()" x-cloak>
+                        <td colspan="6" class="px-5 py-10 text-center text-gray-500 italic">
+                            Tidak ada guru yang cocok dengan pencarian &ldquo;<span x-text="guruSearch"></span>&rdquo;
+                        </td>
+                    </tr>
                 </tbody>
             </table>
         </div>

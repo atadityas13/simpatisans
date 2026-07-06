@@ -299,21 +299,7 @@
 
             {{-- Per Kelas & Per Hari: Guru → Mapel --}}
             <div x-show="editor && (editor.context === 'kelas' || editor.context === 'hari')" class="space-y-4">
-                <div>
-                    <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest">1. Pilih Guru</label>
-                    <select x-model.number="editor.selectedGuruId" @change="onGuruSelectKelas()"
-                        class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500 bg-white">
-                        <option value="">— Pilih guru —</option>
-                        <template x-for="g in guruOptionsForKelasInput(editor.kelasId, editor.selectedGuruId)" :key="g.guru_id">
-                            <option :value="g.guru_id" :disabled="g.isFull"
-                                x-text="'[' + g.kg + '] ' + g.guru + (g.isFull ? ' — PENUH' : '')"></option>
-                        </template>
-                    </select>
-                    <p x-show="editor && isBtqOnlySlot(editor.hari, editor.jam) && guruOptionsForKelasInput(editor.kelasId, editor.selectedGuruId).length === 0"
-                        class="mt-2 text-xs text-emerald-800 font-bold italic">
-                        Tidak ada guru pengampu BTQ di kelas ini
-                    </p>
-                </div>
+                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru — ketik KG'])
 
                 <div x-show="editor.mapelFullMessage"
                     class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-bold">
@@ -415,21 +401,7 @@
 
             {{-- Matriks: KG → Mapel → Blok Jam --}}
             <div x-show="editor && editor.context === 'matrix'" class="space-y-4">
-                <div>
-                    <label class="text-[10px] font-black uppercase text-gray-500 tracking-widest">1. Pilih Guru (KG)</label>
-                    <select x-model.number="editor.selectedGuruId" @change="onMatrixKgSelect()"
-                        class="mt-1 w-full border border-gray-200 rounded-lg p-2.5 text-sm font-bold text-gray-800 focus:ring-indigo-500 bg-white">
-                        <option value="">— Pilih KG —</option>
-                        <template x-for="g in guruOptionsForKelasInput(editor.kelasId, editor.selectedGuruId)" :key="'mx-' + g.guru_id">
-                            <option :value="g.guru_id" :disabled="g.isFull"
-                                x-text="'[' + g.kg + '] ' + g.guru + (g.isFull ? ' — PENUH' : '')"></option>
-                        </template>
-                    </select>
-                    <p x-show="editor && isBtqOnlySlot(editor.hari, editor.jam) && guruOptionsForKelasInput(editor.kelasId, editor.selectedGuruId).length === 0"
-                        class="mt-2 text-xs text-emerald-800 font-bold italic">
-                        Tidak ada guru pengampu BTQ di kelas ini
-                    </p>
-                </div>
+                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru (KG)'])
 
                 <div x-show="editor.mapelFullMessage"
                     class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-bold">

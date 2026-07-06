@@ -117,6 +117,33 @@ class Guru extends Model
     public function bebanMengajars() { return $this->hasMany(BebanMengajar::class, 'guru_id'); }
 
     /**
+     * Pencarian guru by KG, nama, NIP, NUPTK, jabatan, mapel.
+     */
+    public function scopeSearch($query, ?string $term)
+    {
+        $term = trim($term ?? '');
+        if ($term === '') {
+            return $query;
+        }
+
+        $like = '%' . $term . '%';
+
+        return $query->where(function ($q) use ($like) {
+            $q->where('kode_guru', 'like', $like)
+                ->orWhere('nama_guru', 'like', $like)
+                ->orWhere('username', 'like', $like)
+                ->orWhere('nuptk', 'like', $like)
+                ->orWhere('jabatan', 'like', $like)
+                ->orWhere('golongan', 'like', $like)
+                ->orWhere('gelar_depan', 'like', $like)
+                ->orWhere('gelar_belakang', 'like', $like)
+                ->orWhereHas('mapelSertifikasi', fn ($mq) => $mq->where('nama_mapel', 'like', $like))
+                ->orWhereHas('mapelIjazah', fn ($mq) => $mq->where('nama_mapel', 'like', $like))
+                ->orWhereHas('mapelDiampu', fn ($mq) => $mq->where('nama_mapel', 'like', $like));
+        });
+    }
+
+    /**
      * Urutan resmi Daftar Urut Kepegawaian (DUK).
      * Guru tanpa nomor DUK ditempatkan di akhir, diurutkan nama.
      */
