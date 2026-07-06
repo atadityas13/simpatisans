@@ -77,8 +77,8 @@ class CetakController extends Controller
             }
         }
 
-        // 5. Get all gurus for legend
-        $gurus = Guru::orderBy('nama_guru')->get();
+        // 5. Get all gurus for legend (urut DUK)
+        $gurus = Guru::orderedByDuk()->get();
 
         // 7. Get Signatories (Kepala and Waka Kurikulum)
         $kepalaMadrasah = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
@@ -140,8 +140,8 @@ class CetakController extends Controller
             }
         }
 
-        // 5. Get all gurus for legend
-        $gurus = Guru::orderBy('nama_guru')->get();
+        // 5. Get all gurus for legend (urut DUK)
+        $gurus = Guru::orderedByDuk()->get();
 
         // Signatories
         $kepalaMadrasah = Guru::whereHas('tugasTambahans', function($q) use ($semesterId) {
@@ -248,7 +248,7 @@ class CetakController extends Controller
             },
             'mapelSertifikasi'
         ])
-        ->orderBy('duk') // Order by DUK for official ranking
+        ->orderedByDuk()
         ->get();
 
         // 4. Signatory (Kepala Madrasah)

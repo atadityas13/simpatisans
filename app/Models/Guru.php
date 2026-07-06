@@ -115,4 +115,14 @@ class Guru extends Model
     public function mapelDiampu() { return $this->belongsToMany(Mapel::class, 'guru_mapels', 'guru_id', 'mapel_id')->orderBy('mapels.id'); }
     public function tugasTambahans() { return $this->belongsToMany(TugasTambahan::class, 'guru_tugas_tambahans', 'guru_id', 'tugas_tambahan_id')->withPivot('is_ekuivalen', 'detail', 'hari', 'semester_id'); }
     public function bebanMengajars() { return $this->hasMany(BebanMengajar::class, 'guru_id'); }
+
+    /**
+     * Urutan resmi Daftar Urut Kepegawaian (DUK).
+     * Guru tanpa nomor DUK ditempatkan di akhir, diurutkan nama.
+     */
+    public function scopeOrderedByDuk($query)
+    {
+        return $query->orderByRaw('duk IS NULL ASC, duk ASC')
+            ->orderBy('nama_guru');
+    }
 }
