@@ -10,8 +10,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Penjadwalan CSP: backtracking per kelas + occupancy guru global.
- * Target: 100% JTM terisi, struktur blok valid, tanpa bentrok/blokir.
+ * Penjadwalan otomatis: CSP per kelas + greedy global + fase paksa isi penuh.
+ * Preset guru tidak menghalangi penempatan (hanya penanda di Laporan Analisa).
  */
 class JadwalSAOService
 {
@@ -24,8 +24,8 @@ class JadwalSAOService
     private array $lockedSlots = [];
     private array $bebanMeta = [];
     private array $kelasIds = [];
-    /** Izinkan penempatan di slot preset blokir jika tidak ada solusi lain. */
-    private bool $honorBlockConstraints = true;
+    /** Preset blokir tidak pernah menghalangi penempatan. */
+    private bool $honorBlockConstraints = false;
     /** @var array<string, array<int, array<int, true>>> */
     private array $guruOcc = [];
 
@@ -69,8 +69,8 @@ class JadwalSAOService
         $bebanMap = $this->getBebanMap();
 
         $waktuMulai = time();
-        $deadlineTotal = $waktuMulai + 175;
-        $deadlineCari = $waktuMulai + 22;
+        $deadlineTotal = $waktuMulai + 110;
+        $deadlineCari = $waktuMulai + 25;
         $solusiTerbaik = null;
         $skorTerbaik = PHP_INT_MAX;
 
@@ -103,7 +103,7 @@ class JadwalSAOService
         }
 
         if ($solusiTerbaik === null) {
-            throw new \Exception('Gagal membuat jadwal. Kurangi preset blokir guru.');
+            throw new \Exception('Gagal membuat jadwal. Periksa beban mengajar.');
         }
 
         $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
@@ -114,8 +114,7 @@ class JadwalSAOService
             $kosongTerbaik = $totalJtm - $this->hitungTerisi($solusiTerbaik);
         }
 
-        // Fase paksa: budget waktu penuh, abaikan preset blokir, maks 7 jam/hari guru
-        $this->honorBlockConstraints = false;
+        // Fase paksa: isi semua JTM tersisa (maks 7 jam/hari guru)
         $this->unlockNonBtqSlots($solusiTerbaik, $unitsByKelas);
         $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
 
@@ -130,8 +129,6 @@ class JadwalSAOService
             $kosongTerbaik = $totalJtm - $terisiSebelumPaksa;
         }
 
-        $this->honorBlockConstraints = true;
-
         if ($kosongTerbaik === 0) {
             $this->rebuildGuruOcc($solusiTerbaik, $kelasIds);
             $solusiTerbaik = $this->seimbangkanKelelahan($solusiTerbaik, $unitsByKelas, $kelasIds, $bebanMap, time(), $deadlineTotal);
@@ -139,7 +136,7 @@ class JadwalSAOService
 
         $terisi = $this->hitungTerisi($solusiTerbaik);
         if ($terisi === 0) {
-            throw new \Exception('Gagal membuat jadwal. Kurangi preset blokir guru atau periksa beban mengajar.');
+            throw new \Exception('Gagal membuat jadwal. Periksa beban mengajar.');
         }
 
         $kosongTerbaik = $totalJtm - $terisi;
@@ -884,7 +881,7 @@ class JadwalSAOService
         return $best;
     }
 
-    /** Fase paksa: isi semua JTM tersisa, boleh langgar preset blokir, maks 7 jam/hari guru. */
+    /** Fase paksa: isi semua JTM tersisa, maks 7 jam/hari guru. */
     private function isiSemuaPaksa(array $jadwal, array $unitsByKelas, array $kelasIds, int $t0, int $deadline): array
     {
         $best = $jadwal;
