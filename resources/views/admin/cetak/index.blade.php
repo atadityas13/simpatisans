@@ -3,7 +3,7 @@
 @section('header', 'Menu Cetak Laporan')
 
 @section('content')
-<div x-data="{ showPresets: false }" class="space-y-8">
+<div x-data="{ showPresets: {{ session('success') ? 'true' : 'false' }} }" class="space-y-8">
     <div class="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm relative overflow-hidden">
         <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -101,178 +101,125 @@
 
     <!-- PRESET MODAL -->
     <template x-teleport="body">
-        <div x-show="showPresets" 
-             x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="opacity-0 scale-95"
-             x-transition:enter-end="opacity-100 scale-100"
-             x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="opacity-100 scale-100"
-             x-transition:leave-end="opacity-0 scale-95"
-             class="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 md:p-6"
+        <div x-show="showPresets"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 z-[9999] bg-slate-900/50 flex items-end sm:items-center justify-center p-0 sm:p-4"
              @keydown.escape.window="showPresets = false"
              style="display: none;">
-            
-            <div @click.away="showPresets = false" 
-                 class="bg-white rounded-[2rem] md:rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500 border border-gray-100">
-                
-                <div class="px-6 md:px-10 py-6 md:py-8 border-b border-gray-100 flex justify-between items-start bg-white">
-                    <div>
-                        <h3 class="text-xl md:text-2xl font-black text-gray-900 tracking-tight">Pengaturan Atribut Cetak</h3>
-                        <p class="text-xs md:text-sm text-gray-500 font-medium mt-1">Kelola tanda tangan digital dan stempel resmi madrasah untuk dokumen otomatis.</p>
+
+            <div @click.away="showPresets = false"
+                 class="bg-white w-full sm:max-w-lg sm:rounded-2xl shadow-2xl border border-gray-100 flex flex-col max-h-[92vh] sm:max-h-[85vh] rounded-t-2xl sm:rounded-b-2xl overflow-hidden">
+
+                {{-- Header --}}
+                <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+                    <div class="min-w-0 pr-2">
+                        <h3 class="text-base font-black text-gray-900 truncate">Preset Cetak</h3>
+                        <p class="text-[11px] text-gray-500 truncate">Tanggal, pejabat, TTD & stempel</p>
                     </div>
-                    <button @click="showPresets = false" class="p-2 md:p-3 bg-gray-50 text-gray-400 hover:text-gray-900 rounded-2xl transition-all">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18"></path></svg>
+                    <button type="button" @click="showPresets = false"
+                        class="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg shrink-0">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18"/></svg>
                     </button>
                 </div>
 
-                <div class="p-6 md:p-10 bg-white space-y-8">
-                    {{-- Pengaturan tanggal & pejabat --}}
-                    <form action="{{ route('cetak.presets.store') }}" method="POST" class="bg-slate-50 rounded-3xl p-6 border border-slate-100">
+                {{-- Body scroll --}}
+                <div class="overflow-y-auto flex-1 px-4 py-4 space-y-4">
+
+                    @if(session('success'))
+                        <div class="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                            {{ session('success') }}
+                        </div>
+                    @endif
+
+                    {{-- Titimangsa --}}
+                    <form action="{{ route('cetak.presets.store') }}" method="POST" class="space-y-3">
                         @csrf
-                        <h4 class="text-sm font-black text-gray-800 uppercase tracking-wide mb-4">Titimangsa & Pejabat Penandatangan</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="tanggal_cetak" class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Tanggal Cetak Dokumen</label>
-                                <input type="date" name="tanggal_cetak" id="tanggal_cetak"
-                                    value="{{ $cetakSettings['tanggal_cetak'] ?? now()->format('Y-m-d') }}"
-                                    class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-800 bg-white focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-400">
-                                <p class="mt-1.5 text-[10px] text-gray-400">Dipakai di semua dokumen bertanda tangan (jadwal, lampiran SK, piket).</p>
-                            </div>
-                            <div>
-                                <span class="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Pejabat Penandatangan</span>
-                                <div class="space-y-2">
-                                    <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'kepala' ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300' }}">
-                                        <input type="radio" name="pejabat_penandatangan" value="kepala" class="text-indigo-600 focus:ring-indigo-500"
-                                            {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'kepala' ? 'checked' : '' }}>
-                                        <span class="text-sm font-bold text-gray-800">Kepala Madrasah</span>
-                                    </label>
-                                    <label class="flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'plt_kepala' ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300' }}">
-                                        <input type="radio" name="pejabat_penandatangan" value="plt_kepala" class="text-indigo-600 focus:ring-indigo-500"
-                                            {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'plt_kepala' ? 'checked' : '' }}>
-                                        <span class="text-sm font-bold text-gray-800">Plt. Kepala Madrasah</span>
-                                    </label>
-                                </div>
-                            </div>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest">Titimangsa</p>
+
+                        <div>
+                            <label for="tanggal_cetak" class="block text-xs font-bold text-gray-600 mb-1">Tanggal cetak</label>
+                            <input type="date" name="tanggal_cetak" id="tanggal_cetak"
+                                value="{{ $cetakSettings['tanggal_cetak'] ?? now()->format('Y-m-d') }}"
+                                class="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm text-gray-800 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400">
                         </div>
-                        <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
-                            <p class="text-[10px] text-gray-500">
-                                Pratinjau: <span class="font-bold text-indigo-700">{{ $cetakTanggalLokasi ?? '' }}</span>
-                                · <span class="font-bold text-indigo-700">{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }}</span>
-                            </p>
-                            <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-colors shadow-sm">
-                                Simpan Pengaturan
-                            </button>
+
+                        <div>
+                            <label for="pejabat_penandatangan" class="block text-xs font-bold text-gray-600 mb-1">Pejabat penandatangan</label>
+                            <select name="pejabat_penandatangan" id="pejabat_penandatangan"
+                                class="w-full h-9 border border-gray-200 rounded-lg px-3 text-sm text-gray-800 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400">
+                                <option value="kepala" {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'kepala' ? 'selected' : '' }}>Kepala Madrasah</option>
+                                <option value="plt_kepala" {{ ($cetakSettings['pejabat_penandatangan'] ?? 'kepala') === 'plt_kepala' ? 'selected' : '' }}>Plt. Kepala Madrasah</option>
+                            </select>
                         </div>
+
+                        <p class="text-[10px] text-gray-400 leading-snug">
+                            Pratinjau: <span class="text-indigo-600 font-bold">{{ $cetakTanggalLokasi ?? '' }}</span>
+                            · <span class="text-indigo-600 font-bold">{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }}</span>
+                        </p>
+
+                        <button type="submit"
+                            class="w-full h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black uppercase tracking-wide rounded-lg transition-colors">
+                            Simpan
+                        </button>
                     </form>
 
-                    {{-- Upload TTD & stempel --}}
+                    <hr class="border-gray-100">
+
+                    {{-- TTD & Stempel --}}
                     <form action="{{ route('cetak.presets.store') }}" method="POST" enctype="multipart/form-data">
                         @csrf
-                        <h4 class="text-sm font-black text-gray-800 uppercase tracking-wide mb-4">Tanda Tangan & Stempel</h4>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-                            
-                            {{-- 1. TTD KEPALA CARD --}}
-                            <div class="group bg-slate-50 rounded-3xl p-6 border border-slate-100 hover:border-indigo-200 hover:bg-white hover:shadow-xl transition-all duration-300 relative overflow-hidden">
-                                <div class="relative z-10 space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kepala Madrasah</span>
-                                        @if($presets['ttd_kepala'])
-                                            <span class="flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                                        @else
-                                            <span class="flex h-2 w-2 rounded-full bg-slate-300"></span>
-                                        @endif
-                                    </div>
-                                    <div class="aspect-[4/3] bg-white rounded-2xl border border-slate-200 shadow-inner flex items-center justify-center relative overflow-hidden group-hover:border-indigo-100 transition-colors">
-                                        @if($presets['ttd_kepala'])
-                                            <img src="{{ $presets['ttd_kepala'] }}?v={{ time() }}" class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500">
-                                        @else
-                                            <svg class="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                                        @endif
-                                        <!-- Action Overlay -->
-                                        <div class="absolute inset-0 bg-indigo-600/5 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer" onclick="document.getElementById('input_ttd_kepala_new').click()">
-                                            <div class="bg-white p-2 rounded-xl shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                                                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-center">
-                                        <h4 class="text-xs font-bold text-slate-700 uppercase tracking-tight">Tanda Tangan</h4>
-                                        <p class="text-[9px] text-slate-400 mt-0.5">PNG Transparan direkomendasikan</p>
-                                    </div>
-                                    <input type="file" name="ttd_kepala" id="input_ttd_kepala_new" class="hidden" accept="image/*" onchange="this.form.submit()">
-                                </div>
+                        <p class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">TTD & Stempel</p>
+                        <p class="text-[10px] text-gray-400 mb-3">Ketuk kotak untuk unggah PNG transparan</p>
+
+                        <div class="grid grid-cols-3 gap-2">
+                            {{-- Kepala --}}
+                            <div class="group text-center">
+                                <button type="button" onclick="document.getElementById('input_ttd_kepala_new').click()"
+                                    class="w-full aspect-square max-h-24 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors relative">
+                                    @if($presets['ttd_kepala'])
+                                        <img src="{{ $presets['ttd_kepala'] }}?v={{ time() }}" alt="TTD Kepala" class="max-w-full max-h-full object-contain p-1">
+                                        <span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    @else
+                                        <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+                                    @endif
+                                </button>
+                                <p class="mt-1 text-[9px] font-bold text-gray-500 leading-tight">Kepala</p>
+                                <input type="file" name="ttd_kepala" id="input_ttd_kepala_new" class="hidden" accept="image/*" onchange="this.form.submit()">
                             </div>
 
-                            {{-- 2. TTD WAKA CARD --}}
-                            <div class="group bg-slate-50 rounded-3xl p-6 border border-slate-100 hover:border-blue-200 hover:bg-white hover:shadow-xl transition-all duration-300 relative overflow-hidden">
-                                <div class="relative z-10 space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Waka Kurikulum</span>
-                                        @if($presets['ttd_waka'])
-                                            <span class="flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                                        @else
-                                            <span class="flex h-2 w-2 rounded-full bg-slate-300"></span>
-                                        @endif
-                                    </div>
-                                    <div class="aspect-[4/3] bg-white rounded-2xl border border-slate-200 shadow-inner flex items-center justify-center relative overflow-hidden group-hover:border-blue-100 transition-colors">
-                                        @if($presets['ttd_waka'])
-                                            <img src="{{ $presets['ttd_waka'] }}?v={{ time() }}" class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500">
-                                        @else
-                                            <svg class="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                                        @endif
-                                        <!-- Action Overlay -->
-                                        <div class="absolute inset-0 bg-blue-600/5 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer" onclick="document.getElementById('input_ttd_waka_new').click()">
-                                            <div class="bg-white p-2 rounded-xl shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-center">
-                                        <h4 class="text-xs font-bold text-slate-700 uppercase tracking-tight">Tanda Tangan</h4>
-                                        <p class="text-[9px] text-slate-400 mt-0.5">PNG Transparan direkomendasikan</p>
-                                    </div>
-                                    <input type="file" name="ttd_waka" id="input_ttd_waka_new" class="hidden" accept="image/*" onchange="this.form.submit()">
-                                </div>
+                            {{-- Waka --}}
+                            <div class="group text-center">
+                                <button type="button" onclick="document.getElementById('input_ttd_waka_new').click()"
+                                    class="w-full aspect-square max-h-24 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden hover:border-blue-300 hover:bg-blue-50/30 transition-colors relative">
+                                    @if($presets['ttd_waka'])
+                                        <img src="{{ $presets['ttd_waka'] }}?v={{ time() }}" alt="TTD Waka" class="max-w-full max-h-full object-contain p-1">
+                                        <span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    @else
+                                        <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+                                    @endif
+                                </button>
+                                <p class="mt-1 text-[9px] font-bold text-gray-500 leading-tight">Waka Kur.</p>
+                                <input type="file" name="ttd_waka" id="input_ttd_waka_new" class="hidden" accept="image/*" onchange="this.form.submit()">
                             </div>
 
-                            {{-- 3. STEMPEL CARD --}}
-                            <div class="group bg-slate-50 rounded-3xl p-6 border border-slate-100 hover:border-purple-200 hover:bg-white hover:shadow-xl transition-all duration-300 relative overflow-hidden">
-                                <div class="relative z-10 space-y-4">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stempel Resmi</span>
-                                        @if($presets['stempel'])
-                                            <span class="flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                                        @else
-                                            <span class="flex h-2 w-2 rounded-full bg-slate-300"></span>
-                                        @endif
-                                    </div>
-                                    <div class="aspect-[4/3] bg-white rounded-2xl border border-slate-200 shadow-inner flex items-center justify-center relative overflow-hidden group-hover:border-purple-100 transition-colors">
-                                        @if($presets['stempel'])
-                                            <img src="{{ $presets['stempel'] }}?v={{ time() }}" class="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500">
-                                        @else
-                                            <svg class="w-10 h-10 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
-                                        @endif
-                                        <!-- Action Overlay -->
-                                        <div class="absolute inset-0 bg-purple-600/5 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer" onclick="document.getElementById('input_stempel_new').click()">
-                                            <div class="bg-white p-2 rounded-xl shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                                                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-center">
-                                        <h4 class="text-xs font-bold text-slate-700 uppercase tracking-tight">Cap/Stempel</h4>
-                                        <p class="text-[9px] text-slate-400 mt-0.5">PNG Transparan direkomendasikan</p>
-                                    </div>
-                                    <input type="file" name="stempel" id="input_stempel_new" class="hidden" accept="image/*" onchange="this.form.submit()">
-                                </div>
-                            </div>
-
-                        </div>
-
-                        <div class="mt-8 flex items-center justify-center bg-indigo-50 p-4 rounded-3xl border border-indigo-100">
-                            <div class="flex items-center gap-3 text-center">
-                                <svg class="w-4 h-4 text-indigo-500 animate-pulse shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <p class="text-[10px] md:text-xs text-indigo-600 font-bold tracking-tight">Klik pada kotak gambar untuk memperbarui aset secara otomatis.</p>
+                            {{-- Stempel --}}
+                            <div class="group text-center">
+                                <button type="button" onclick="document.getElementById('input_stempel_new').click()"
+                                    class="w-full aspect-square max-h-24 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-center overflow-hidden hover:border-purple-300 hover:bg-purple-50/30 transition-colors relative">
+                                    @if($presets['stempel'])
+                                        <img src="{{ $presets['stempel'] }}?v={{ time() }}" alt="Stempel" class="max-w-full max-h-full object-contain p-1">
+                                        <span class="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    @else
+                                        <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4v16m8-8H4"/></svg>
+                                    @endif
+                                </button>
+                                <p class="mt-1 text-[9px] font-bold text-gray-500 leading-tight">Stempel</p>
+                                <input type="file" name="stempel" id="input_stempel_new" class="hidden" accept="image/*" onchange="this.form.submit()">
                             </div>
                         </div>
                     </form>
