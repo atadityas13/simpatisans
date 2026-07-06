@@ -794,6 +794,7 @@
                         viewMode: 'matrix',
                         showEditorModal: false,
                         editor: null,
+                        guruKgDropdownPos: { top: 0, left: 0, width: 0 },
                         slotData: @json($slotData ?? []),
                         slotIssueMap: @json($slotIssueMap ?? []),
                         strukturHari: @json($strukturHari ?? []),
@@ -1008,11 +1009,35 @@
                             }
                         },
 
+                        updateGuruKgDropdownPos() {
+                            const el = this.$refs.guruKgCombobox;
+                            if (!el) return;
+                            const rect = el.getBoundingClientRect();
+                            this.guruKgDropdownPos = {
+                                top: Math.round(rect.bottom + 4),
+                                left: Math.round(rect.left),
+                                width: Math.round(rect.width),
+                            };
+                        },
+
+                        guruKgDropdownStyle() {
+                            const p = this.guruKgDropdownPos;
+                            return 'top:' + p.top + 'px;left:' + p.left + 'px;width:' + p.width + 'px;';
+                        },
+
+                        handleGuruKgClickOutside(event) {
+                            if (!this.editor?.guruKgDropdownOpen) return;
+                            if (this.$refs.guruKgCombobox?.contains(event.target)) return;
+                            if (this.$refs.guruKgDropdownPanel?.contains(event.target)) return;
+                            this.closeGuruKgDropdown();
+                        },
+
                         openGuruKgDropdown() {
                             if (!this.editor) return;
                             this.editor.guruKgDropdownOpen = true;
                             this.editor.guruKgQuery = '';
                             this.$nextTick(() => {
+                                this.updateGuruKgDropdownPos();
                                 const el = this.$refs.guruKgSearchInput;
                                 if (el) {
                                     el.focus();
@@ -1231,6 +1256,7 @@
                         },
 
                         closeEditor() {
+                            this.closeGuruKgDropdown();
                             this.showEditorModal = false;
                             this.editor = null;
                         },

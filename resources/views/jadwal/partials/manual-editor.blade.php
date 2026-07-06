@@ -277,8 +277,11 @@
 <div x-show="showEditorModal" x-cloak
     class="fixed inset-0 flex items-center justify-center p-4"
     style="z-index: 99999; background: rgba(15, 23, 42, 0.65);"
-    @keydown.escape.window="closeEditor()">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-indigo-200 overflow-hidden relative"
+    @keydown.escape.window="closeEditor()"
+    @click.window="handleGuruKgClickOutside($event)"
+    @scroll.window="if (editor?.guruKgDropdownOpen) closeGuruKgDropdown()"
+    @resize.window="if (editor?.guruKgDropdownOpen) updateGuruKgDropdownPos()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-indigo-200 relative"
         style="z-index: 100000; isolation: isolate;"
         @click.stop>
         <div class="bg-indigo-600 px-5 py-3 flex justify-between items-center relative z-10">
@@ -297,9 +300,13 @@
                 Slot khusus BTQ — hanya guru pengampu BTQ di kelas ini
             </div>
 
+            {{-- Pilih guru (Per Kelas / Per Hari / Matriks) — satu instance agar dropdown tidak duplikat --}}
+            <div x-show="editor && (editor.context === 'kelas' || editor.context === 'hari' || editor.context === 'matrix')">
+                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru'])
+            </div>
+
             {{-- Per Kelas & Per Hari: Guru → Mapel --}}
             <div x-show="editor && (editor.context === 'kelas' || editor.context === 'hari')" class="space-y-4">
-                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru'])
 
                 <div x-show="editor.mapelFullMessage"
                     class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-bold">
@@ -401,7 +408,6 @@
 
             {{-- Matriks: KG → Mapel → Blok Jam --}}
             <div x-show="editor && editor.context === 'matrix'" class="space-y-4">
-                @include('jadwal.partials.guru-kg-search', ['label' => '1. Pilih Guru'])
 
                 <div x-show="editor.mapelFullMessage"
                     class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-bold">
