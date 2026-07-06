@@ -26,7 +26,7 @@
             mapel_diampu: []
         },
         guruSearch: '',
-        guruSearchBlobs: @json($guruSearchBlobs ?? []),
+        guruSearchBlobs: @js($guruSearchBlobs ?? []),
         rowMatches(blob) {
             const q = this.guruSearch.trim().toLowerCase();
             return !q || blob.includes(q);
