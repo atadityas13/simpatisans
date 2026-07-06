@@ -9,11 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Penjadwalan Constraint Satisfaction Problem (CSP).
- *
- * Metode: Backtracking + MRV (Minimum Remaining Values) + forward checking,
- * diikuti fase perbaikan konflik (conflict-directed repair).
- * Ini pendekatan standar industri untuk school timetabling (setara inti FET / OR-Tools CP).
+ * Penjadwalan CSP: backtracking + MRV, lalu perbaikan konflik.
+ * Preset guru tidak menghalangi penempatan (hanya dilaporkan di analisa).
  */
 class JadwalSAOService
 {
@@ -32,10 +29,7 @@ class JadwalSAOService
 
     private int $deadline = 0;
     private int $terisiTerbaik = 0;
-    private int $unitLengkapTerbaik = 0;
     private array $gridTerbaik = [];
-    /** true = semua jam terisi lebih penting daripada pola blok JTM sempurna */
-    private bool $prioritasIsiPenuh = false;
 
     public function generate(int $semesterId): array
     {
@@ -66,13 +60,11 @@ class JadwalSAOService
             throw new \Exception("Kelebihan beban: {$totalJtm} JTM melebihi kapasitas grid.");
         }
 
-        $this->deadline = time() + 100;
+        $this->deadline = time() + 90;
         $this->terisiTerbaik = 0;
-        $this->unitLengkapTerbaik = 0;
         $this->gridTerbaik = $this->gridKosong();
-        $this->prioritasIsiPenuh = false;
 
-        for ($seed = 0; $seed < 8; $seed++) {
+        for ($seed = 0; $seed < 10; $seed++) {
             if ($this->waktuHabis()) {
                 break;
             }
@@ -82,31 +74,11 @@ class JadwalSAOService
             }
         }
 
-        $gridCsp = $this->salinGrid($this->gridTerbaik);
-        $terisiCsp = $this->terisiTerbaik;
-        $unitCsp = $this->unitLengkapTerbaik;
+        $this->muatGridTerbaik();
 
-        if (!$this->semuaJamLengkap()) {
-            $this->grid = $this->salinGrid($this->gridTerbaik);
-            $this->rebuildOcc();
-            $this->perbaikiKonflik(false);
-            $this->simpanTerbaik();
-        }
-
-        if (!$this->semuaJamLengkap()) {
-            $this->prioritasIsiPenuh = true;
-            $this->grid = $this->salinGrid($this->gridTerbaik);
-            $this->rebuildOcc();
-            $this->isiPaksaSisa();
-            $this->perbaikiKonflik(true);
-            $this->isiPaksaSisa();
-            $this->simpanTerbaik();
-        }
-
-        if ($this->terisiTerbaik < $terisiCsp) {
-            $this->gridTerbaik = $gridCsp;
-            $this->terisiTerbaik = $terisiCsp;
-            $this->unitLengkapTerbaik = $unitCsp;
+        if ($this->terisiTerbaik < $totalJtm) {
+            $this->perbaikiKonflik();
+            $this->isiSisaGreedy();
         }
 
         if ($this->terisiTerbaik === 0) {
@@ -129,7 +101,7 @@ class JadwalSAOService
 
         if ($this->waktuHabis()) {
             $this->simpanTerbaik();
-            return $this->semuaJamLengkap();
+            return false;
         }
 
         $idx = $this->pilihMrv();
@@ -165,7 +137,6 @@ class JadwalSAOService
         return false;
     }
 
-    /** MRV: pilih mapel dengan kandidat penempatan paling sedikit. */
     private function pilihMrv(): ?int
     {
         $pilih = null;
@@ -175,7 +146,6 @@ class JadwalSAOService
             if ($this->lengkap($unit)) {
                 continue;
             }
-            $this->siapkanUnit($unit);
             $sisa = $this->sisaJam($unit);
             if ($sisa <= 0) {
                 continue;
@@ -193,13 +163,10 @@ class JadwalSAOService
         return $pilih;
     }
 
-    /** LCV: kandidat diurutkan beban guru paling ringan dulu. */
     private function kandidatTerpilih(array $unit, int $sisa): array
     {
         $list = $this->kandidatPenempatan($unit, $sisa);
-        usort($list, function ($a, $b) use ($unit) {
-            return $this->skorBlok($unit['guruId'], $a) <=> $this->skorBlok($unit['guruId'], $b);
-        });
+        usort($list, fn($a, $b) => $this->skorBlok($unit['guruId'], $a) <=> $this->skorBlok($unit['guruId'], $b));
         return $list;
     }
 
@@ -212,38 +179,35 @@ class JadwalSAOService
         return $skor;
     }
 
-    // ─── Perbaikan konflik (geser mapel penghalang) ───────────────────────
+    // ─── Perbaikan & isi sisa ─────────────────────────────────────────────
 
-    private function perbaikiKonflik(bool $paksa): void
+    private function perbaikiKonflik(): void
     {
-        for ($round = 0; $round < ($paksa ? 300 : 200); $round++) {
+        for ($round = 0; $round < 200; $round++) {
             if ($this->waktuHabis()) {
                 break;
             }
 
-            $pending = array_values(array_filter(
-                $this->units,
-                fn($u) => $paksa ? $this->sisaJam($u) > 0 : !$this->lengkap($u)
-            ));
+            $pending = array_values(array_filter($this->units, fn($u) => !$this->lengkap($u)));
             if (empty($pending)) {
                 break;
             }
 
             usort($pending, fn($a, $b) => $this->sisaJam($b) <=> $this->sisaJam($a));
             $progress = false;
-            $terisiAwal = $this->hitungTerisi();
 
             foreach ($pending as $unit) {
                 $snap = $this->salinGrid($this->grid);
-                if ($this->cobaPasangDenganEviksi($unit)) {
-                    if ($this->hitungTerisi() >= $terisiAwal) {
-                        $progress = true;
-                        $this->simpanTerbaik();
-                        break;
-                    }
-                    $this->grid = $snap;
-                    $this->rebuildOcc();
+                $terisiAwal = $this->hitungTerisi();
+
+                if ($this->cobaPasangDenganEviksi($unit) && $this->hitungTerisi() > $terisiAwal) {
+                    $progress = true;
+                    $this->simpanTerbaik();
+                    break;
                 }
+
+                $this->grid = $snap;
+                $this->rebuildOcc();
             }
 
             if (!$progress) {
@@ -252,10 +216,10 @@ class JadwalSAOService
         }
     }
 
-    /** Isi sisa jam per slot tunggal — prioritas utama: tidak ada mapel belum dialokasikan. */
-    private function isiPaksaSisa(): void
+    /** Isi sisa jam per slot tunggal tanpa eviksi — aman, tidak merusak grid. */
+    private function isiSisaGreedy(): void
     {
-        for ($round = 0; $round < 2000; $round++) {
+        for ($round = 0; $round < 3000; $round++) {
             if ($this->waktuHabis()) {
                 break;
             }
@@ -265,25 +229,20 @@ class JadwalSAOService
                 break;
             }
 
-            usort($pending, function ($a, $b) {
-                return $this->sisaJam($b) <=> $this->sisaJam($a)
-                    ?: ($b['guruLoad'] <=> $a['guruLoad'])
-                    ?: count($this->kandidatPenempatan($a, $this->sisaJam($a))) <=> count($this->kandidatPenempatan($b, $this->sisaJam($b)));
-            });
+            usort($pending, fn($a, $b) => $this->sisaJam($b) <=> $this->sisaJam($a));
 
             $progress = false;
             foreach ($pending as $unit) {
-                $snap = $this->salinGrid($this->grid);
-                $terisiAwal = $this->hitungTerisi();
-
-                if ($this->cobaPasangSatuJam($unit) || $this->cobaPasangDenganEviksi($unit)) {
-                    if ($this->hitungTerisi() > $terisiAwal) {
+                foreach ($this->kandidatJamTunggal($unit) as $blok) {
+                    if (!$this->bebanGuruOk($unit['guruId'], $blok)) {
+                        continue;
+                    }
+                    if ($this->bisaTaruh($unit, $blok)) {
+                        $this->taruh($unit, $blok);
                         $progress = true;
                         $this->simpanTerbaik();
-                        break;
+                        break 2;
                     }
-                    $this->grid = $snap;
-                    $this->rebuildOcc();
                 }
             }
 
@@ -291,25 +250,6 @@ class JadwalSAOService
                 break;
             }
         }
-    }
-
-    private function cobaPasangSatuJam(array $unit): bool
-    {
-        if ($this->sisaJam($unit) <= 0) {
-            return true;
-        }
-
-        foreach ($this->kandidatJamTunggal($unit) as $blok) {
-            if (!$this->bebanGuruOk($unit['guruId'], $blok)) {
-                continue;
-            }
-            if ($this->bisaTaruh($unit, $blok)) {
-                $this->taruh($unit, $blok);
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function cobaPasangDenganEviksi(array $unit): bool
@@ -321,66 +261,78 @@ class JadwalSAOService
         $this->siapkanUnit($unit);
         $sisa = $this->sisaJam($unit);
         if ($sisa <= 0) {
-            return $this->lengkap($unit);
+            return false;
         }
 
-        $kandidat = $this->prioritasIsiPenuh
-            ? array_merge($this->kandidatPenempatan($unit, $sisa), $this->kandidatJamTunggal($unit))
-            : $this->kandidatPenempatan($unit, $sisa);
-
-        foreach ($kandidat as $blok) {
+        foreach ($this->kandidatPenempatan($unit, $sisa) as $blok) {
             if (!$this->bebanGuruOk($unit['guruId'], $blok)) {
                 continue;
             }
 
             $evicted = $this->kumpulkanPenghalang($unit, $blok);
+            $snapEvicted = [];
             foreach ($evicted as $e) {
+                $snapEvicted[$e['bmId']] = $this->snapshotUnit($e);
                 $this->hapusUnit($e);
             }
 
             if ($this->bisaTaruh($unit, $blok)) {
                 $this->taruh($unit, $blok);
-                if ($this->lengkap($unit)) {
-                    foreach ($evicted as $e) {
-                        $this->pasangGreedy($e);
-                    }
+                if ($this->lengkap($unit) && $this->pulihkanEvicted($evicted, $snapEvicted)) {
                     return true;
                 }
                 $this->batalTaruh($unit, $blok);
             }
 
-            foreach (array_reverse($evicted) as $e) {
-                $this->pasangGreedy($e);
-            }
+            $this->restoreSnapshot($snapEvicted);
         }
 
         return false;
     }
 
-    private function pasangGreedy(array $unit): bool
+    private function snapshotUnit(array $unit): array
     {
-        if ($this->lengkap($unit)) {
-            return true;
-        }
-        $this->siapkanUnit($unit);
-        $sisa = $this->sisaJam($unit);
-        $kandidat = array_merge(
-            $this->kandidatTerpilih($unit, $sisa),
-            $this->prioritasIsiPenuh ? $this->kandidatJamTunggal($unit) : []
-        );
-        foreach ($kandidat as $blok) {
-            if ($this->bebanGuruOk($unit['guruId'], $blok) && $this->bisaTaruh($unit, $blok)) {
-                $this->taruh($unit, $blok);
-                if ($this->lengkap($unit)) {
-                    return true;
+        $slots = [];
+        $kid = $unit['kelasId'];
+        $bm = $unit['bmId'];
+        foreach ($this->strukturHari as $hari => $max) {
+            for ($j = 1; $j <= $max; $j++) {
+                $s = $this->grid[$hari][$j][$kid] ?? null;
+                if ($s !== null && ($s['beban_mengajar_id'] ?? null) == $bm) {
+                    $slots[] = ['hari' => $hari, 'jam' => $j];
                 }
-                $this->batalTaruh($unit, $blok);
             }
         }
-        return $this->lengkap($unit);
+        return $slots;
     }
 
-    /** @return list<array> */
+    private function restoreSnapshot(array $snapshots): void
+    {
+        foreach ($snapshots as $bmId => $slots) {
+            if (!isset($this->unitByBm[$bmId])) {
+                continue;
+            }
+            $unit = $this->unitByBm[$bmId];
+            foreach ($slots as $s) {
+                $this->grid[$s['hari']][$s['jam']][$unit['kelasId']] = $unit['tpl'];
+                $this->guruOcc[$s['hari']][$s['jam']][$unit['guruId']] = true;
+            }
+        }
+    }
+
+    private function pulihkanEvicted(array $evicted, array $snapEvicted): bool
+    {
+        foreach ($evicted as $e) {
+            $this->restoreSnapshot([$e['bmId'] => $snapEvicted[$e['bmId']] ?? []]);
+        }
+        foreach ($evicted as $e) {
+            if ($this->sisaJam($e) > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private function kumpulkanPenghalang(array $unit, array $blok): array
     {
         $out = [];
@@ -419,9 +371,6 @@ class JadwalSAOService
             $this->hapusUnit($unit);
             return;
         }
-        if ($this->prioritasIsiPenuh) {
-            return;
-        }
         if (!$this->strukturOk($unit)) {
             $this->hapusUnit($unit);
             return;
@@ -452,11 +401,6 @@ class JadwalSAOService
                 break;
             }
         }
-
-        if ($this->prioritasIsiPenuh && empty($hasil)) {
-            $hasil = $this->kandidatJamTunggal($unit);
-        }
-
         return $hasil;
     }
 
@@ -584,25 +528,7 @@ class JadwalSAOService
 
     private function lengkap(array $unit): bool
     {
-        if ($this->sisaJam($unit) !== 0) {
-            return false;
-        }
-        return $this->prioritasIsiPenuh || $this->strukturOk($unit);
-    }
-
-    private function jamLengkap(array $unit): bool
-    {
         return $this->sisaJam($unit) === 0;
-    }
-
-    private function semuaJamLengkap(): bool
-    {
-        foreach ($this->units as $u) {
-            if (!$this->jamLengkap($u)) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private function semuaLengkap(): bool
@@ -761,6 +687,12 @@ class JadwalSAOService
         $this->guruOcc = [];
     }
 
+    private function muatGridTerbaik(): void
+    {
+        $this->grid = $this->salinGrid($this->gridTerbaik);
+        $this->rebuildOcc();
+    }
+
     private function rebuildOcc(): void
     {
         $this->guruOcc = [];
@@ -777,33 +709,16 @@ class JadwalSAOService
 
     private function simpanTerbaik(): void
     {
-        $unitLengkap = $this->hitungUnitJamLengkap();
         $t = $this->hitungTerisi();
-
-        $lebihBaik = $t > $this->terisiTerbaik
-            || ($t === $this->terisiTerbaik && $unitLengkap > $this->unitLengkapTerbaik);
-
-        if ($lebihBaik) {
-            $this->unitLengkapTerbaik = $unitLengkap;
+        if ($t > $this->terisiTerbaik) {
             $this->terisiTerbaik = $t;
             $this->gridTerbaik = $this->salinGrid($this->grid);
         }
     }
 
-    private function hitungUnitJamLengkap(): int
-    {
-        $n = 0;
-        foreach ($this->units as $u) {
-            if ($this->jamLengkap($u)) {
-                $n++;
-            }
-        }
-        return $n;
-    }
-
     private function salinGrid(array $grid): array
     {
-        return unserialize(serialize($grid));
+        return json_decode(json_encode($grid), true);
     }
 
     private function hitungTerisi(): int
@@ -830,11 +745,6 @@ class JadwalSAOService
 
     private function buatUnits($bebanMengajar): array
     {
-        $guruLoad = [];
-        foreach ($bebanMengajar as $b) {
-            $guruLoad[$b->guru_id] = ($guruLoad[$b->guru_id] ?? 0) + (int) $b->jtm;
-        }
-
         $units = [];
         foreach ($bebanMengajar as $b) {
             $nama = $b->mapel->nama_mapel ?? '';
@@ -844,7 +754,6 @@ class JadwalSAOService
                 'kelasId' => $b->kelas_id,
                 'jtm' => (int) $b->jtm,
                 'btq' => $this->isBtq($nama),
-                'guruLoad' => $guruLoad[$b->guru_id] ?? 0,
                 'tpl' => [
                     'beban_mengajar_id' => $b->id,
                     'guru_id' => $b->guru_id,
@@ -853,7 +762,7 @@ class JadwalSAOService
                 ],
             ];
         }
-        usort($units, fn($a, $b) => ($b['btq'] <=> $a['btq']) ?: ($b['guruLoad'] <=> $a['guruLoad']) ?: ($b['jtm'] <=> $a['jtm']));
+        usort($units, fn($a, $b) => ($b['btq'] <=> $a['btq']) ?: ($b['jtm'] <=> $a['jtm']));
         return $units;
     }
 
