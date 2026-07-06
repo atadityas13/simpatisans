@@ -219,7 +219,7 @@ class JadwalController extends Controller
     public function generate(Request $request, JadwalSAOService $saoService)
     {
         @ini_set('memory_limit', '512M');
-        set_time_limit(210);
+        set_time_limit(240);
 
         $semesterId = (int) $request->get('semester_id');
         if (!$semesterId) {
