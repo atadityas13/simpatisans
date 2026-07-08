@@ -86,6 +86,8 @@ class GuruElapkinController extends Controller
             $debug = mb_substr(trim($rawBody), 0, 400);
             if ($debug !== '') {
                 $message .= " (HTTP {$response->status()}: {$debug})";
+            } else {
+                $message .= " (HTTP {$response->status()})";
             }
 
             Log::error('elapkin-bridge rejected', [
