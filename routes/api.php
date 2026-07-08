@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\GuruCetakController;
 use App\Http\Controllers\Api\GuruDashboardController;
 use App\Http\Controllers\Api\GuruElapkinController;
 use App\Http\Controllers\Api\GuruProfileController;
@@ -26,6 +27,8 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth:sanctum')->prefix('guru')->group(function () {
     Route::get('/dashboard', [GuruDashboardController::class, 'index']);
     Route::get('/jadwal', [GuruDashboardController::class, 'jadwal']);
+    Route::get('/cetak/jadwal-pelajaran', [GuruCetakController::class, 'jadwalPelajaran']);
+    Route::get('/cetak/lampiran-sk', [GuruCetakController::class, 'lampiranSk']);
     Route::get('/elapkin-sso', [GuruElapkinController::class, 'ssoToken']);
     Route::post('/elapkin-bridge', [GuruElapkinController::class, 'bridgeSession']);
     Route::put('/profile/biodata', [GuruProfileController::class, 'updateBiodata']);

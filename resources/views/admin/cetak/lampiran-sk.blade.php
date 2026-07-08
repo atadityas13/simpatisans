@@ -147,14 +147,31 @@
                 #e8e8e8 10px
             ) !important;
         }
+
+        @if(!empty($guruMobileView))
+        .guru-mobile-view .main-paper {
+            width: 100%;
+            min-height: auto;
+            overflow-x: auto;
+        }
+        .guru-mobile-view .adjustable-wrapper {
+            pointer-events: none !important;
+            border: none !important;
+        }
+        .guru-mobile-view .resize-handle {
+            display: none !important;
+        }
+        @endif
     </style>
 </head>
-<body>
+<body class="{{ !empty($guruMobileView) ? 'guru-mobile-view' : '' }}">
     <div class="no-print controls-panel">
         <a href="javascript:window.print()" class="no-print-btn">CETAK LAMPIRAN SK</a>
     </div>
 
+    @if(empty($guruMobileView))
     @include('admin.cetak._adjustable_assets', ['templateKey' => 'lampiran_sk'])
+    @endif
 
     @php $mainIdx = 0; @endphp
     @foreach($gurus->chunk(6) as $pageIndex => $guruChunk)

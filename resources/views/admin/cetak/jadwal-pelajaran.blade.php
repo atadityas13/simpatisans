@@ -485,13 +485,30 @@
         .col-kelas {
             width: 14pt;
         }
+
+        @if(!empty($guruMobileView))
+        .guru-mobile-view .paper-preview {
+            transform-origin: top left;
+            transform: scale(0.45);
+            width: 220%;
+            margin-bottom: -50%;
+        }
+        .guru-mobile-view .adjustable-wrapper {
+            pointer-events: none !important;
+            border: none !important;
+        }
+        .guru-mobile-view .resize-handle {
+            display: none !important;
+        }
+        @endif
     </style>
 </head>
 
-<body>
+<body class="{{ !empty($guruMobileView) ? 'guru-mobile-view' : '' }}">
     <div class="no-print controls-panel">
         <a href="javascript:window.print()" class="no-print-btn">Cetak Jadwal</a>
         
+        @if(empty($guruMobileView))
         <div class="controls-group">
             <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); margin-bottom: 4px;">Filter Guru</div>
             <select id="guru-selector" class="guru-select">
@@ -501,6 +518,7 @@
                 @endforeach
             </select>
         </div>
+        @endif
     </div>
 
     <div class="paper-preview">
@@ -811,27 +829,19 @@
     </div>
 
     <script>
-        document.getElementById('guru-selector').addEventListener('change', function() {
-            const selectedKg = this.value;
-            const selectedName = this.options[this.selectedIndex].getAttribute('data-name');
-            
-            // Clear existing highlights
+        function applyGuruFilter(selectedKg, selectedName) {
             document.querySelectorAll('.highlight-yellow').forEach(el => el.classList.remove('highlight-yellow'));
-            
-            // Footer Logic
+
             const footer = document.getElementById('specific-guru-footer');
             const footerName = document.getElementById('display-guru-name');
-            
+
             if (selectedKg) {
-                // Highlight Schedule Cells
                 document.querySelectorAll('.schedule-cell').forEach(cell => {
                     const kgFull = cell.getAttribute('data-kg-full');
                     if (kgFull) {
-                        // Check if it exactly matches or starts with (e.g. "AT-07")
                         if (kgFull === selectedKg || kgFull.startsWith(selectedKg + '-')) {
                             cell.classList.add('highlight-yellow');
-                            
-                            // Highlight corresponding Mapel if using the "GURU-NO" format
+
                             if (kgFull.includes('-')) {
                                 const mapelNo = kgFull.split('-')[1];
                                 document.querySelectorAll(`.mapel-legend-cell[data-mapel-no="${mapelNo}"]`).forEach(mCell => {
@@ -841,23 +851,39 @@
                         }
                     }
                 });
-                
-                // Highlight Guru Legend Row
+
                 document.querySelectorAll(`.guru-legend-row[data-kg="${selectedKg}"]`).forEach(row => {
                     row.classList.add('highlight-yellow');
-                    // Highlight all cells in the row
                     row.querySelectorAll('td').forEach(td => td.classList.add('highlight-yellow'));
                 });
-                
-                // Update Footer
-                footerName.textContent = selectedName;
-                footer.style.display = 'block';
-            } else {
+
+                if (footer && footerName) {
+                    footerName.textContent = selectedName;
+                    footer.style.display = 'block';
+                }
+            } else if (footer) {
                 footer.style.display = 'none';
             }
+        }
+
+        const guruSelector = document.getElementById('guru-selector');
+        if (guruSelector) {
+            guruSelector.addEventListener('change', function() {
+                const selectedKg = this.value;
+                const selectedName = this.options[this.selectedIndex].getAttribute('data-name');
+                applyGuruFilter(selectedKg, selectedName);
+            });
+        }
+
+        @if(!empty($guruMobileView) && !empty($preselectedGuru))
+        document.addEventListener('DOMContentLoaded', function() {
+            applyGuruFilter(@json($preselectedGuru->kode_guru), @json($preselectedGuru->nama_lengkap));
         });
+        @endif
     </script>
+    @if(empty($guruMobileView))
     @include('admin.cetak._adjustable_assets', ['templateKey' => 'cetak_pelajaran'])
+    @endif
 </body>
 
 </html>
