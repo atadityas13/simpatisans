@@ -495,25 +495,29 @@
             background: #e8ecf0;
         }
         .guru-mobile-view .paper-preview {
+            width: max-content;
+            min-width: 210mm;
+            overflow: visible;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
             background: #fff;
+        }
+        .guru-mobile-view .main-content {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: flex-start;
+            width: max-content;
+            min-width: 100%;
+        }
+        .guru-mobile-view .legend-container {
+            flex-shrink: 0;
+            width: 130pt;
+            margin-left: 5pt;
         }
         .guru-mobile-view .controls-panel {
             display: none !important;
         }
         .guru-mobile-view .print-fab-mobile {
-            position: fixed;
-            bottom: 20px;
-            right: 16px;
-            z-index: 10000;
-            background: #047857;
-            color: #fff;
-            border: none;
-            border-radius: 999px;
-            padding: 12px 20px;
-            font-size: 13px;
-            font-weight: 700;
-            box-shadow: 0 4px 14px rgba(4, 120, 87, 0.45);
+            display: none !important;
         }
         .guru-mobile-view .adjustable-wrapper {
             pointer-events: none !important;

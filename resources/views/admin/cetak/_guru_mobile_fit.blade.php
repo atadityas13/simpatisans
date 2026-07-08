@@ -23,16 +23,35 @@
     .guru-mobile-view .mobile-fit-target {
         margin-left: auto !important;
         margin-right: auto !important;
+        overflow: visible !important;
     }
     .guru-mobile-view .mobile-fit-spacer {
         width: 100%;
         max-width: 100vw;
         margin: 0 auto 12px;
         box-sizing: border-box;
+        overflow: visible;
     }
 </style>
 <script>
     (function () {
+        function measureTargetWidth(el) {
+            var width = Math.max(el.scrollWidth || 0, el.offsetWidth || 0);
+            if (width > 0) return width;
+
+            var clone = el.cloneNode(true);
+            clone.style.visibility = 'hidden';
+            clone.style.position = 'absolute';
+            clone.style.left = '-99999px';
+            clone.style.width = 'max-content';
+            clone.style.transform = 'none';
+            clone.style.zoom = '1';
+            document.body.appendChild(clone);
+            width = Math.max(clone.scrollWidth || 0, clone.offsetWidth || 0);
+            document.body.removeChild(clone);
+            return width;
+        }
+
         function fitMobileDocument() {
             if (!document.body.classList.contains('guru-mobile-view')) return;
 
@@ -43,7 +62,7 @@
             document.querySelectorAll('.mobile-fit-target').forEach(function (el) {
                 el.style.zoom = '';
                 el.style.transform = '';
-                var w = el.offsetWidth || el.scrollWidth;
+                var w = measureTargetWidth(el);
                 if (w > maxNaturalW) maxNaturalW = w;
             });
 
