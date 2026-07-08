@@ -3,7 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
+    @if(!empty($preselectedGuru))
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0, user-scalable=yes">
+    @else
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    @endif
     <title>Jadwal Pelajaran - {{ $activeSemester->getFullLabelAttribute() }}</title>
     <style>
         @page {
@@ -89,6 +93,28 @@
             display: flex;
             align-items: flex-start;
             gap: 5pt;
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .schedule-table-wrap {
+            flex: 1 1 0;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .schedule-table-wrap table {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .schedule-cell {
+            white-space: nowrap !important;
+            word-break: keep-all !important;
+            overflow: hidden;
+            line-height: 1 !important;
+            font-size: 6pt;
+            padding: 0 !important;
         }
 
         table {
@@ -104,8 +130,9 @@
             text-align: center;
             height: 8.8pt;
             font-weight: bold;
-            /* Reduced from 9.0pt to ensure 1-page fit */
-            /* Reduced slightly from 9.2pt */
+            white-space: nowrap;
+            overflow: hidden;
+            line-height: 1;
         }
 
         /* Ensuring only the leftmost overall border is thick */
@@ -485,10 +512,59 @@
         .col-kelas {
             width: 14pt;
         }
+
+        @if(!empty($preselectedGuru))
+        @media screen {
+            body.guru-app-view {
+                display: block !important;
+                background: #e8ecf0 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow-x: hidden;
+            }
+            .guru-app-frame {
+                width: 100%;
+                max-width: 100vw;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start;
+                padding: 8px 0 88px;
+                box-sizing: border-box;
+                overflow: hidden;
+            }
+            body.guru-app-view .paper-preview {
+                transform-origin: top center;
+                flex-shrink: 0;
+                margin: 0;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            }
+        }
+        body.guru-printing .guru-app-frame,
+        body.guru-printing .paper-preview {
+            transform: none !important;
+            height: auto !important;
+            padding: 0 !important;
+        }
+        @media print {
+            body.guru-app-view {
+                background: #fff !important;
+            }
+            .guru-app-frame {
+                display: block !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+            }
+            body.guru-app-view .paper-preview {
+                transform: none !important;
+                box-shadow: none !important;
+            }
+        }
+        @endif
     </style>
 </head>
 
-<body>
+<body class="{{ !empty($preselectedGuru) ? 'guru-app-view' : '' }}">
     @if(empty($preselectedGuru))
     <div class="no-print controls-panel">
         <a href="javascript:window.print()" class="no-print-btn">Cetak Jadwal</a>
@@ -505,7 +581,10 @@
     </div>
     @endif
 
-    <div class="paper-preview">
+    @if(!empty($preselectedGuru))
+    <div class="guru-app-frame" id="guru-app-frame">
+    @endif
+    <div class="paper-preview" id="paper-preview">
         <div class="container">
         <!-- Header -->
         <div class="header">
@@ -529,7 +608,7 @@
 
         <div class="main-content">
             <!-- Schedule Table -->
-            <div style="flex-grow: 1;">
+            <div class="schedule-table-wrap">
                 <table>
                     <thead>
                         <tr>
@@ -811,6 +890,9 @@
             </div>
         </div>
     </div>
+    @if(!empty($preselectedGuru))
+    </div>
+    @endif
 
     <script>
         function applyGuruFilter(selectedKg, selectedName) {
@@ -863,6 +945,54 @@
         });
         @endif
     </script>
+    @if(!empty($preselectedGuru))
+    <script>
+        (function () {
+            function fitGuruApp() {
+                if (document.body.classList.contains('guru-printing')) return;
+                var paper = document.getElementById('paper-preview');
+                var frame = document.getElementById('guru-app-frame');
+                if (!paper || !frame) return;
+
+                paper.style.transform = '';
+                var naturalW = paper.offsetWidth;
+                if (!naturalW) return;
+
+                var viewW = window.innerWidth || document.documentElement.clientWidth;
+                var scale = Math.min(1, (viewW - 8) / naturalW);
+
+                if (scale < 0.999) {
+                    paper.style.transform = 'scale(' + scale + ')';
+                    paper.style.transformOrigin = 'top center';
+                }
+                frame.style.height = Math.ceil(paper.getBoundingClientRect().height) + 'px';
+            }
+
+            window.prepareGuruPrint = function (cb) {
+                document.body.classList.add('guru-printing');
+                var paper = document.getElementById('paper-preview');
+                if (paper) paper.style.transform = 'none';
+                var frame = document.getElementById('guru-app-frame');
+                if (frame) frame.style.height = 'auto';
+                setTimeout(function () { if (typeof cb === 'function') cb(); }, 250);
+            };
+
+            window.finishGuruPrint = function () {
+                document.body.classList.remove('guru-printing');
+                fitGuruApp();
+            };
+
+            window.addEventListener('load', function () {
+                fitGuruApp();
+                setTimeout(fitGuruApp, 300);
+            });
+            window.addEventListener('resize', fitGuruApp);
+            window.addEventListener('orientationchange', function () {
+                setTimeout(fitGuruApp, 300);
+            });
+        })();
+    </script>
+    @endif
     @if(empty($preselectedGuru))
     @include('admin.cetak._adjustable_assets', ['templateKey' => 'cetak_pelajaran'])
     @endif
