@@ -280,20 +280,20 @@
         /* Mapel legend: smaller to free vertical room so footer fits 1 page */
         .mapel-legend-table th,
         .mapel-legend-table td {
-            font-size: 3pt;
-            height: 5.8pt;
-            padding: 0 0.5pt;
-            letter-spacing: -0.2pt;
-        }
-
-        .mapel-legend-table td.mapel-legend-cell:not(.no-col) {
-            font-size: 2.8pt;
-            font-weight: normal;
+            font-size: 2.5pt;
+            height: 5.2pt;
+            padding: 0;
             letter-spacing: -0.25pt;
         }
 
+        .mapel-legend-table td.mapel-legend-cell:not(.no-col) {
+            font-size: 2.3pt;
+            font-weight: normal;
+            letter-spacing: -0.3pt;
+        }
+
         .mapel-legend-table .no-col {
-            width: 7pt;
+            width: 6pt;
         }
 
         .legend-title {
