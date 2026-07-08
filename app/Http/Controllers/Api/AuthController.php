@@ -76,7 +76,12 @@ class AuthController extends Controller
     private function formatUser(User $user): array
     {
         $guru = Guru::where('username', $user->username)
-            ->with(['mapelDiampu:id,nama_mapel'])
+            ->with([
+                'mapelDiampu:id,nama_mapel',
+                'mapelIjazah:id,nama_mapel',
+                'mapelSertifikasi:id,nama_mapel',
+                'rumpunIjazah:id,nama_rumpun',
+            ])
             ->first();
 
         return [
@@ -92,6 +97,10 @@ class AuthController extends Controller
                 'kode_guru' => $guru->kode_guru,
                 'nuptk' => $guru->nuptk,
                 'golongan' => $guru->golongan,
+                'status_pegawai' => $guru->status_pegawai,
+                'status_sertifikasi' => (bool) $guru->status_sertifikasi,
+                'mapel_ijazah' => $guru->kualifikasi_ijazah,
+                'mapel_sertifikasi' => $guru->mapelSertifikasi?->nama_mapel,
                 'mapel' => $guru->mapelDiampu->pluck('nama_mapel')->values(),
             ] : null,
         ];
