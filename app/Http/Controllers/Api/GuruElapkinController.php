@@ -37,9 +37,117 @@ class GuruElapkinController extends Controller
      */
     public function bridgeSession(Request $request): JsonResponse
     {
-        $ticket = $this->buildSsoTicket($request->user());
-        $apiUrl = rtrim(config('services.elapkin.mobile_url'), '/').'/api/auth/sso.php';
+        $bridge = $this->openElapkinBridge($request->user());
+        if (! $bridge['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $bridge['message'],
+            ], $bridge['status'] ?? 401);
+        }
 
+        return response()->json([
+            'success' => true,
+            'message' => 'Sesi Kinerja berhasil dibuka.',
+            'cookies' => $bridge['cookies'],
+            'kepala_madrasah' => $bridge['kepala_madrasah'],
+        ]);
+    }
+
+    /**
+     * Proxy hari libur e-Lapkin (hindari masalah cookie sesi di Android).
+     */
+    public function hariLibur(Request $request): JsonResponse
+    {
+        $tahun = (int) $request->query('tahun', now()->year);
+        if ($tahun < 2000 || $tahun > 2100) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter tahun tidak valid.',
+            ], 422);
+        }
+
+        $bridge = $this->openElapkinBridge($request->user());
+        if (! $bridge['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $bridge['message'],
+            ], $bridge['status'] ?? 401);
+        }
+
+        $cookieHeader = $this->cookiesToHeader($bridge['cookies']);
+        $mobileToken = $this->generateMobileToken();
+        $headers = [
+            'User-Agent' => config('services.elapkin.talim_user_agent'),
+            'X-Mobile-Token' => $mobileToken,
+            'X-App-Package' => config('services.elapkin.talim_package'),
+            'Accept' => 'application/json',
+            'Cookie' => $cookieHeader,
+        ];
+        $query = [
+            'action' => 'get_by_year',
+            'tahun' => $tahun,
+        ];
+
+        $candidates = [
+            rtrim(config('services.elapkin.mobile_url'), '/').'/api/hari_libur.php',
+            preg_replace('#/mobile-app/?$#', '', rtrim(config('services.elapkin.mobile_url'), '/')).'/api/hari_libur.php',
+        ];
+        $candidates = array_values(array_unique(array_filter($candidates)));
+
+        $lastMessage = 'Gagal memuat hari libur dari e-Lapkin.';
+        $lastStatus = 502;
+
+        foreach ($candidates as $holidayUrl) {
+            try {
+                $response = Http::timeout(20)
+                    ->withHeaders($headers)
+                    ->get($holidayUrl, $query);
+            } catch (\Throwable $e) {
+                $lastMessage = 'Tidak dapat menghubungi server e-Lapkin.';
+                $lastStatus = 502;
+                continue;
+            }
+
+            $payload = null;
+            $rawBody = (string) $response->body();
+            try {
+                $payload = $response->json();
+            } catch (\Throwable $e) {
+                $payload = null;
+            }
+
+            if ($response->successful() && ($payload['success'] ?? false)) {
+                return response()->json([
+                    'success' => true,
+                    'tahun' => $tahun,
+                    'data' => $payload['data'] ?? [],
+                    'count' => count($payload['data'] ?? []),
+                ]);
+            }
+
+            $lastMessage = is_string($payload['message'] ?? null) && $payload['message'] !== ''
+                ? $payload['message']
+                : $lastMessage;
+            $lastStatus = $response->status() ?: 502;
+
+            if ($response->status() !== 404) {
+                break;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $lastMessage,
+        ], $lastStatus);
+    }
+
+    /**
+     * @return array{success:bool,message?:string,status?:int,cookies?:string,kepala_madrasah?:?array}
+     */
+    private function openElapkinBridge(User $user): array
+    {
+        $ticket = $this->buildSsoTicket($user);
+        $apiUrl = rtrim(config('services.elapkin.mobile_url'), '/').'/api/auth/sso.php';
         $mobileToken = $this->generateMobileToken();
 
         try {
@@ -59,10 +167,11 @@ class GuruElapkinController extends Controller
                     'profile' => $ticket['profile'],
                 ]);
         } catch (\Throwable $e) {
-            return response()->json([
+            return [
                 'success' => false,
                 'message' => 'Tidak dapat menghubungi server e-Lapkin.',
-            ], 502);
+                'status' => 502,
+            ];
         }
 
         $payload = null;
@@ -82,7 +191,6 @@ class GuruElapkinController extends Controller
                 $message = 'SSO e-Lapkin ditolak.';
             }
 
-            // Bantuan debug (agar kita tahu kenapa ditolak)
             $debug = mb_substr(trim($rawBody), 0, 400);
             if ($debug !== '') {
                 $message .= " (HTTP {$response->status()}: {$debug})";
@@ -100,26 +208,40 @@ class GuruElapkinController extends Controller
                 'user_agent' => config('services.elapkin.talim_user_agent'),
             ]);
 
-            return response()->json([
+            return [
                 'success' => false,
                 'message' => $message,
-            ], 401);
+                'status' => 401,
+            ];
         }
 
         $cookies = $this->extractCookies($response);
         if ($cookies === '') {
-            return response()->json([
+            return [
                 'success' => false,
                 'message' => 'SSO berhasil tetapi cookie sesi tidak diterima dari e-Lapkin.',
-            ], 502);
+                'status' => 502,
+            ];
         }
 
-        return response()->json([
+        return [
             'success' => true,
-            'message' => 'Sesi Kinerja berhasil dibuka.',
             'cookies' => $cookies,
             'kepala_madrasah' => $ticket['kepala_madrasah'],
-        ]);
+        ];
+    }
+
+    private function cookiesToHeader(string $cookies): string
+    {
+        $parts = [];
+        foreach (preg_split('/\r\n|\r|\n/', $cookies) as $line) {
+            $pair = trim(explode(';', $line)[0]);
+            if ($pair !== '' && str_contains($pair, '=')) {
+                $parts[] = $pair;
+            }
+        }
+
+        return implode('; ', array_unique($parts));
     }
 
     private function buildSsoTicket(User $user): array

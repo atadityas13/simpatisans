@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->prefix('guru')->group(function () {
     Route::get('/cetak/lampiran-sk', [GuruCetakController::class, 'lampiranSk']);
     Route::get('/elapkin-sso', [GuruElapkinController::class, 'ssoToken']);
     Route::post('/elapkin-bridge', [GuruElapkinController::class, 'bridgeSession']);
+    Route::get('/hari-libur', [GuruElapkinController::class, 'hariLibur']);
     Route::put('/profile/biodata', [GuruProfileController::class, 'updateBiodata']);
     Route::put('/profile/kontak', [GuruProfileController::class, 'updateKontak']);
     Route::post('/profile/photo', [GuruProfileController::class, 'updatePhoto']);
