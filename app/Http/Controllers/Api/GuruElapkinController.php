@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Guru;
 use App\Models\TugasTambahan;
+use App\Models\User;
 use App\Services\SemesterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 
 class GuruElapkinController extends Controller
 {
@@ -17,11 +19,80 @@ class GuruElapkinController extends Controller
 
     /**
      * Terbitkan ticket SSO + profil guru dari SimpatiSans.
-     * Aturan bisnis: penilai LKH/RKB selalu Kepala Madrasah (semester aktif).
      */
     public function ssoToken(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $ticket = $this->buildSsoTicket($request->user());
+
+        return response()->json([
+            'success' => true,
+            ...$ticket,
+            'expires_in' => 300,
+        ]);
+    }
+
+    /**
+     * Buka sesi e-Lapkin dari server (hindari masalah serialisasi JSON di Android).
+     */
+    public function bridgeSession(Request $request): JsonResponse
+    {
+        $ticket = $this->buildSsoTicket($request->user());
+        $apiUrl = rtrim(config('services.elapkin.mobile_url'), '/').'/api/auth/sso.php';
+
+        $mobileToken = $this->generateMobileToken();
+
+        try {
+            $response = Http::timeout(20)
+                ->withHeaders([
+                    'User-Agent' => config('services.elapkin.talim_user_agent'),
+                    'X-Mobile-Token' => $mobileToken,
+                    'X-App-Package' => config('services.elapkin.talim_package'),
+                    'Accept' => 'application/json',
+                ])
+                ->post($apiUrl, [
+                    'nip' => $ticket['nip'],
+                    'timestamp' => $ticket['timestamp'],
+                    'signature' => $ticket['signature'],
+                    'profile_hash' => $ticket['profile_hash'],
+                    'profile' => $ticket['profile'],
+                ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat menghubungi server e-Lapkin.',
+            ], 502);
+        }
+
+        $payload = $response->json();
+        if (! $response->successful() || ! ($payload['success'] ?? false)) {
+            $message = $payload['message']
+                ?? $payload['error']
+                ?? 'SSO e-Lapkin ditolak. Pastikan e-Lapkin sudah di-update.';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 401);
+        }
+
+        $cookies = $this->extractCookies($response);
+        if ($cookies === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'SSO berhasil tetapi cookie sesi tidak diterima dari e-Lapkin.',
+            ], 502);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sesi Kinerja berhasil dibuka.',
+            'cookies' => $cookies,
+            'kepala_madrasah' => $ticket['kepala_madrasah'],
+        ]);
+    }
+
+    private function buildSsoTicket(User $user): array
+    {
         $guru = Guru::where('username', $user->username)
             ->with(['mapelDiampu:id,nama_mapel', 'tugasTambahans:id,nama_tugas'])
             ->first();
@@ -38,7 +109,6 @@ class GuruElapkinController extends Controller
             'nuptk' => $guru?->nuptk,
             'golongan' => $guru?->golongan,
             'unit_kerja' => 'MTsN 11 Majalengka',
-            // Penilai = Kepala Madrasah (bukan Waka / role lain)
             'nip_penilai' => $kepalaMadrasah?->username,
             'nama_penilai' => $kepalaMadrasah?->nama_lengkap,
             'jabatan_penilai' => $kepalaMadrasah?->jabatan ?? 'Kepala Madrasah',
@@ -61,22 +131,49 @@ class GuruElapkinController extends Controller
         $secret = config('services.elapkin.sso_secret');
         $signature = hash_hmac('sha256', $payload, $secret);
 
-        return response()->json([
-            'success' => true,
+        return [
             'nip' => $user->username,
             'timestamp' => $timestamp,
             'signature' => $signature,
             'profile_hash' => $profileHash,
             'profile' => $profile,
             'kepala_madrasah' => $kepala,
-            'expires_in' => 300,
-        ]);
+        ];
+    }
+
+    private function generateMobileToken(): string
+    {
+        $date = now('Asia/Jakarta')->format('Y-m-d');
+        $secret = config('services.elapkin.mobile_secret');
+
+        return md5($secret.$date);
+    }
+
+    private function extractCookies(\Illuminate\Http\Client\Response $response): string
+    {
+        $parts = [];
+
+        foreach ($response->cookies() as $cookie) {
+            $parts[] = $cookie->getName().'='.$cookie->getValue();
+        }
+
+        if ($parts === []) {
+            $headers = $response->header('Set-Cookie');
+            $lines = is_array($headers) ? $headers : ($headers ? [$headers] : []);
+            foreach ($lines as $line) {
+                $pair = trim(explode(';', (string) $line)[0]);
+                if (str_contains($pair, '=')) {
+                    $parts[] = $pair;
+                }
+            }
+        }
+
+        return implode("\n", array_unique($parts));
     }
 
     private function resolveKepalaMadrasah(?int $semesterId): ?Guru
     {
-        // Penilai kinerja selalu guru yang memegang tugas Kepala Madrasah.
-        if (!$semesterId) {
+        if (! $semesterId) {
             return Guru::whereHas('tugasTambahans', fn ($q) => $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID))->first();
         }
 

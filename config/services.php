@@ -38,6 +38,9 @@ return [
     'elapkin' => [
         'sso_secret' => env('ELAPKIN_SSO_SECRET', 'MTSN11-TALIM-SSO-2026'),
         'mobile_url' => env('ELAPKIN_MOBILE_URL', 'https://e-lapkin.mtsn11majalengka.sch.id/mobile-app/'),
+        'mobile_secret' => env('ELAPKIN_MOBILE_SECRET', 'MTSN11-MOBILE-KEY-2025'),
+        'talim_user_agent' => env('ELAPKIN_TALIM_USER_AGENT', 'ATADevLabs_TalimSuperApp_MTsN11'),
+        'talim_package' => env('ELAPKIN_TALIM_PACKAGE', 'com.atadevlabs.talim'),
     ],
 
 ];
