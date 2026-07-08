@@ -244,15 +244,39 @@
         /* Legend Styling */
         .legend-container {
             width: 130pt;
-            /* Increased back as there is more room with 0.3cm margins */
             flex-shrink: 0;
             margin-left: 5pt;
+            max-width: 130pt;
+            overflow: hidden;
+            box-sizing: border-box;
         }
 
         .legend-table {
             font-size: 5pt;
-            /* Compact font */
             width: 100%;
+            table-layout: fixed;
+            max-width: 100%;
+        }
+
+        .mapel-legend-table {
+            font-size: 4pt;
+        }
+
+        .mapel-legend-table th,
+        .mapel-legend-table td {
+            font-size: 4pt;
+            padding: 0 0.5pt;
+            height: 7.2pt;
+            letter-spacing: -0.15pt;
+        }
+
+        .mapel-legend-table .no-col {
+            width: 8pt;
+        }
+
+        .mapel-legend-table td.mapel-legend-cell:not(.no-col) {
+            font-size: 3.8pt;
+            text-align: left;
         }
 
         .legend-table td {
@@ -781,7 +805,7 @@
                     </tbody>
                 </table>
 
-                <table class="legend-table" style="margin-top: 5pt;">
+                <table class="legend-table mapel-legend-table" style="margin-top: 5pt;">
                     <thead>
                         <tr>
                             <th class="no-col">No</th>
