@@ -95,9 +95,20 @@
                                     ['label' => 'NIP / NIK', 'value' => $guru->username ?? '—'],
                                     ['label' => 'Kode Guru', 'value' => $guru->kode_guru ?? '—', 'badge' => true],
                                     ['label' => 'NUPTK', 'value' => $guru->nuptk ?? '—'],
+                                    ['label' => 'DUK', 'value' => $guru->duk ?? '—'],
                                     ['label' => 'Status Pegawai', 'value' => $guru->status_pegawai ?? '—'],
                                     ['label' => 'Jabatan', 'value' => $guru->jabatan ?? '—'],
                                     ['label' => 'Golongan', 'value' => $guru->golongan ?? '—'],
+                                    ['label' => 'Jenis Kelamin', 'value' => match ($guru->jenis_kelamin) {
+                                        'L' => 'Laki-laki',
+                                        'P' => 'Perempuan',
+                                        default => $guru->jenis_kelamin ?: '—',
+                                    }],
+                                    ['label' => 'Tempat, Tanggal Lahir', 'value' => trim(($guru->tempat_lahir ?? '') . ($guru->tanggal_lahir ? ', ' . $guru->tanggal_lahir->translatedFormat('d F Y') : ''), ', ') ?: '—'],
+                                    ['label' => 'Agama', 'value' => $guru->agama ?? '—'],
+                                    ['label' => 'Nomor HP', 'value' => $guru->nomor_hp ?? '—'],
+                                    ['label' => 'Email', 'value' => $guru->email ?? '—'],
+                                    ['label' => 'Alamat', 'value' => $guru->alamat ?? '—'],
                                     ['label' => 'Mapel Ijazah', 'value' => $guru->kualifikasi_ijazah ?? '—'],
                                 ];
                             @endphp

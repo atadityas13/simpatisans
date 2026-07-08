@@ -92,17 +92,33 @@ class AuthController extends Controller
             'jabatan' => $guru?->jabatan ?? $user->getRawOriginal('jabatan'),
             'role' => $user->role,
             'foto' => $user->foto ? asset('storage/' . $user->foto) : null,
-            'guru' => $guru ? [
-                'id' => $guru->id,
-                'kode_guru' => $guru->kode_guru,
-                'nuptk' => $guru->nuptk,
-                'golongan' => $guru->golongan,
-                'status_pegawai' => $guru->status_pegawai,
-                'status_sertifikasi' => (bool) $guru->status_sertifikasi,
-                'mapel_ijazah' => $guru->kualifikasi_ijazah,
-                'mapel_sertifikasi' => $guru->mapelSertifikasi?->nama_mapel,
-                'mapel' => $guru->mapelDiampu->pluck('nama_mapel')->values(),
-            ] : null,
+            'guru' => $guru ? $this->formatGuru($guru) : null,
+        ];
+    }
+
+    private function formatGuru(Guru $guru): array
+    {
+        return [
+            'id' => $guru->id,
+            'kode_guru' => $guru->kode_guru,
+            'duk' => $guru->duk,
+            'gelar_depan' => $guru->gelar_depan,
+            'gelar_belakang' => $guru->gelar_belakang,
+            'nuptk' => $guru->nuptk,
+            'golongan' => $guru->golongan,
+            'status_pegawai' => $guru->status_pegawai,
+            'status_sertifikasi' => (bool) $guru->status_sertifikasi,
+            'is_bk' => (bool) $guru->is_bk,
+            'jenis_kelamin' => $guru->jenis_kelamin,
+            'tempat_lahir' => $guru->tempat_lahir,
+            'tanggal_lahir' => $guru->tanggal_lahir?->format('Y-m-d'),
+            'agama' => $guru->agama,
+            'nomor_hp' => $guru->nomor_hp,
+            'email' => $guru->email,
+            'alamat' => $guru->alamat,
+            'mapel_ijazah' => $guru->kualifikasi_ijazah,
+            'mapel_sertifikasi' => $guru->mapelSertifikasi?->nama_mapel,
+            'mapel' => $guru->mapelDiampu->pluck('nama_mapel')->values(),
         ];
     }
 }

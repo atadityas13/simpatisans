@@ -16,6 +16,13 @@
             nama_guru: '',
             gelar_depan: '',
             gelar_belakang: '',
+            jenis_kelamin: '',
+            tempat_lahir: '',
+            tanggal_lahir: '',
+            agama: '',
+            nomor_hp: '',
+            email: '',
+            alamat: '',
             nuptk: '',
             jabatan: '',
             golongan: '',
@@ -53,6 +60,13 @@
                 nama_guru: '',
                 gelar_depan: '',
                 gelar_belakang: '',
+                jenis_kelamin: '',
+                tempat_lahir: '',
+                tanggal_lahir: '',
+                agama: '',
+                nomor_hp: '',
+                email: '',
+                alamat: '',
                 nuptk: '',
                 jabatan: '',
                 golongan: '',
@@ -77,6 +91,13 @@
                 nama_guru: guru.nama_guru || '',
                 gelar_depan: guru.gelar_depan || '',
                 gelar_belakang: guru.gelar_belakang || '',
+                jenis_kelamin: guru.jenis_kelamin || '',
+                tempat_lahir: guru.tempat_lahir || '',
+                tanggal_lahir: guru.tanggal_lahir ? guru.tanggal_lahir.substring(0, 10) : '',
+                agama: guru.agama || '',
+                nomor_hp: guru.nomor_hp || '',
+                email: guru.email || '',
+                alamat: guru.alamat || '',
                 nuptk: guru.nuptk || '',
                 jabatan: guru.jabatan || '',
                 golongan: guru.golongan || '',
@@ -319,7 +340,59 @@
                                 </div>
                             </div>
 
-                            {{-- Baris 3: KG, Jabatan, Golongan --}}
+                            {{-- Baris 3: Biodata Pribadi --}}
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Jenis Kelamin</label>
+                                    <select name="jenis_kelamin" x-model="formData.jenis_kelamin"
+                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
+                                        <option value="">— Pilih —</option>
+                                        <option value="L">Laki-laki</option>
+                                        <option value="P">Perempuan</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Tempat Lahir</label>
+                                    <input type="text" name="tempat_lahir" x-model="formData.tempat_lahir"
+                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Tanggal Lahir</label>
+                                    <input type="date" name="tanggal_lahir" x-model="formData.tanggal_lahir"
+                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Agama</label>
+                                    <select name="agama" x-model="formData.agama"
+                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
+                                        <option value="">— Pilih —</option>
+                                        @foreach(['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'] as $agama)
+                                            <option value="{{ $agama }}">{{ $agama }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </div>
+
+                            {{-- Baris 4: Kontak --}}
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Nomor HP</label>
+                                    <input type="text" name="nomor_hp" x-model="formData.nomor_hp" placeholder="08xxxxxxxxxx"
+                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Email</label>
+                                    <input type="email" name="email" x-model="formData.email"
+                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
+                                </div>
+                                <div class="md:col-span-1">
+                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Alamat</label>
+                                    <input type="text" name="alamat" x-model="formData.alamat"
+                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
+                                </div>
+                            </div>
+
+                            {{-- Baris 5: KG, Jabatan, Golongan --}}
                             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                                 {{-- a. KG --}}
                                 <div>
