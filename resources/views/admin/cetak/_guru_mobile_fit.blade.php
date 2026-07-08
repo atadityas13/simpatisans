@@ -8,7 +8,6 @@
         overflow-x: hidden !important;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
-        touch-action: pan-y pinch-zoom;
         display: block !important;
         box-sizing: border-box;
     }
@@ -17,20 +16,17 @@
         max-width: 100vw;
         overflow-x: hidden !important;
         overflow-y: visible;
-        padding: 4px 0 80px;
+        padding: 12px 0 88px;
         margin: 0 auto;
         box-sizing: border-box;
     }
     .guru-mobile-view .mobile-fit-target {
-        transform-origin: top center;
         margin-left: auto !important;
         margin-right: auto !important;
-        max-width: none;
     }
     .guru-mobile-view .mobile-fit-spacer {
         width: 100%;
         max-width: 100vw;
-        overflow: hidden;
         margin: 0 auto 12px;
         box-sizing: border-box;
     }
@@ -41,41 +37,30 @@
             if (!document.body.classList.contains('guru-mobile-view')) return;
 
             var viewW = window.innerWidth || document.documentElement.clientWidth;
-            var available = Math.max(viewW - 8, 280);
+            var available = Math.max(viewW - 12, 280);
+            var maxNaturalW = 0;
 
             document.querySelectorAll('.mobile-fit-target').forEach(function (el) {
                 el.style.zoom = '';
                 el.style.transform = '';
-                el.style.marginBottom = '';
-
-                var naturalW = el.offsetWidth;
-                if (!naturalW) return;
-
-                var scale = Math.min(1, available / naturalW);
-                var spacer = el.parentElement;
-                var hasSpacer = spacer && spacer.classList.contains('mobile-fit-spacer');
-
-                if (scale < 0.999) {
-                    if ('zoom' in el.style) {
-                        el.style.zoom = String(scale);
-                    } else {
-                        el.style.transform = 'scale(' + scale + ')';
-                        el.style.transformOrigin = 'top center';
-                        if (hasSpacer) {
-                            spacer.style.width = Math.ceil(naturalW * scale) + 'px';
-                        }
-                    }
-                } else if (hasSpacer) {
-                    spacer.style.width = '';
-                }
-
-                if (hasSpacer) {
-                    spacer.style.maxWidth = '100%';
-                    spacer.style.margin = '0 auto';
-                    spacer.style.overflow = 'hidden';
-                    spacer.style.height = Math.ceil(el.getBoundingClientRect().height) + 'px';
-                }
+                var w = el.offsetWidth || el.scrollWidth;
+                if (w > maxNaturalW) maxNaturalW = w;
             });
+
+            if (!maxNaturalW) return;
+
+            var scale = Math.min(1, available / maxNaturalW);
+            var minScale = Math.max(0.2, scale * 0.35);
+            var meta = document.querySelector('meta[name="viewport"]');
+            if (meta) {
+                meta.setAttribute(
+                    'content',
+                    'width=' + Math.round(maxNaturalW) +
+                    ', initial-scale=' + scale.toFixed(4) +
+                    ', minimum-scale=' + minScale.toFixed(4) +
+                    ', maximum-scale=5.0, user-scalable=yes'
+                );
+            }
         }
 
         function scheduleFit() {

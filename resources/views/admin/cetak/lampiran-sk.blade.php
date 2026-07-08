@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     @if(!empty($guruMobileView))
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=4.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0, user-scalable=yes">
     @else
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @endif
@@ -194,7 +194,7 @@
     </div>
 
     @if(!empty($guruMobileView))
-    <button type="button" class="print-fab-mobile no-print" onclick="window.print()">Cetak Pembagian Tugas</button>
+    <button type="button" class="print-fab-mobile no-print" onclick="if(window.TalimAndroid){TalimAndroid.saveAsPdf();}else{window.print();}">Simpan</button>
     <div class="mobile-doc-scroll">
     @endif
 
