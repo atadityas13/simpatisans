@@ -280,14 +280,20 @@
         /* Mapel legend: smaller to free vertical room so footer fits 1 page */
         .mapel-legend-table th,
         .mapel-legend-table td {
-            font-size: 3.5pt;
-            height: 6pt;
+            font-size: 3pt;
+            height: 5.8pt;
             padding: 0 0.5pt;
-            letter-spacing: -0.1pt;
+            letter-spacing: -0.2pt;
+        }
+
+        .mapel-legend-table td.mapel-legend-cell:not(.no-col) {
+            font-size: 2.8pt;
+            font-weight: normal;
+            letter-spacing: -0.25pt;
         }
 
         .mapel-legend-table .no-col {
-            width: 9pt;
+            width: 7pt;
         }
 
         .legend-title {
@@ -848,7 +854,6 @@
                                 $nama1 = $m1 ? $m1->nama_mapel : '';
                                 $nama2 = $m2 ? $m2->nama_mapel : '';
 
-                                // Shorten long names for print utility
                                 $nama1 = str_replace('Pendidikan Jasmani, Olahraga dan Kesehatan', 'Penjaskes', $nama1);
                                 $nama2 = str_replace('Pendidikan Jasmani, Olahraga dan Kesehatan', 'Penjaskes', $nama2);
                             @endphp
