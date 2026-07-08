@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="{{ !empty($guruMobileView) ? 'guru-mobile-html' : '' }}">
 
 <head>
     <meta charset="UTF-8">
     @if(!empty($guruMobileView))
-    <meta name="viewport" content="width=device-width, initial-scale=0.38, minimum-scale=0.15, maximum-scale=5.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=4.0, user-scalable=yes">
     @else
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @endif
@@ -493,20 +493,8 @@
         @if(!empty($guruMobileView))
         .guru-mobile-view {
             background: #e8ecf0;
-            overflow: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .guru-mobile-view .mobile-doc-scroll {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 8px 8px 72px;
         }
         .guru-mobile-view .paper-preview {
-            margin: 0 auto;
-            transform: none !important;
-            width: max-content;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
             background: #fff;
         }
@@ -558,9 +546,10 @@
     @if(!empty($guruMobileView))
     <button type="button" class="print-fab-mobile no-print" onclick="window.print()">Cetak Jadwal</button>
     <div class="mobile-doc-scroll">
+    <div class="mobile-fit-spacer">
     @endif
 
-    <div class="paper-preview">
+    <div class="paper-preview{{ !empty($guruMobileView) ? ' mobile-fit-target' : '' }}">
         <div class="container">
         <!-- Header -->
         <div class="header">
@@ -868,6 +857,8 @@
     </div>
     @if(!empty($guruMobileView))
     </div>
+    </div>
+    @include('admin.cetak._guru_mobile_fit')
     @endif
 
     <script>

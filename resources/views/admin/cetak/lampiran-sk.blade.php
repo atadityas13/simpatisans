@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="{{ !empty($guruMobileView) ? 'guru-mobile-html' : '' }}">
 <head>
     <meta charset="UTF-8">
     @if(!empty($guruMobileView))
-    <meta name="viewport" content="width=device-width, initial-scale=0.42, minimum-scale=0.15, maximum-scale=5.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=4.0, user-scalable=yes">
     @else
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     @endif
@@ -155,20 +155,10 @@
         @if(!empty($guruMobileView))
         .guru-mobile-view {
             background: #e8ecf0;
-            overflow: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-        .guru-mobile-view .mobile-doc-scroll {
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            min-height: 100vh;
-            padding: 8px 8px 72px;
         }
         .guru-mobile-view .main-paper {
             width: 297mm;
             min-height: auto;
-            margin: 0 auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
         }
         .guru-mobile-view .controls-panel {
@@ -214,7 +204,8 @@
 
     @php $mainIdx = 0; @endphp
     @foreach($gurus->chunk(6) as $pageIndex => $guruChunk)
-    <div class="main-paper">
+    @if(!empty($guruMobileView))<div class="mobile-fit-spacer">@endif
+    <div class="main-paper{{ !empty($guruMobileView) ? ' mobile-fit-target' : '' }}">
         @if($pageIndex === 0)
         <div class="header">
             <img src="{{ asset('img/logo-kemenag.png') }}" class="logo-kemenag">
@@ -455,10 +446,12 @@
         </div>
         @endif
     </div>
+    @if(!empty($guruMobileView))</div>@endif
     @endforeach
 
     @if(!empty($guruMobileView))
     </div>
+    @include('admin.cetak._guru_mobile_fit')
     @endif
 </body>
 </html>
