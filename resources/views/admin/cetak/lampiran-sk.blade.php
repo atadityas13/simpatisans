@@ -2,7 +2,11 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
+    @if(!empty($guruMobileView))
+    <meta name="viewport" content="width=device-width, initial-scale=0.42, minimum-scale=0.15, maximum-scale=5.0, user-scalable=yes">
+    @else
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    @endif
     <title>Lampiran SK Pembagian Tugas - {{ $activeSemester->nama_tahun }}</title>
     <style>
         @media screen {
@@ -149,10 +153,40 @@
         }
 
         @if(!empty($guruMobileView))
+        .guru-mobile-view {
+            background: #e8ecf0;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .guru-mobile-view .mobile-doc-scroll {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 8px 8px 72px;
+        }
         .guru-mobile-view .main-paper {
-            width: 100%;
+            width: 297mm;
             min-height: auto;
-            overflow-x: auto;
+            margin: 0 auto;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        }
+        .guru-mobile-view .controls-panel {
+            display: none !important;
+        }
+        .guru-mobile-view .print-fab-mobile {
+            position: fixed;
+            bottom: 20px;
+            right: 16px;
+            z-index: 10000;
+            background: #047857;
+            color: #fff;
+            border: none;
+            border-radius: 999px;
+            padding: 12px 20px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(4, 120, 87, 0.45);
         }
         .guru-mobile-view .adjustable-wrapper {
             pointer-events: none !important;
@@ -168,6 +202,11 @@
     <div class="no-print controls-panel">
         <a href="javascript:window.print()" class="no-print-btn">CETAK LAMPIRAN SK</a>
     </div>
+
+    @if(!empty($guruMobileView))
+    <button type="button" class="print-fab-mobile no-print" onclick="window.print()">Cetak Pembagian Tugas</button>
+    <div class="mobile-doc-scroll">
+    @endif
 
     @if(empty($guruMobileView))
     @include('admin.cetak._adjustable_assets', ['templateKey' => 'lampiran_sk'])
@@ -417,5 +456,9 @@
         @endif
     </div>
     @endforeach
+
+    @if(!empty($guruMobileView))
+    </div>
+    @endif
 </body>
 </html>

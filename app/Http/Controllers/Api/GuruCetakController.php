@@ -125,7 +125,6 @@ class GuruCetakController extends Controller
             },
             'mapelSertifikasi',
         ])
-            ->where('id', $guru->id)
             ->orderedByDuk()
             ->get();
 

@@ -3,7 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
+    @if(!empty($guruMobileView))
+    <meta name="viewport" content="width=device-width, initial-scale=0.38, minimum-scale=0.15, maximum-scale=5.0, user-scalable=yes">
+    @else
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    @endif
     <title>Jadwal Pelajaran - {{ $activeSemester->getFullLabelAttribute() }}</title>
     <style>
         @page {
@@ -487,11 +491,41 @@
         }
 
         @if(!empty($guruMobileView))
+        .guru-mobile-view {
+            background: #e8ecf0;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .guru-mobile-view .mobile-doc-scroll {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 8px 8px 72px;
+        }
         .guru-mobile-view .paper-preview {
-            transform-origin: top left;
-            transform: scale(0.45);
-            width: 220%;
-            margin-bottom: -50%;
+            margin: 0 auto;
+            transform: none !important;
+            width: max-content;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+            background: #fff;
+        }
+        .guru-mobile-view .controls-panel {
+            display: none !important;
+        }
+        .guru-mobile-view .print-fab-mobile {
+            position: fixed;
+            bottom: 20px;
+            right: 16px;
+            z-index: 10000;
+            background: #047857;
+            color: #fff;
+            border: none;
+            border-radius: 999px;
+            padding: 12px 20px;
+            font-size: 13px;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(4, 120, 87, 0.45);
         }
         .guru-mobile-view .adjustable-wrapper {
             pointer-events: none !important;
@@ -520,6 +554,11 @@
         </div>
         @endif
     </div>
+
+    @if(!empty($guruMobileView))
+    <button type="button" class="print-fab-mobile no-print" onclick="window.print()">Cetak Jadwal</button>
+    <div class="mobile-doc-scroll">
+    @endif
 
     <div class="paper-preview">
         <div class="container">
@@ -827,6 +866,9 @@
             </div>
         </div>
     </div>
+    @if(!empty($guruMobileView))
+    </div>
+    @endif
 
     <script>
         function applyGuruFilter(selectedKg, selectedName) {
