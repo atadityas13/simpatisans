@@ -43,6 +43,7 @@ class GuruElapkinController extends Controller
 
         try {
             $response = Http::timeout(20)
+                ->asJson()
                 ->withHeaders([
                     'User-Agent' => config('services.elapkin.talim_user_agent'),
                     'X-Mobile-Token' => $mobileToken,
@@ -63,11 +64,28 @@ class GuruElapkinController extends Controller
             ], 502);
         }
 
-        $payload = $response->json();
+        $payload = null;
+        $rawBody = (string) $response->body();
+        try {
+            $payload = $response->json();
+        } catch (\Throwable $e) {
+            $payload = null;
+        }
+
         if (! $response->successful() || ! ($payload['success'] ?? false)) {
             $message = $payload['message']
                 ?? $payload['error']
-                ?? 'SSO e-Lapkin ditolak. Pastikan e-Lapkin sudah di-update.';
+                ?? null;
+
+            if (! is_string($message) || $message === '') {
+                $message = 'SSO e-Lapkin ditolak.';
+            }
+
+            // Bantuan debug (agar kita tahu kenapa ditolak)
+            $debug = mb_substr(trim($rawBody), 0, 400);
+            if ($debug !== '') {
+                $message .= " (HTTP {$response->status()}: {$debug})";
+            }
 
             return response()->json([
                 'success' => false,
