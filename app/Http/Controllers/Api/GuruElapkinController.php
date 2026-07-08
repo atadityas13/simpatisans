@@ -10,6 +10,7 @@ use App\Services\SemesterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class GuruElapkinController extends Controller
 {
@@ -86,6 +87,16 @@ class GuruElapkinController extends Controller
             if ($debug !== '') {
                 $message .= " (HTTP {$response->status()}: {$debug})";
             }
+
+            Log::error('elapkin-bridge rejected', [
+                'elapkin_http_status' => $response->status(),
+                'nip' => $ticket['nip'] ?? null,
+                'timestamp' => $ticket['timestamp'] ?? null,
+                'profile_hash' => $ticket['profile_hash'] ?? null,
+                'elapkin_body_preview' => $debug,
+                'app_package' => config('services.elapkin.talim_package'),
+                'user_agent' => config('services.elapkin.talim_user_agent'),
+            ]);
 
             return response()->json([
                 'success' => false,
