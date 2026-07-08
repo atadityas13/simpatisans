@@ -50,6 +50,8 @@ class GuruDashboardController extends Controller
             'semester' => $semester ? [
                 'id' => $semester->id,
                 'nama' => $semester->full_label,
+                'nama_tahun' => $semester->nama_tahun,
+                'tipe' => $semester->tipe,
             ] : null,
             'hari_ini' => $hariIni,
             'jtm_hari_ini' => $jadwalHariIni->count(),
