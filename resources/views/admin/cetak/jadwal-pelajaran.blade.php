@@ -95,6 +95,11 @@
             gap: 5pt;
         }
 
+        .main-content > div:first-child {
+            flex: 1 1 0;
+            min-width: 0;
+        }
+
         table {
             border-collapse: collapse;
             width: 100%;
@@ -495,23 +500,14 @@
             background: #e8ecf0;
         }
         .guru-mobile-view .paper-preview {
-            width: max-content;
-            min-width: 210mm;
-            overflow: visible;
+            width: 210mm;
+            min-height: auto;
+            padding: 0.5cm 0.7cm;
+            box-sizing: border-box;
+            overflow: hidden;
+            margin: 0 auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
             background: #fff;
-        }
-        .guru-mobile-view .main-content {
-            display: flex;
-            flex-wrap: nowrap;
-            align-items: flex-start;
-            width: max-content;
-            min-width: 100%;
-        }
-        .guru-mobile-view .legend-container {
-            flex-shrink: 0;
-            width: 130pt;
-            margin-left: 5pt;
         }
         .guru-mobile-view .controls-panel {
             display: none !important;
