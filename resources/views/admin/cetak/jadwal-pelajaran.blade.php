@@ -1,13 +1,9 @@
 <!DOCTYPE html>
-<html lang="id" class="{{ !empty($guruMobileView) ? 'guru-mobile-html' : '' }}">
+<html lang="id">
 
 <head>
     <meta charset="UTF-8">
-    @if(!empty($guruMobileView))
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0, user-scalable=yes">
-    @else
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    @endif
     <title>Jadwal Pelajaran - {{ $activeSemester->getFullLabelAttribute() }}</title>
     <style>
         @page {
@@ -93,11 +89,6 @@
             display: flex;
             align-items: flex-start;
             gap: 5pt;
-        }
-
-        .main-content > .schedule-table-wrap {
-            flex: 1 1 0;
-            min-width: 0;
         }
 
         table {
@@ -412,17 +403,6 @@
                 padding: 0.5cm 0.7cm;
                 box-sizing: border-box;
                 position: relative;
-                overflow-x: hidden;
-            }
-
-            .paper-preview .main-content {
-                width: 100%;
-                max-width: 100%;
-            }
-
-            .paper-preview .schedule-table-wrap table {
-                width: 100%;
-                table-layout: fixed;
             }
 
             .guru-select {
@@ -467,11 +447,6 @@
                 margin: 0 !important;
                 padding: 0 !important;
                 width: 100% !important;
-                overflow: visible !important;
-            }
-            .paper-preview .schedule-table-wrap table {
-                table-layout: fixed;
-                width: 100%;
             }
         }
 
@@ -510,33 +485,13 @@
         .col-kelas {
             width: 14pt;
         }
-
-        @if(!empty($guruMobileView))
-        .guru-mobile-view {
-            background: #e8ecf0;
-        }
-        .guru-mobile-view .controls-panel {
-            display: none !important;
-        }
-        .guru-mobile-view .print-fab-mobile {
-            display: none !important;
-        }
-        .guru-mobile-view .adjustable-wrapper {
-            pointer-events: none !important;
-            border: none !important;
-        }
-        .guru-mobile-view .resize-handle {
-            display: none !important;
-        }
-        @endif
     </style>
 </head>
 
-<body class="{{ !empty($guruMobileView) ? 'guru-mobile-view' : '' }}">
+<body>
     <div class="no-print controls-panel">
         <a href="javascript:window.print()" class="no-print-btn">Cetak Jadwal</a>
         
-        @if(empty($guruMobileView))
         <div class="controls-group">
             <div style="font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: rgba(255,255,255,0.4); margin-bottom: 4px;">Filter Guru</div>
             <select id="guru-selector" class="guru-select">
@@ -546,16 +501,9 @@
                 @endforeach
             </select>
         </div>
-        @endif
     </div>
 
-    @if(!empty($guruMobileView))
-    <button type="button" class="print-fab-mobile no-print" onclick="if(window.TalimAndroid){TalimAndroid.saveAsPdf();}else{window.print();}">Simpan</button>
-    <div class="mobile-doc-scroll">
-    <div class="mobile-fit-spacer">
-    @endif
-
-    <div class="paper-preview{{ !empty($guruMobileView) ? ' mobile-fit-target' : '' }}">
+    <div class="paper-preview">
         <div class="container">
         <!-- Header -->
         <div class="header">
@@ -579,7 +527,7 @@
 
         <div class="main-content">
             <!-- Schedule Table -->
-            <div class="schedule-table-wrap">
+            <div style="flex-grow: 1;">
                 <table>
                     <thead>
                         <tr>
@@ -861,26 +809,29 @@
             </div>
         </div>
     </div>
-    @if(!empty($guruMobileView))
-    </div>
-    </div>
-    @include('admin.cetak._guru_mobile_fit')
-    @endif
 
     <script>
-        function applyGuruFilter(selectedKg, selectedName) {
+        document.getElementById('guru-selector').addEventListener('change', function() {
+            const selectedKg = this.value;
+            const selectedName = this.options[this.selectedIndex].getAttribute('data-name');
+            
+            // Clear existing highlights
             document.querySelectorAll('.highlight-yellow').forEach(el => el.classList.remove('highlight-yellow'));
-
+            
+            // Footer Logic
             const footer = document.getElementById('specific-guru-footer');
             const footerName = document.getElementById('display-guru-name');
-
+            
             if (selectedKg) {
+                // Highlight Schedule Cells
                 document.querySelectorAll('.schedule-cell').forEach(cell => {
                     const kgFull = cell.getAttribute('data-kg-full');
                     if (kgFull) {
+                        // Check if it exactly matches or starts with (e.g. "AT-07")
                         if (kgFull === selectedKg || kgFull.startsWith(selectedKg + '-')) {
                             cell.classList.add('highlight-yellow');
-
+                            
+                            // Highlight corresponding Mapel if using the "GURU-NO" format
                             if (kgFull.includes('-')) {
                                 const mapelNo = kgFull.split('-')[1];
                                 document.querySelectorAll(`.mapel-legend-cell[data-mapel-no="${mapelNo}"]`).forEach(mCell => {
@@ -890,39 +841,23 @@
                         }
                     }
                 });
-
+                
+                // Highlight Guru Legend Row
                 document.querySelectorAll(`.guru-legend-row[data-kg="${selectedKg}"]`).forEach(row => {
                     row.classList.add('highlight-yellow');
+                    // Highlight all cells in the row
                     row.querySelectorAll('td').forEach(td => td.classList.add('highlight-yellow'));
                 });
-
-                if (footer && footerName) {
-                    footerName.textContent = selectedName;
-                    footer.style.display = 'block';
-                }
-            } else if (footer) {
+                
+                // Update Footer
+                footerName.textContent = selectedName;
+                footer.style.display = 'block';
+            } else {
                 footer.style.display = 'none';
             }
-        }
-
-        const guruSelector = document.getElementById('guru-selector');
-        if (guruSelector) {
-            guruSelector.addEventListener('change', function() {
-                const selectedKg = this.value;
-                const selectedName = this.options[this.selectedIndex].getAttribute('data-name');
-                applyGuruFilter(selectedKg, selectedName);
-            });
-        }
-
-        @if(!empty($preselectedGuru))
-        document.addEventListener('DOMContentLoaded', function() {
-            applyGuruFilter(@json($preselectedGuru->kode_guru), @json($preselectedGuru->nama_lengkap));
         });
-        @endif
     </script>
-    @if(empty($guruMobileView))
     @include('admin.cetak._adjustable_assets', ['templateKey' => 'cetak_pelajaran'])
-    @endif
 </body>
 
 </html>
