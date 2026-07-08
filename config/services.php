@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'elapkin' => [
+        'sso_secret' => env('ELAPKIN_SSO_SECRET', 'MTSN11-TALIM-SSO-2026'),
+        'mobile_url' => env('ELAPKIN_MOBILE_URL', 'https://e-lapkin.mtsn11majalengka.sch.id/mobile-app/'),
+    ],
+
 ];
