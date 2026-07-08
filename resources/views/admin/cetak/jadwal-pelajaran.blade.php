@@ -500,14 +500,53 @@
             background: #e8ecf0;
         }
         .guru-mobile-view .paper-preview {
-            width: 210mm;
+            width: 794px;
+            max-width: 794px;
             min-height: auto;
-            padding: 0.5cm 0.7cm;
+            padding: 18px 26px;
             box-sizing: border-box;
             overflow: hidden;
             margin: 0 auto;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
             background: #fff;
+        }
+        .guru-mobile-view .container {
+            width: 100%;
+            max-width: 100%;
+        }
+        .guru-mobile-view .main-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 4px;
+            width: 100%;
+            max-width: 100%;
+        }
+        .guru-mobile-view .schedule-table-wrap {
+            flex: 1 1 0;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .guru-mobile-view .schedule-table-wrap table {
+            width: 100%;
+            table-layout: fixed;
+        }
+        .guru-mobile-view .legend-container {
+            width: 118px;
+            flex-shrink: 0;
+            margin-left: 0;
+        }
+        .guru-mobile-view .legend-table {
+            font-size: 4.5pt;
+        }
+        .guru-mobile-view .legend-table td {
+            height: 7pt;
+            padding: 0.5pt;
+        }
+        .guru-mobile-view .kg-col {
+            width: 14px;
+        }
+        .guru-mobile-view .no-col {
+            width: 10px;
         }
         .guru-mobile-view .controls-panel {
             display: none !important;
@@ -573,7 +612,7 @@
 
         <div class="main-content">
             <!-- Schedule Table -->
-            <div style="flex-grow: 1;">
+            <div class="schedule-table-wrap">
                 <table>
                     <thead>
                         <tr>
@@ -908,7 +947,7 @@
             });
         }
 
-        @if(!empty($guruMobileView) && !empty($preselectedGuru))
+        @if(!empty($preselectedGuru))
         document.addEventListener('DOMContentLoaded', function() {
             applyGuruFilter(@json($preselectedGuru->kode_guru), @json($preselectedGuru->nama_lengkap));
         });

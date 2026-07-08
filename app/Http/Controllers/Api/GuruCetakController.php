@@ -86,7 +86,7 @@ class GuruCetakController extends Controller
             ),
             $this->cetakPresetService->viewData(),
             [
-                'guruMobileView' => true,
+                'guruMobileView' => ! $request->boolean('print'),
                 'preselectedGuru' => $guru,
             ]
         ));
@@ -137,7 +137,7 @@ class GuruCetakController extends Controller
             compact('activeSemester', 'kelasList', 'allKelas', 'gurus', 'kepalaMadrasah'),
             $this->cetakPresetService->viewData(),
             [
-                'guruMobileView' => true,
+                'guruMobileView' => ! $request->boolean('print'),
             ]
         ));
     }
