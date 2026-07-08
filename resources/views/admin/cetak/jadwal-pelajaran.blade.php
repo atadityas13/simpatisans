@@ -489,6 +489,7 @@
 </head>
 
 <body>
+    @if(empty($preselectedGuru))
     <div class="no-print controls-panel">
         <a href="javascript:window.print()" class="no-print-btn">Cetak Jadwal</a>
         
@@ -502,6 +503,7 @@
             </select>
         </div>
     </div>
+    @endif
 
     <div class="paper-preview">
         <div class="container">
@@ -811,27 +813,19 @@
     </div>
 
     <script>
-        document.getElementById('guru-selector').addEventListener('change', function() {
-            const selectedKg = this.value;
-            const selectedName = this.options[this.selectedIndex].getAttribute('data-name');
-            
-            // Clear existing highlights
+        function applyGuruFilter(selectedKg, selectedName) {
             document.querySelectorAll('.highlight-yellow').forEach(el => el.classList.remove('highlight-yellow'));
-            
-            // Footer Logic
+
             const footer = document.getElementById('specific-guru-footer');
             const footerName = document.getElementById('display-guru-name');
-            
+
             if (selectedKg) {
-                // Highlight Schedule Cells
                 document.querySelectorAll('.schedule-cell').forEach(cell => {
                     const kgFull = cell.getAttribute('data-kg-full');
                     if (kgFull) {
-                        // Check if it exactly matches or starts with (e.g. "AT-07")
                         if (kgFull === selectedKg || kgFull.startsWith(selectedKg + '-')) {
                             cell.classList.add('highlight-yellow');
-                            
-                            // Highlight corresponding Mapel if using the "GURU-NO" format
+
                             if (kgFull.includes('-')) {
                                 const mapelNo = kgFull.split('-')[1];
                                 document.querySelectorAll(`.mapel-legend-cell[data-mapel-no="${mapelNo}"]`).forEach(mCell => {
@@ -841,23 +835,37 @@
                         }
                     }
                 });
-                
-                // Highlight Guru Legend Row
+
                 document.querySelectorAll(`.guru-legend-row[data-kg="${selectedKg}"]`).forEach(row => {
                     row.classList.add('highlight-yellow');
-                    // Highlight all cells in the row
                     row.querySelectorAll('td').forEach(td => td.classList.add('highlight-yellow'));
                 });
-                
-                // Update Footer
-                footerName.textContent = selectedName;
-                footer.style.display = 'block';
-            } else {
+
+                if (footer && footerName) {
+                    footerName.textContent = selectedName;
+                    footer.style.display = 'block';
+                }
+            } else if (footer) {
                 footer.style.display = 'none';
             }
+        }
+
+        const guruSelector = document.getElementById('guru-selector');
+        if (guruSelector) {
+            guruSelector.addEventListener('change', function() {
+                applyGuruFilter(this.value, this.options[this.selectedIndex].getAttribute('data-name'));
+            });
+        }
+
+        @if(!empty($preselectedGuru))
+        document.addEventListener('DOMContentLoaded', function() {
+            applyGuruFilter(@json($preselectedGuru->kode_guru), @json($preselectedGuru->nama_lengkap));
         });
+        @endif
     </script>
+    @if(empty($preselectedGuru))
     @include('admin.cetak._adjustable_assets', ['templateKey' => 'cetak_pelajaran'])
+    @endif
 </body>
 
 </html>
