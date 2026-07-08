@@ -137,7 +137,7 @@ class GuruCetakController extends Controller
             compact('activeSemester', 'kelasList', 'allKelas', 'gurus', 'kepalaMadrasah'),
             $this->cetakPresetService->viewData(),
             [
-                'guruMobileView' => false,
+                'preselectedGuru' => $guru,
             ]
         ));
     }

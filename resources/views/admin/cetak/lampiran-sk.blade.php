@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="id" class="{{ !empty($guruMobileView) ? 'guru-mobile-html' : '' }}">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
-    @if(!empty($guruMobileView))
+    @if(!empty($preselectedGuru))
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.2, maximum-scale=5.0, user-scalable=yes">
     @else
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -152,49 +152,39 @@
             ) !important;
         }
 
-        @if(!empty($guruMobileView))
-        .guru-mobile-view {
-            background: #e8ecf0;
+        @if(!empty($preselectedGuru))
+        @media screen {
+            body.guru-app-view {
+                background: #e8ecf0 !important;
+                padding: 8px 0 88px !important;
+                margin: 0 !important;
+                overflow-x: auto;
+                overflow-y: auto;
+            }
         }
-        .guru-mobile-view .main-paper {
-            width: 297mm;
-            min-height: auto;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
-        }
-        .guru-mobile-view .controls-panel {
-            display: none !important;
-        }
-        .guru-mobile-view .print-fab-mobile {
-            display: none !important;
-        }
-        .guru-mobile-view .adjustable-wrapper {
-            pointer-events: none !important;
-            border: none !important;
-        }
-        .guru-mobile-view .resize-handle {
-            display: none !important;
+        @media print {
+            body.guru-app-view {
+                background: #fff !important;
+                padding: 0 !important;
+            }
         }
         @endif
     </style>
 </head>
-<body class="{{ !empty($guruMobileView) ? 'guru-mobile-view' : '' }}">
+<body class="{{ !empty($preselectedGuru) ? 'guru-app-view' : '' }}">
+    @if(empty($preselectedGuru))
     <div class="no-print controls-panel">
         <a href="javascript:window.print()" class="no-print-btn">CETAK LAMPIRAN SK</a>
     </div>
-
-    @if(!empty($guruMobileView))
-    <button type="button" class="print-fab-mobile no-print" onclick="if(window.TalimAndroid){TalimAndroid.saveAsPdf();}else{window.print();}">Simpan</button>
-    <div class="mobile-doc-scroll">
     @endif
 
-    @if(empty($guruMobileView))
+    @if(empty($preselectedGuru))
     @include('admin.cetak._adjustable_assets', ['templateKey' => 'lampiran_sk'])
     @endif
 
     @php $mainIdx = 0; @endphp
     @foreach($gurus->chunk(6) as $pageIndex => $guruChunk)
-    @if(!empty($guruMobileView))<div class="mobile-fit-spacer">@endif
-    <div class="main-paper{{ !empty($guruMobileView) ? ' mobile-fit-target' : '' }}">
+    <div class="main-paper">
         @if($pageIndex === 0)
         <div class="header">
             <img src="{{ asset('img/logo-kemenag.png') }}" class="logo-kemenag">
@@ -435,12 +425,6 @@
         </div>
         @endif
     </div>
-    @if(!empty($guruMobileView))</div>@endif
     @endforeach
-
-    @if(!empty($guruMobileView))
-    </div>
-    @include('admin.cetak._guru_mobile_fit')
-    @endif
 </body>
 </html>
