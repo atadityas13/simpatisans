@@ -277,6 +277,19 @@
             font-weight: bold;
         }
 
+        /* Mapel legend: smaller to free vertical room so footer fits 1 page */
+        .mapel-legend-table th,
+        .mapel-legend-table td {
+            font-size: 3.5pt;
+            height: 6pt;
+            padding: 0 0.5pt;
+            letter-spacing: -0.1pt;
+        }
+
+        .mapel-legend-table .no-col {
+            width: 9pt;
+        }
+
         .legend-title {
             font-weight: bold;
             text-align: center;
@@ -461,12 +474,12 @@
         .guru-specific-footer {
             display: none;
             text-align: right;
-            margin-top: 8pt;
-            font-size: 5pt;
+            font-size: 5.5pt;
             font-weight: bold;
             line-height: 1;
-            border-top: 0.5pt dashed #ccc;
+            border-top: 0.5pt dashed #999;
             padding-top: 3pt;
+            margin-top: 6pt;
         }
 
         .guru-specific-footer.guru-footer-active {
@@ -486,20 +499,15 @@
 
             .guru-specific-footer.guru-footer-active {
                 display: block !important;
-                margin-top: 4pt;
-                padding-top: 2pt;
-            }
-
-            .footer-container.guru-print-compact .kokurikuler-note {
-                margin-top: 8pt !important;
-            }
-
-            .footer-container.guru-print-compact .signature-box {
-                margin-top: 5pt !important;
-            }
-
-            .footer-container.guru-print-compact .signature-slot {
-                height: 25pt !important;
+                position: fixed;
+                bottom: 2pt;
+                right: 0.7cm;
+                left: auto;
+                width: auto;
+                text-align: right;
+                margin: 0;
+                border-top: none;
+                background: #fff;
             }
 
             .paper-preview {
@@ -814,7 +822,7 @@
                     </tbody>
                 </table>
 
-                <table class="legend-table" style="margin-top: 5pt;">
+                <table class="legend-table mapel-legend-table" style="margin-top: 5pt;">
                     <thead>
                         <tr>
                             <th class="no-col">No</th>
@@ -933,7 +941,6 @@
 
             const footer = document.getElementById('specific-guru-footer');
             const footerName = document.getElementById('display-guru-name');
-            const footerContainer = document.querySelector('.footer-container');
 
             if (selectedKg) {
                 document.querySelectorAll('.schedule-cell').forEach(cell => {
@@ -961,15 +968,9 @@
                     footerName.textContent = selectedName;
                     footer.classList.add('guru-footer-active');
                 }
-                if (footerContainer) {
-                    footerContainer.classList.add('guru-print-compact');
-                }
             } else {
                 if (footer) {
                     footer.classList.remove('guru-footer-active');
-                }
-                if (footerContainer) {
-                    footerContainer.classList.remove('guru-print-compact');
                 }
             }
         }
