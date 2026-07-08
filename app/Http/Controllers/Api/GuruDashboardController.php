@@ -5,14 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Guru;
 use App\Models\Jadwal;
+use App\Services\JamPelajaranService;
 use App\Services\SemesterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class GuruDashboardController extends Controller
 {
-    public function __construct(private SemesterService $semesterService)
-    {
+    public function __construct(
+        private SemesterService $semesterService,
+        private JamPelajaranService $jamPelajaranService,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -52,6 +55,7 @@ class GuruDashboardController extends Controller
             'jtm_hari_ini' => $jadwalHariIni->count(),
             'jadwal_hari_ini' => $jadwalHariIni->map(fn ($j) => [
                 'jam_ke' => $j->jam_ke,
+                'waktu' => $this->jamPelajaranService->waktuFor($hariIni, (int) $j->jam_ke),
                 'mapel' => $j->bebanMengajar?->mapel?->nama_mapel,
                 'kelas' => $j->bebanMengajar?->kelas?->nama_kelas,
             ])->values(),
@@ -81,6 +85,7 @@ class GuruDashboardController extends Controller
             ->map(fn ($j) => [
                 'hari' => $j->hari,
                 'jam_ke' => $j->jam_ke,
+                'waktu' => $this->jamPelajaranService->waktuFor($j->hari, (int) $j->jam_ke),
                 'mapel' => $j->bebanMengajar?->mapel?->nama_mapel,
                 'kelas' => $j->bebanMengajar?->kelas?->nama_kelas,
             ])
