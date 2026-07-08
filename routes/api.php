@@ -29,4 +29,5 @@ Route::middleware('auth:sanctum')->prefix('guru')->group(function () {
     Route::get('/elapkin-sso', [GuruElapkinController::class, 'ssoToken']);
     Route::put('/profile/biodata', [GuruProfileController::class, 'updateBiodata']);
     Route::put('/profile/kontak', [GuruProfileController::class, 'updateKontak']);
+    Route::post('/profile/photo', [GuruProfileController::class, 'updatePhoto']);
 });

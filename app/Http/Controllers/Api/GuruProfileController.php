@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Guru;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class GuruProfileController extends Controller
 {
@@ -49,6 +50,34 @@ class GuruProfileController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Data kontak berhasil diperbarui.',
+            'user' => $this->formatUser($user->fresh()),
+        ]);
+    }
+
+    public function updatePhoto(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $this->resolveGuru($user);
+
+        $request->validate([
+            'foto' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+        ], [
+            'foto.required' => 'File foto harus dipilih.',
+            'foto.image' => 'File harus berupa gambar.',
+            'foto.max' => 'Ukuran foto maksimal 2MB.',
+        ]);
+
+        if ($user->foto && Storage::disk('public')->exists($user->foto)) {
+            Storage::disk('public')->delete($user->foto);
+        }
+
+        $path = $request->file('foto')->store('user_photos', 'public');
+        $user->foto = $path;
+        $user->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Foto profil berhasil diperbarui.',
             'user' => $this->formatUser($user->fresh()),
         ]);
     }
