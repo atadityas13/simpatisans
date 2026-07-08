@@ -258,27 +258,6 @@
             max-width: 100%;
         }
 
-        .mapel-legend-table {
-            font-size: 4pt;
-        }
-
-        .mapel-legend-table th,
-        .mapel-legend-table td {
-            font-size: 4pt;
-            padding: 0 0.5pt;
-            height: 7.2pt;
-            letter-spacing: -0.15pt;
-        }
-
-        .mapel-legend-table .no-col {
-            width: 8pt;
-        }
-
-        .mapel-legend-table td.mapel-legend-cell:not(.no-col) {
-            font-size: 3.8pt;
-            text-align: left;
-        }
-
         .legend-table td {
             text-align: left;
             padding: 0.5pt 1pt;
@@ -482,17 +461,47 @@
         .guru-specific-footer {
             display: none;
             text-align: right;
-            margin-top: 20pt;
+            margin-top: 8pt;
             font-size: 5pt;
             font-weight: bold;
-            border-top: 1px dashed #ccc;
-            padding-top: 10pt;
+            line-height: 1;
+            border-top: 0.5pt dashed #ccc;
+            padding-top: 3pt;
+        }
+
+        .guru-specific-footer.guru-footer-active {
+            display: block;
+        }
+
+        .kokurikuler-note {
+            margin-top: 35pt;
+            text-align: left;
+            padding-left: 5pt;
         }
 
         @media print {
             .guru-specific-footer {
-                display: block !important;
+                display: none !important;
             }
+
+            .guru-specific-footer.guru-footer-active {
+                display: block !important;
+                margin-top: 4pt;
+                padding-top: 2pt;
+            }
+
+            .footer-container.guru-print-compact .kokurikuler-note {
+                margin-top: 8pt !important;
+            }
+
+            .footer-container.guru-print-compact .signature-box {
+                margin-top: 5pt !important;
+            }
+
+            .footer-container.guru-print-compact .signature-slot {
+                height: 25pt !important;
+            }
+
             .paper-preview {
                 box-shadow: none !important;
                 margin: 0 !important;
@@ -805,7 +814,7 @@
                     </tbody>
                 </table>
 
-                <table class="legend-table mapel-legend-table" style="margin-top: 5pt;">
+                <table class="legend-table" style="margin-top: 5pt;">
                     <thead>
                         <tr>
                             <th class="no-col">No</th>
@@ -864,7 +873,7 @@
                         <p>{{ $cetakTanggalLokasi ?? 'Cingambul, ' . date('j F Y') }}</p>
                         <p>Wakil Kepala Bid. Kurikulum</p>
                         
-                        <div style="height: 35pt; position: relative;">
+                        <div class="signature-slot" style="height: 35pt; position: relative;">
                             @if($hasNewTTD_Waka)
                                 <div class="adjustable-wrapper" data-adjustable-id="pelajaran_ttd_waka" style="position: absolute; left: 20pt; top: -5pt; z-index: 1;">
                                     <img src="{{ $ttdWakaURL }}?v={{ $v }}" style="height: 40pt; width: auto; display: block;">
@@ -881,7 +890,7 @@
                         <p>Mengetahui,</p>
                         <p>{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }}</p>
 
-                        <div style="height: 35pt; position: relative;">
+                        <div class="signature-slot" style="height: 35pt; position: relative;">
                             @if($hasNewTTD_Kepala)
                                 <div class="adjustable-wrapper" data-adjustable-id="pelajaran_ttd_kepala" style="position: absolute; left: 15pt; top: -5pt; z-index: 1;">
                                     <img src="{{ $ttdKepalaURL }}?v={{ $v }}" style="height: 45pt; width: auto; display: block;">
@@ -901,7 +910,7 @@
                         <p>NIP. {{ $kepalaMadrasah->username ?? '....................................' }}</p>
                     </div>
 
-                    <div style="margin-top: 35pt; text-align: left; padding-left: 5pt;">
+                    <div class="kokurikuler-note">
                         <span class="dark-green-bg"
                             style="padding: 1pt 5pt; font-weight: bold; font-style: italic;">Kokurikuler
                             BTQ</span>
@@ -924,6 +933,7 @@
 
             const footer = document.getElementById('specific-guru-footer');
             const footerName = document.getElementById('display-guru-name');
+            const footerContainer = document.querySelector('.footer-container');
 
             if (selectedKg) {
                 document.querySelectorAll('.schedule-cell').forEach(cell => {
@@ -949,10 +959,18 @@
 
                 if (footer && footerName) {
                     footerName.textContent = selectedName;
-                    footer.style.display = 'block';
+                    footer.classList.add('guru-footer-active');
                 }
-            } else if (footer) {
-                footer.style.display = 'none';
+                if (footerContainer) {
+                    footerContainer.classList.add('guru-print-compact');
+                }
+            } else {
+                if (footer) {
+                    footer.classList.remove('guru-footer-active');
+                }
+                if (footerContainer) {
+                    footerContainer.classList.remove('guru-print-compact');
+                }
             }
         }
 
