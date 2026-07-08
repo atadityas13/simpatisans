@@ -55,7 +55,8 @@ class GuruElapkinController extends Controller
         ] : null;
 
         $timestamp = time();
-        $profileHash = hash('sha256', json_encode($profile, JSON_UNESCAPED_UNICODE));
+        $profileJson = json_encode($profile, JSON_UNESCAPED_UNICODE);
+        $profileHash = hash('sha256', $profileJson);
         $payload = $user->username.'|'.$timestamp.'|'.$profileHash;
         $secret = config('services.elapkin.sso_secret');
         $signature = hash_hmac('sha256', $payload, $secret);
@@ -65,6 +66,7 @@ class GuruElapkinController extends Controller
             'nip' => $user->username,
             'timestamp' => $timestamp,
             'signature' => $signature,
+            'profile_hash' => $profileHash,
             'profile' => $profile,
             'kepala_madrasah' => $kepala,
             'expires_in' => 300,
