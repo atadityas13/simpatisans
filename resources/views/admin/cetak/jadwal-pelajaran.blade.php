@@ -277,6 +277,17 @@
             font-weight: bold;
         }
 
+        /* Web: slightly smaller mapel names so long names fit the column */
+        .mapel-legend-table td.mapel-legend-cell:not(.no-col) {
+            font-size: 4.2pt;
+            letter-spacing: -0.1pt;
+            padding: 0.5pt 0.5pt;
+        }
+
+        .mapel-legend-table .no-col {
+            width: 8pt;
+        }
+
         /* Android app only: compact mapel legend so footer fits on 1 page */
         body.guru-app-view .mapel-legend-table th,
         body.guru-app-view .mapel-legend-table td {
