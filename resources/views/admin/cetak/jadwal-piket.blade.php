@@ -174,7 +174,7 @@
                 <tr>
                     @foreach($days as $day)
                         <td>
-                            {{ $schedule[$day][$i]->nama_lengkap ?? '' }}
+                            {{ ($schedule[$day][$i] ?? null)?->nama_lengkap ?? '' }}
                         </td>
                     @endforeach
                 </tr>

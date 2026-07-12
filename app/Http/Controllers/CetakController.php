@@ -193,11 +193,22 @@ class CetakController extends Controller
         foreach ($piketData as $guru) {
             $tugas = $guru->tugasTambahans()
                 ->where('tugas_tambahan_id', TugasTambahan::GURU_PIKET_ID)
-                ->where('semester_id', $semesterId)
+                ->wherePivot('semester_id', $semesterId)
                 ->first();
 
-            if ($tugas && $tugas->pivot->hari) {
-                $schedule[$tugas->pivot->hari][] = $guru;
+            if (!$tugas || !$tugas->pivot->hari) {
+                continue;
+            }
+
+            $hariList = json_decode($tugas->pivot->hari, true);
+            if (!is_array($hariList)) {
+                $hariList = [$tugas->pivot->hari];
+            }
+
+            foreach ($hariList as $hari) {
+                if (isset($schedule[$hari])) {
+                    $schedule[$hari][] = $guru;
+                }
             }
         }
 

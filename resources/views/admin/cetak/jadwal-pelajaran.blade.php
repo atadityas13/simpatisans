@@ -95,12 +95,15 @@
             gap: 5pt;
             width: 100%;
             max-width: 100%;
+            position: relative;
         }
 
         .schedule-table-wrap {
             flex: 1 1 0;
             min-width: 0;
             overflow: hidden;
+            position: relative;
+            z-index: 1;
         }
 
         .schedule-table-wrap table {
@@ -247,8 +250,10 @@
             flex-shrink: 0;
             margin-left: 5pt;
             max-width: 130pt;
-            overflow: hidden;
+            overflow: visible;
             box-sizing: border-box;
+            position: relative;
+            z-index: 2;
         }
 
         .legend-table {
@@ -406,6 +411,11 @@
             line-height: 1.1;
         }
 
+        .footer-container,
+        .signature-slot {
+            overflow: visible;
+        }
+
         .signature-box {
             width: 100%;
             text-align: center;
@@ -533,6 +543,12 @@
                 padding: 0 !important;
                 width: 100% !important;
             }
+
+            .legend-container,
+            .footer-container,
+            .signature-slot {
+                overflow: visible !important;
+            }
         }
 
         /* Column Widths (Tightened) */
@@ -565,6 +581,14 @@
             /* Dark Green */
             color: #ffffff !important;
             /* White text for contrast */
+        }
+
+        /* Guru filter highlight must override Jumat jam 5 dark-green styling */
+        .schedule-cell.highlight-yellow,
+        .schedule-cell.dark-green-bg.highlight-yellow {
+            background-color: yellow !important;
+            color: black !important;
+            font-weight: bold !important;
         }
 
         .col-kelas {
