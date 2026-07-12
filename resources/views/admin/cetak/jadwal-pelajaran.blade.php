@@ -277,22 +277,22 @@
             font-weight: bold;
         }
 
-        /* Mapel legend: smaller to free vertical room so footer fits 1 page */
-        .mapel-legend-table th,
-        .mapel-legend-table td {
+        /* Android app only: compact mapel legend so footer fits on 1 page */
+        body.guru-app-view .mapel-legend-table th,
+        body.guru-app-view .mapel-legend-table td {
             font-size: 2.5pt;
             height: 5.2pt;
             padding: 0;
             letter-spacing: -0.25pt;
         }
 
-        .mapel-legend-table td.mapel-legend-cell:not(.no-col) {
+        body.guru-app-view .mapel-legend-table td.mapel-legend-cell:not(.no-col) {
             font-size: 2.3pt;
             font-weight: normal;
             letter-spacing: -0.3pt;
         }
 
-        .mapel-legend-table .no-col {
+        body.guru-app-view .mapel-legend-table .no-col {
             width: 6pt;
         }
 
