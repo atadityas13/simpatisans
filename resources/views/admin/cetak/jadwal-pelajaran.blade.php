@@ -501,12 +501,13 @@
         .guru-specific-footer {
             display: none;
             text-align: right;
-            font-size: 5.5pt;
+            font-size: 6pt;
             font-weight: bold;
-            line-height: 1;
+            line-height: 1.2;
             border-top: 0.5pt dashed #999;
             padding-top: 3pt;
-            margin-top: 6pt;
+            margin-top: 8pt;
+            white-space: nowrap;
         }
 
         .guru-specific-footer.guru-footer-active {
@@ -526,15 +527,16 @@
 
             .guru-specific-footer.guru-footer-active {
                 display: block !important;
-                position: fixed;
-                bottom: 2pt;
-                right: 0.7cm;
-                left: auto;
-                width: auto;
+                position: relative;
                 text-align: right;
-                margin: 0;
-                border-top: none;
+                margin-top: 8pt;
+                padding-top: 3pt;
+                border-top: 0.5pt dashed #999;
+                font-size: 6pt;
+                font-weight: bold;
                 background: #fff;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
             }
 
             .paper-preview {
