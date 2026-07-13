@@ -223,6 +223,50 @@ class CetakController extends Controller
         ));
     }
 
+    /**
+     * Print homeroom teacher list (Daftar Wali Kelas).
+     */
+    public function daftarWaliKelas()
+    {
+        $activeSemester = $this->semesterService->getActiveSemester();
+
+        if (!$activeSemester) {
+            return redirect()->back()->with('error', 'Tidak ada semester aktif.');
+        }
+
+        $semesterId = $activeSemester->id;
+
+        $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
+            ->orderBy('nama_kelas')
+            ->get();
+
+        $waliGurus = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+            $q->where('tugas_tambahan_id', TugasTambahan::WALI_KELAS_ID)
+              ->where('semester_id', $semesterId);
+        })->with(['tugasTambahans' => function ($q) use ($semesterId) {
+            $q->where('tugas_tambahan_id', TugasTambahan::WALI_KELAS_ID)
+              ->wherePivot('semester_id', $semesterId);
+        }])->get();
+
+        $waliByKelas = [];
+        foreach ($waliGurus as $guru) {
+            $tugas = $guru->tugasTambahans->first();
+            if ($tugas && $tugas->pivot->detail) {
+                $waliByKelas[$tugas->pivot->detail] = $guru->nama_lengkap;
+            }
+        }
+
+        $rows = $kelasList->map(function ($kelas, $index) use ($waliByKelas) {
+            return [
+                'no' => $index + 1,
+                'kelas' => str_replace('Kelas ', '', $kelas->nama_kelas),
+                'nama_wali' => $waliByKelas[$kelas->nama_kelas] ?? '',
+            ];
+        });
+
+        return view('admin.cetak.daftar-wali-kelas', compact('activeSemester', 'rows'));
+    }
+
     public function lampiranSk()
     {
         $activeSemester = $this->semesterService->getActiveSemester();

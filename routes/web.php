@@ -58,6 +58,7 @@ Route::group(['middleware' => 'auth'], function () {
             Route::get('cetak/jadwal-pelajaran', [App\Http\Controllers\CetakController::class, 'jadwalPelajaran'])->name('cetak.jadwal-pelajaran');
             Route::get('cetak/jadwal-besar', [App\Http\Controllers\CetakController::class, 'jadwalBesar'])->name('cetak.jadwal-besar');
             Route::get('cetak/jadwal-piket', [App\Http\Controllers\CetakController::class, 'jadwalPiket'])->name('cetak.jadwal-piket');
+            Route::get('cetak/daftar-wali-kelas', [App\Http\Controllers\CetakController::class, 'daftarWaliKelas'])->name('cetak.daftar-wali-kelas');
             Route::get('cetak/lampiran-sk', [App\Http\Controllers\CetakController::class, 'lampiranSk'])->name('cetak.lampiran-sk');
             Route::post('cetak/presets', [App\Http\Controllers\CetakController::class, 'storePresets'])->name('cetak.presets.store');
 
