@@ -680,7 +680,7 @@
                                 </td>
                                 <td
                                     class="border border-gray-800 p-0.5 font-bold text-center text-[8px] tracking-tighter row-tadarus">
-                                    06.45-07.00</td>
+                                    07.00-07.15</td>
                                 <td class="border border-gray-800 p-0.5 font-black text-center uppercase tracking-widest row-tadarus"
                                     colspan="{{ $totalCols + 1 }}">
                                     TADARUS AL-QUR'AN
@@ -695,7 +695,7 @@
                             @if($hari !== 'Jumat' && $jam === 5)
                                 <tr class="row-istirahat">
                                     <td class="border border-gray-800 p-0.5 font-bold text-center text-[7px] tracking-tighter">
-                                        {{ $hari === 'Senin' ? '10.05-10.35' : '09.20-09.50' }}</td>
+                                        {{ $hari === 'Senin' ? '10.05-10.35' : '09.35-10.05' }}</td>
                                     <td class="border border-gray-800 p-0 text-[10px] font-black text-center uppercase tracking-widest"
                                         colspan="{{ $totalCols + 1 }}">ISTIRAHAT</td>
                                 </tr>
@@ -712,13 +712,13 @@
                             @if($hari !== 'Jumat' && $jam === 8)
                                 <tr class="row-makan">
                                     <td class="border border-gray-800 p-0.5 font-bold text-center text-[7px] tracking-tighter">
-                                        {{ $hari === 'Senin' ? '11.45-12.15' : '11.35-12.10' }}</td>
+                                        {{ $hari === 'Senin' ? '11.45-12.15' : '11.50-12.25' }}</td>
                                     <td class="border border-gray-800 p-0 text-[9px] font-black text-center uppercase tracking-widest"
                                         colspan="{{ $totalCols + 1 }}">PENDISTRIBUSIAN MAKAN BERGIZI GRATIS</td>
                                 </tr>
                                 <tr class="row-sholat">
                                     <td class="border border-gray-800 p-0.5 font-bold text-center text-[7px] tracking-tighter">
-                                        {{ $hari === 'Senin' ? '12.15-12.45' : '12.10-12.45' }}</td>
+                                        {{ $hari === 'Senin' ? '12.15-12.45' : '12.25-13.00' }}</td>
                                     <td class="border border-gray-800 p-0 text-[10px] font-black text-center uppercase tracking-widest"
                                         colspan="{{ $totalCols + 1 }}">SHALAT DUHUR</td>
                                 </tr>
