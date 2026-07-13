@@ -217,7 +217,7 @@
                                             <td class="border p-2 text-center bg-gray-100 text-gray-400" colspan="2">{{ $item['label'] }}</td>
                                             @if($item['type'] === 'top')
                                                 <td class="border p-1 text-center bg-gray-200">UPACARA</td>
-                                                <td class="border p-1 text-center bg-orange-400 text-white font-black" colspan="3">TADARUS</td>
+                                                <td class="border p-1 text-center bg-orange-400 text-black font-black" colspan="3">TADARUS</td>
                                                 <td class="border p-1 text-center bg-gray-200">LKD/KULTUM</td>
                                             @else
                                                 <td class="border p-1 text-center bg-gray-200 tracking-[0.5em]" colspan="5">{{ $item['label'] }}</td>
@@ -1612,7 +1612,7 @@
                 .row-makan { background-color: #9fc5e8 !important; color: #1e3a8a !important; }
                 .row-sholat { background-color: #42b419 !important; color: white !important; }
                 .row-lkd { background-color: #42b419 !important; color: white !important; }
-                .row-tadarus { background-color: #ff9800 !important; color: white !important; }
+                .row-tadarus { background-color: #ff9800 !important; color: #000 !important; }
                 .row-pramuka { background-color: #4b54b5 !important; color: white !important; }
                 .cell-jumat-5 { background-color: #354c29 !important; color: white !important; }
                 .slot-issue-critical { background-color: #fecaca !important; color: #7f1d1d !important; box-shadow: inset 0 0 0 2px #ef4444 !important; }

@@ -167,7 +167,7 @@
         .makan-row { background-color: #9fc5e8; font-weight: bold; letter-spacing: 3pt; white-space: normal; }
         .sholat-row { background-color: #42b419ff; font-weight: bold; letter-spacing: 5pt; color: white !important; white-space: normal; }
         .violet-row { background-color: #42b419ff; font-weight: bold; letter-spacing: 5pt; color: white !important; white-space: normal; }
-        .tadarus-row { background-color: #ff9800; font-weight: bold; letter-spacing: 3pt; color: white !important; white-space: normal; }
+        .tadarus-row { background-color: #ff9800; font-weight: bold; letter-spacing: 3pt; color: #000 !important; white-space: normal; }
         .dark-green-bg { background-color: #354c29ff !important; color: #ffffff !important; }
         .legend-container { width: 130pt; flex-shrink: 0; margin-left: 5pt; }
         .legend-table { font-size: 5pt; width: 100%; }

@@ -248,7 +248,7 @@
             background-color: #ff9800;
             font-weight: bold;
             letter-spacing: 3pt;
-            color: white !important;
+            color: #000 !important;
             white-space: normal;
         }
 
