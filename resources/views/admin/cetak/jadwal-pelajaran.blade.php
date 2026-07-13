@@ -244,6 +244,14 @@
             background-color: #42b419ff;
         }
 
+        .tadarus-row {
+            background-color: #ff9800;
+            font-weight: bold;
+            letter-spacing: 3pt;
+            color: white !important;
+            white-space: normal;
+        }
+
         /* Legend Styling */
         .legend-container {
             width: 130pt;
@@ -734,6 +742,7 @@
                                     ['time' => '13.55-14.30', 'jam' => 9],
                                 ],
                                 'Selasa' => [
+                                    ['time' => '06.45-07.00', 'jam' => 'TAD', 'type' => 'TADARUS'],
                                     ['time' => '07.00-07.35', 'jam' => 1],
                                     ['time' => '07.35-08.10', 'jam' => 2],
                                     ['time' => '08.10-08.45', 'jam' => 3],
@@ -749,6 +758,7 @@
                                     ['time' => '13.55-14.30', 'jam' => 10],
                                 ],
                                 'Rabu' => [
+                                    ['time' => '06.45-07.00', 'jam' => 'TAD', 'type' => 'TADARUS'],
                                     ['time' => '07.00-07.35', 'jam' => 1],
                                     ['time' => '07.35-08.10', 'jam' => 2],
                                     ['time' => '08.10-08.45', 'jam' => 3],
@@ -764,6 +774,7 @@
                                     ['time' => '13.55-14.30', 'jam' => 10],
                                 ],
                                 'Kamis' => [
+                                    ['time' => '06.45-07.00', 'jam' => 'TAD', 'type' => 'TADARUS'],
                                     ['time' => '07.00-07.35', 'jam' => 1],
                                     ['time' => '07.35-08.10', 'jam' => 2],
                                     ['time' => '08.10-08.45', 'jam' => 3],
@@ -816,6 +827,8 @@
                                                 GRATIS</td>
                                         @elseif($slot['type'] === 'SHALAT')
                                             <td colspan="{{ $allKelas->count() }}" class="sholat-row">SHALAT DZUHUR</td>
+                                        @elseif($slot['type'] === 'TADARUS')
+                                            <td colspan="{{ $allKelas->count() }}" class="tadarus-row">TADARUS AL-QUR'AN</td>
                                         @elseif($slot['type'] === 'LKD')
                                             <td colspan="{{ $allKelas->count() }}" class="violet-row">LKD / KULTUM</td>
                                         @elseif($slot['type'] === 'QIROAH')

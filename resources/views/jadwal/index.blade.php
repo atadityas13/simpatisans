@@ -217,7 +217,7 @@
                                             <td class="border p-2 text-center bg-gray-100 text-gray-400" colspan="2">{{ $item['label'] }}</td>
                                             @if($item['type'] === 'top')
                                                 <td class="border p-1 text-center bg-gray-200">UPACARA</td>
-                                                <td class="border p-1 text-center bg-gray-200" colspan="3"></td>
+                                                <td class="border p-1 text-center bg-orange-400 text-white font-black" colspan="3">TADARUS</td>
                                                 <td class="border p-1 text-center bg-gray-200">LKD/KULTUM</td>
                                             @else
                                                 <td class="border p-1 text-center bg-gray-200 tracking-[0.5em]" colspan="5">{{ $item['label'] }}</td>
@@ -631,7 +631,7 @@
                             elseif ($hari === 'Jumat')
                                 $totalRowsForDay += 6; // LKD, Qiroatul, Istirahat, Makan, Shalat, Pramuka
                             else
-                                $totalRowsForDay += 3; // Istirahat, Makan, Shalat
+                                $totalRowsForDay += 4; // Tadarus, Istirahat, Makan, Shalat
                         @endphp
 
                         <!-- Row 1 Hari + Row Spesial/Awal -->
@@ -670,6 +670,20 @@
                                 <td class="border border-gray-800 p-0.5 font-black text-center uppercase tracking-widest row-lkd"
                                     colspan="{{ $totalCols + 1 }}">
                                     QIROATUL QUR'AN
+                                </td>
+                            </tr>
+                        @elseif(in_array($hari, ['Selasa', 'Rabu', 'Kamis']))
+                            <tr class="{{ $dayTopBorder }}">
+                                <td class="border border-gray-800 font-bold p-0.5 text-center bg-gray-50 align-middle"
+                                    rowspan="{{ $totalRowsForDay }}">
+                                    <div class="writing-vertical mx-auto">{{ $hari }}</div>
+                                </td>
+                                <td
+                                    class="border border-gray-800 p-0.5 font-bold text-center text-[8px] tracking-tighter row-tadarus">
+                                    06.45-07.00</td>
+                                <td class="border border-gray-800 p-0.5 font-black text-center uppercase tracking-widest row-tadarus"
+                                    colspan="{{ $totalCols + 1 }}">
+                                    TADARUS AL-QUR'AN
                                 </td>
                             </tr>
                         @endif
@@ -711,13 +725,7 @@
                             @endif
 
                             <!-- Baris JTM -->
-                            <tr class="{{ (!in_array($hari, ['Senin', 'Jumat']) && $jam === 1) ? $dayTopBorder : '' }}">
-                                @if(!in_array($hari, ['Senin', 'Jumat']) && $jam === 1)
-                                    <td class="border border-gray-800 font-bold p-0.5 text-center bg-gray-50 align-middle"
-                                        rowspan="{{ $totalRowsForDay }}">
-                                        <div class="writing-vertical mx-auto">{{ $hari }}</div>
-                                    </td>
-                                @endif
+                            <tr>
                                 <td
                                     class="border border-gray-800 p-0.5 font-bold text-center bg-gray-50 text-[8px] tracking-tighter whitespace-nowrap">
                                     {{ $currentLabels[$jam] ?? '-' }}</td>
@@ -1604,6 +1612,7 @@
                 .row-makan { background-color: #9fc5e8 !important; color: #1e3a8a !important; }
                 .row-sholat { background-color: #42b419 !important; color: white !important; }
                 .row-lkd { background-color: #42b419 !important; color: white !important; }
+                .row-tadarus { background-color: #ff9800 !important; color: white !important; }
                 .row-pramuka { background-color: #4b54b5 !important; color: white !important; }
                 .cell-jumat-5 { background-color: #354c29 !important; color: white !important; }
                 .slot-issue-critical { background-color: #fecaca !important; color: #7f1d1d !important; box-shadow: inset 0 0 0 2px #ef4444 !important; }

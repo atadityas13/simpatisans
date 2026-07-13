@@ -167,6 +167,7 @@
         .makan-row { background-color: #9fc5e8; font-weight: bold; letter-spacing: 3pt; white-space: normal; }
         .sholat-row { background-color: #42b419ff; font-weight: bold; letter-spacing: 5pt; color: white !important; white-space: normal; }
         .violet-row { background-color: #42b419ff; font-weight: bold; letter-spacing: 5pt; color: white !important; white-space: normal; }
+        .tadarus-row { background-color: #ff9800; font-weight: bold; letter-spacing: 3pt; color: white !important; white-space: normal; }
         .dark-green-bg { background-color: #354c29ff !important; color: #ffffff !important; }
         .legend-container { width: 130pt; flex-shrink: 0; margin-left: 5pt; }
         .legend-table { font-size: 5pt; width: 100%; }
@@ -209,6 +210,7 @@
                 ['time' => '13.55-14.30', 'jam' => 9],
             ],
             'Selasa' => [
+                ['time' => '06.45-07.00', 'jam' => 'TAD', 'type' => 'TADARUS'],
                 ['time' => '07.00-07.35', 'jam' => 1], ['time' => '07.35-08.10', 'jam' => 2],
                 ['time' => '08.10-08.45', 'jam' => 3], ['time' => '08.45-09.20', 'jam' => 4],
                 ['time' => '09.20-09.50', 'jam' => 'IST', 'type' => 'ISTIRAHAT'],
@@ -219,6 +221,7 @@
                 ['time' => '13.55-14.30', 'jam' => 10],
             ],
             'Rabu' => [
+                ['time' => '06.45-07.00', 'jam' => 'TAD', 'type' => 'TADARUS'],
                 ['time' => '07.00-07.35', 'jam' => 1], ['time' => '07.35-08.10', 'jam' => 2],
                 ['time' => '08.10-08.45', 'jam' => 3], ['time' => '08.45-09.20', 'jam' => 4],
                 ['time' => '09.20-09.50', 'jam' => 'IST', 'type' => 'ISTIRAHAT'],
@@ -229,6 +232,7 @@
                 ['time' => '13.55-14.30', 'jam' => 10],
             ],
             'Kamis' => [
+                ['time' => '06.45-07.00', 'jam' => 'TAD', 'type' => 'TADARUS'],
                 ['time' => '07.00-07.35', 'jam' => 1], ['time' => '07.35-08.10', 'jam' => 2],
                 ['time' => '08.10-08.45', 'jam' => 3], ['time' => '08.45-09.20', 'jam' => 4],
                 ['time' => '09.20-09.50', 'jam' => 'IST', 'type' => 'ISTIRAHAT'],
@@ -311,6 +315,7 @@
                                                                     $type = $slot['type'];
                                                                     if($type === 'ISTIRAHAT') $class = 'ist-row';
                                                                     elseif($type === 'MAKAN') $class = 'makan-row';
+                                                                    elseif($type === 'TADARUS') $class = 'tadarus-row';
                                                                     elseif(in_array($type, ['SHALAT', 'LKD', 'QIROAH', 'SHALAT_J'])) $class = 'sholat-row';
 
                                                                     $text = match($type) {
@@ -320,6 +325,7 @@
                                                                         'PRAMUKA' => 'EKSTRAKURIKULER PRAMUKA',
                                                                         'SHALAT' => 'SHALAT DZUHUR',
                                                                         'LKD' => 'LKD / KULTUM',
+                                                                        'TADARUS' => "TADARUS AL-QUR'AN",
                                                                         default => $type
                                                                     };
                                                                 @endphp
