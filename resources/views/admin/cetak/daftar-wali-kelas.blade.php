@@ -101,10 +101,11 @@
             margin-top: 20px;
             display: flex;
             justify-content: flex-end;
+            margin-right: -1.2cm;
         }
 
         .signature-box {
-            width: 300px;
+            width: 280px;
             text-align: left;
             font-size: 16px;
             position: relative;
@@ -207,7 +208,7 @@
                         $ttdURL = $hasNewTTD ? asset('storage/presets/ttd_kepala.png') : null;
                     @endphp
                     <p>{{ $cetakTanggalLokasi ?? 'Cingambul, ' . date('j F Y') }}</p>
-                    <p style="margin-top: -4px;">{{ strtoupper($cetakPejabatLabel ?? 'Kepala Madrasah') }},</p>
+                    <p style="margin-top: -4px;">{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }},</p>
 
                     <div style="position: relative; height: 80px; margin-top: 10px;">
                         @if($hasNewTTD)
