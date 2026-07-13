@@ -264,7 +264,15 @@ class CetakController extends Controller
             ];
         });
 
-        return view('admin.cetak.daftar-wali-kelas', compact('activeSemester', 'rows'));
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+            $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
+              ->where('semester_id', $semesterId);
+        })->first();
+
+        return view('admin.cetak.daftar-wali-kelas', array_merge(
+            compact('activeSemester', 'rows', 'kepalaMadrasah'),
+            $this->cetakPresetService->viewData()
+        ));
     }
 
     public function lampiranSk()

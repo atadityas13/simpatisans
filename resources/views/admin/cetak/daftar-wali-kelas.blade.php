@@ -40,29 +40,30 @@
             margin-bottom: 30px;
         }
 
+        .header h1,
+        .header h2,
+        .header h3 {
+            margin: 5px 0;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
         .header h1 {
             font-size: 20px;
-            margin: 0;
-            text-transform: uppercase;
-            font-weight: bold;
         }
 
         .header h2 {
             font-size: 18px;
-            margin: 5px 0;
-            font-weight: bold;
         }
 
         .header h3 {
             font-size: 16px;
-            margin: 5px 0;
-            font-weight: bold;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-bottom: 20px;
+            margin-bottom: 40px;
         }
 
         th {
@@ -72,6 +73,7 @@
             font-size: 15px;
             font-weight: bold;
             text-align: center;
+            text-transform: uppercase;
         }
 
         td {
@@ -93,6 +95,24 @@
 
         .col-nama {
             text-align: left;
+        }
+
+        .signature-container {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .signature-box {
+            width: 300px;
+            text-align: left;
+            font-size: 16px;
+            position: relative;
+        }
+
+        .sign-area p {
+            margin: 0;
+            line-height: 1.4;
         }
 
         @media screen {
@@ -175,7 +195,54 @@
                 @endforelse
             </tbody>
         </table>
+
+        <div class="signature-container">
+            <div class="signature-box">
+                <div class="sign-area">
+                    @php
+                        $hasNewStempel = \Illuminate\Support\Facades\Storage::disk('public')->exists('presets/stempel.png');
+                        $hasNewTTD = \Illuminate\Support\Facades\Storage::disk('public')->exists('presets/ttd_kepala.png');
+
+                        $stempelURL = $hasNewStempel ? asset('storage/presets/stempel.png') : asset('img/stempel_ttd_kepala.png');
+                        $ttdURL = $hasNewTTD ? asset('storage/presets/ttd_kepala.png') : null;
+                    @endphp
+                    <p>{{ $cetakTanggalLokasi ?? 'Cingambul, ' . date('j F Y') }}</p>
+                    <p style="margin-top: -4px;">{{ strtoupper($cetakPejabatLabel ?? 'Kepala Madrasah') }},</p>
+
+                    <div style="position: relative; height: 80px; margin-top: 10px;">
+                        @if($hasNewTTD)
+                            <div class="adjustable-wrapper" data-adjustable-id="wali_kelas_ttd" style="position: absolute; left: -40px; top: -20px; z-index: 1;">
+                                <img src="{{ $ttdURL }}?v={{ time() }}"
+                                    style="height: 110px; width: auto; display: block;">
+                                <div class="resize-handle"></div>
+                            </div>
+                        @endif
+
+                        @if($hasNewStempel)
+                            <div class="adjustable-wrapper" data-adjustable-id="wali_kelas_stempel" style="position: absolute; left: -120px; top: -50px; z-index: 2;">
+                                <img src="{{ $stempelURL }}?v={{ time() }}"
+                                    style="width: 190px; height: auto; display: block; opacity: 0.85;">
+                                <div class="resize-handle"></div>
+                            </div>
+                        @else
+                            <div class="adjustable-wrapper" data-adjustable-id="wali_kelas_stempel_legacy" style="position: absolute; left: -80px; top: 10px; z-index: 2;">
+                                <img src="{{ $stempelURL }}"
+                                    style="width: 180px; height: auto; display: block;">
+                                <div class="resize-handle"></div>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div style="margin-top: 0;">
+                        <p><strong><u>{{ $kepalaMadrasah->nama_lengkap ?? '..........................................' }}</u></strong></p>
+                        <p style="margin-top: -4px;">NIP. {{ $kepalaMadrasah->username ?? '..........................................' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    @include('admin.cetak._adjustable_assets', ['templateKey' => 'cetak_wali_kelas'])
 </body>
 
 </html>
