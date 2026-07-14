@@ -81,6 +81,11 @@ Route::group(['middleware' => 'auth'], function () {
             Route::resource('pengaturan/semester', SemesterController::class);
             Route::post('pengaturan/semester/{semester}/activate', [SemesterController::class, 'activate'])->name('semester.activate');
 
+            Route::get('pengaturan/pengumuman', [App\Http\Controllers\PengumumanController::class, 'index'])->name('pengumuman.index');
+            Route::post('pengaturan/pengumuman', [App\Http\Controllers\PengumumanController::class, 'store'])->name('pengumuman.store');
+            Route::put('pengaturan/pengumuman/{pengumuman}', [App\Http\Controllers\PengumumanController::class, 'update'])->name('pengumuman.update');
+            Route::delete('pengaturan/pengumuman/{pengumuman}', [App\Http\Controllers\PengumumanController::class, 'destroy'])->name('pengumuman.destroy');
+
             // Admin roles and account management
             Route::resource('pengaturan/admin', AdminController::class)->except(['create', 'show', 'edit']);
             
