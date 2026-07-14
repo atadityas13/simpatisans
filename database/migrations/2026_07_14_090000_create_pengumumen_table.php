@@ -14,8 +14,11 @@ return new class extends Migration
             $table->text('isi');
             $table->boolean('is_active')->default(true);
             $table->timestamp('published_at')->nullable();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
+
+            $table->index('is_active');
+            $table->index('published_at');
         });
     }
 
