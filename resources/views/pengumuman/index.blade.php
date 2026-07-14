@@ -38,7 +38,7 @@
                                     <p class="line-clamp-3 whitespace-pre-line">{{ $item->isi }}</p>
                                 </td>
                                 <td class="px-6 py-4 text-gray-500 whitespace-nowrap">
-                                    {{ optional($item->published_at ?? $item->created_at)->timezone(config('app.timezone'))->format('d M Y H:i') }}
+                                    {{ optional($item->published_at ?? $item->created_at)->timezone('Asia/Jakarta')->format('d M Y H:i') }} WIB
                                 </td>
                                 <td class="px-6 py-4 text-center">
                                     @if($item->is_active)

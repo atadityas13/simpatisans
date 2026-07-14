@@ -19,7 +19,9 @@ class GuruPengumumanController extends Controller
                 'id' => $p->id,
                 'judul' => $p->judul,
                 'isi' => $p->isi,
-                'published_at' => optional($p->published_at ?? $p->created_at)->toIso8601String(),
+                'published_at' => optional($p->published_at ?? $p->created_at)
+                    ?->timezone('Asia/Jakarta')
+                    ->toIso8601String(),
             ]);
 
         return response()->json([
