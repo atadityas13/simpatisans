@@ -4,6 +4,12 @@
 
 @section('content')
     <div x-data="{ showAdd: false }">
+        @if(session('error'))
+            <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <div class="mb-6 flex justify-between items-center gap-4">
             <div>
                 <h2 class="text-2xl font-bold text-gray-900">Pengumuman Ta'lim</h2>

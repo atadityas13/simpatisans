@@ -3,19 +3,39 @@
 namespace App\Http\Controllers;
 
 use App\Models\Pengumuman;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class PengumumanController extends Controller
 {
     public function index()
     {
-        $items = Pengumuman::orderByDesc('published_at')->orderByDesc('id')->get();
+        try {
+            $items = Pengumuman::query()
+                ->orderByDesc('published_at')
+                ->orderByDesc('id')
+                ->get();
+        } catch (QueryException $e) {
+            // Tabel belum dibuat di server → pastikan migrate dijalankan.
+            $items = collect();
+            session()->flash(
+                'error',
+                'Tabel pengumuman belum tersedia. Jalankan: php artisan migrate --force'
+            );
+        }
 
         return view('pengumuman.index', compact('items'));
     }
 
     public function store(Request $request)
     {
+        if (! $this->tableReady()) {
+            return redirect()
+                ->route('pengumuman.index')
+                ->with('error', 'Tabel pengumuman belum tersedia. Jalankan: php artisan migrate --force');
+        }
+
         $data = $request->validate([
             'judul' => 'required|string|max:200',
             'isi' => 'required|string|max:5000',
@@ -58,5 +78,10 @@ class PengumumanController extends Controller
         $pengumuman->delete();
 
         return redirect()->route('pengumuman.index')->with('success', 'Pengumuman dihapus.');
+    }
+
+    private function tableReady(): bool
+    {
+        return Schema::hasTable('pengumuman') || Schema::hasTable('pengumumen');
     }
 }
