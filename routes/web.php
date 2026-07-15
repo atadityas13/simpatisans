@@ -89,6 +89,11 @@ Route::group(['middleware' => 'auth'], function () {
             Route::put('pengaturan/pengumuman/{pengumuman}', [App\Http\Controllers\PengumumanController::class, 'update'])->name('pengumuman.update');
             Route::delete('pengaturan/pengumuman/{pengumuman}', [App\Http\Controllers\PengumumanController::class, 'destroy'])->name('pengumuman.destroy');
 
+            Route::get('pengaturan/kalender', [App\Http\Controllers\CalendarEventController::class, 'index'])->name('calendar-events.index');
+            Route::post('pengaturan/kalender', [App\Http\Controllers\CalendarEventController::class, 'store'])->name('calendar-events.store');
+            Route::put('pengaturan/kalender/{calendarEvent}', [App\Http\Controllers\CalendarEventController::class, 'update'])->name('calendar-events.update');
+            Route::delete('pengaturan/kalender/{calendarEvent}', [App\Http\Controllers\CalendarEventController::class, 'destroy'])->name('calendar-events.destroy');
+
             Route::get('pengaturan/update-app', [App\Http\Controllers\AppUpdateController::class, 'index'])->name('app-updates.index');
             Route::post('pengaturan/update-app', [App\Http\Controllers\AppUpdateController::class, 'store'])->name('app-updates.store');
 
