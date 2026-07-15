@@ -14,6 +14,9 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\PenggunaController;
 use App\Http\Controllers\AuthController;
 
+Route::view('privacy-policy', 'privacy-policy')->name('privacy-policy');
+Route::redirect('kebijakan-privasi', 'privacy-policy');
+
 // Auth Routes (Guest)
 Route::group(['middleware' => 'guest'], function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
