@@ -172,7 +172,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span x-show="sidebarOpen">Kalender di SimpatiSans</span>
+                    <span x-show="sidebarOpen">Kalender</span>
                 </a>
                 <a href="/pengaturan/update-app"
                     class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('pengaturan/update-app*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">

@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('header', 'Kalender di SimpatiSans')
+@section('header', 'Kalender')
 
 @section('content')
     <div class="space-y-6">
@@ -11,7 +11,7 @@
         @endif
 
         <div>
-            <h2 class="text-2xl font-bold text-gray-900">Kalender di SimpatiSans</h2>
+            <h2 class="text-2xl font-bold text-gray-900">Kalender</h2>
             <p class="mt-1 text-sm text-gray-600">
                 Tambahkan acara madrasah agar muncul di kalender aplikasi Ta'lim seluruh guru.
             </p>
