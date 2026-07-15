@@ -168,7 +168,7 @@ class GuruDashboardController extends Controller
             'status' => 'eligible',
             'eligible' => true,
             'reason' => null,
-            'message' => 'Selamat anda dinyatakan LAYAK dan memenuhi syarat sebagai penerima TPG semester berjalan.',
+            'message' => 'Selamat anda dinyatakan LAYAK dan memenuhi syarat sebagai penerima TPG semester ini.',
             'target_jam' => $target,
             'total_linear_jam' => $totalLinear,
             'deficit_jam' => 0,
