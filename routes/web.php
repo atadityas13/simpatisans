@@ -86,6 +86,9 @@ Route::group(['middleware' => 'auth'], function () {
             Route::put('pengaturan/pengumuman/{pengumuman}', [App\Http\Controllers\PengumumanController::class, 'update'])->name('pengumuman.update');
             Route::delete('pengaturan/pengumuman/{pengumuman}', [App\Http\Controllers\PengumumanController::class, 'destroy'])->name('pengumuman.destroy');
 
+            Route::get('pengaturan/update-app', [App\Http\Controllers\AppUpdateController::class, 'index'])->name('app-updates.index');
+            Route::post('pengaturan/update-app', [App\Http\Controllers\AppUpdateController::class, 'store'])->name('app-updates.store');
+
             // Admin roles and account management
             Route::resource('pengaturan/admin', AdminController::class)->except(['create', 'show', 'edit']);
             

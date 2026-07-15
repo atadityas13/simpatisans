@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\GuruDashboardController;
 use App\Http\Controllers\Api\GuruElapkinController;
 use App\Http\Controllers\Api\GuruPengumumanController;
 use App\Http\Controllers\Api\GuruProfileController;
+use App\Http\Controllers\Api\AppUpdateController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -15,6 +16,8 @@ Route::get('/health', function () {
         'time' => now()->toIso8601String(),
     ]);
 });
+
+Route::get('/app-update/{platform}', [AppUpdateController::class, 'show']);
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');

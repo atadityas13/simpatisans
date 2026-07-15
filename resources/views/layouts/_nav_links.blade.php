@@ -165,6 +165,15 @@
                     </svg>
                     <span x-show="sidebarOpen">Pengumuman</span>
                 </a>
+                <a href="/pengaturan/update-app"
+                    class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('pengaturan/update-app*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
+                    <svg class="w-4 h-4 mr-3 {{ request()->is('pengaturan/update-app*') ? 'text-indigo-400' : 'text-slate-500 group-hover:text-indigo-400' }}"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span x-show="sidebarOpen">Update App</span>
+                </a>
                 <a href="/config/pengguna"
                     class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('config/pengguna*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
                     <svg class="w-4 h-4 mr-3 {{ request()->is('config/pengguna*') ? 'text-indigo-400' : 'text-slate-500 group-hover:text-indigo-400' }}"
