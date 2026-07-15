@@ -114,9 +114,7 @@ Route::group(['middleware' => 'auth'], function () {
 
         // GURU CONTEXT ROUTES
         Route::group(['middleware' => 'active_role:guru'], function () {
-            Route::get('/guru', function () {
-                return view('guru.dashboard');
-            })->name('guru.dashboard');
+            Route::get('/guru', [App\Http\Controllers\GuruWebDashboardController::class, 'index'])->name('guru.dashboard');
         });
     });
 });

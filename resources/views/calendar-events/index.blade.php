@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('header', 'Kalender App')
+@section('header', 'Kalender di SimpatiSans')
 
 @section('content')
     <div class="space-y-6">
@@ -11,7 +11,7 @@
         @endif
 
         <div>
-            <h2 class="text-2xl font-bold text-gray-900">Acara Kalender Ta'lim</h2>
+            <h2 class="text-2xl font-bold text-gray-900">Kalender di SimpatiSans</h2>
             <p class="mt-1 text-sm text-gray-600">
                 Tambahkan acara madrasah agar muncul di kalender aplikasi Ta'lim seluruh guru.
             </p>
@@ -122,12 +122,36 @@
                                             <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-500">Nonaktif</span>
                                         @endif
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <details class="group inline-block text-left">
-                                            <summary class="cursor-pointer list-none rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50">
+                                    <td class="px-6 py-4 text-right" x-data="{ editOpen: false }">
+                                        <div class="inline-flex items-center justify-end gap-2">
+                                            <button type="button" @click="editOpen = true"
+                                                class="rounded-lg px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50">
                                                 Edit
-                                            </summary>
-                                            <div class="absolute right-8 z-20 mt-2 w-80 rounded-xl border border-gray-100 bg-white p-4 text-left shadow-xl">
+                                            </button>
+                                            <form action="{{ route('calendar-events.destroy', $item) }}" method="POST" class="inline-block"
+                                                data-confirm="Hapus acara kalender ini?">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="rounded-lg px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-800">
+                                                    Hapus
+                                                </button>
+                                            </form>
+                                        </div>
+
+                                        <div x-show="editOpen" x-cloak class="fixed inset-0 z-[120] flex items-center justify-center p-4" style="display:none;">
+                                            <div class="absolute inset-0 bg-black/45" @click="editOpen = false"></div>
+                                            <div class="relative w-full max-w-lg rounded-2xl border border-gray-100 bg-white p-6 text-left shadow-2xl">
+                                                <div class="mb-4 flex items-start justify-between gap-4">
+                                                    <div>
+                                                        <h3 class="text-lg font-bold text-gray-900">Ubah Acara</h3>
+                                                        <p class="mt-1 text-sm text-gray-500">Perubahan akan tampil di kalender aplikasi Ta'lim setelah guru membuka aplikasi.</p>
+                                                    </div>
+                                                    <button type="button" @click="editOpen = false" class="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                                                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                                 <form action="{{ route('calendar-events.update', $item) }}" method="POST" class="space-y-3">
                                                     @csrf
                                                     @method('PUT')
@@ -152,21 +176,16 @@
                                                         </label>
                                                     </div>
                                                     <div class="flex justify-end gap-2 pt-1">
+                                                        <button type="button" @click="editOpen = false" class="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100">
+                                                            Batal
+                                                        </button>
                                                         <button type="submit" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
                                                             Simpan
                                                         </button>
                                                     </div>
                                                 </form>
-                                                <form action="{{ route('calendar-events.destroy', $item) }}" method="POST" class="mt-2"
-                                                    data-confirm="Hapus acara kalender ini?">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-sm font-medium text-red-600 hover:text-red-800">
-                                                        Hapus acara
-                                                    </button>
-                                                </form>
                                             </div>
-                                        </details>
+                                        </div>
                                     </td>
                                 </tr>
                             @empty

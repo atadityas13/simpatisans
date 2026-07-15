@@ -1,97 +1,155 @@
 @extends('layouts.app')
+
 @section('header', 'Dashboard Guru')
+
 @section('content')
+@php
+    $status = $tpgStatus['status'] ?? 'syncing';
+    $isEligible = $status === 'eligible';
+    $isIneligible = in_array($status, ['not_certified', 'deficit'], true);
+    $statusCardClass = $isEligible
+        ? 'border-emerald-100 bg-emerald-50'
+        : ($isIneligible ? 'border-red-100 bg-red-50' : 'border-amber-100 bg-amber-50');
+    $statusIconClass = $isEligible
+        ? 'text-emerald-600'
+        : ($isIneligible ? 'text-red-600' : 'text-amber-600');
+    $statusTitleClass = $isEligible
+        ? 'text-emerald-800'
+        : ($isIneligible ? 'text-red-800' : 'text-amber-800');
+    $statusSubtitleClass = $isEligible
+        ? 'text-emerald-700'
+        : ($isIneligible ? 'text-red-700' : 'text-amber-700');
+@endphp
 
 <div class="space-y-8">
-    
-    <!-- WELCOME CARD -->
-    <div class="relative overflow-hidden bg-indigo-600 rounded-[32px] p-8 sm:p-12 text-white shadow-2xl shadow-indigo-200">
-        <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
-            <div class="text-center md:text-left">
-                <h2 class="text-3xl sm:text-4xl font-extrabold mb-3">Selamat Datang, {{ Auth::user()->nama_lengkap }}!</h2>
-                <p class="text-indigo-100 text-lg opacity-90 font-medium">Anda sedang masuk sebagai <span class="bg-white/20 px-3 py-1 rounded-lg">Guru</span> di MTsN 11 Majalengka.</p>
-                <div class="mt-8 flex flex-wrap gap-4 justify-center md:justify-start">
-                    <div class="bg-white/10 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/10">
-                        <p class="text-[10px] uppercase font-black tracking-widest text-indigo-200 mb-1">NIP / Username</p>
-                        <p class="font-bold text-xl">{{ Auth::user()->username }}</p>
+    <div class="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-indigo-700 via-indigo-600 to-emerald-600 p-8 text-white shadow-2xl shadow-indigo-200 sm:p-12">
+        <div class="relative z-10 grid gap-8 lg:grid-cols-[1fr,340px] lg:items-center">
+            <div>
+                <p class="mb-3 inline-flex rounded-full bg-white/15 px-4 py-1.5 text-xs font-black uppercase tracking-[0.22em] text-indigo-100">
+                    Akses Guru Web
+                </p>
+                <h2 class="text-3xl font-extrabold leading-tight sm:text-4xl">
+                    Selamat datang, {{ auth()->user()->nama_lengkap ?? auth()->user()->username }}.
+                </h2>
+                <p class="mt-4 max-w-2xl text-lg font-medium text-indigo-50">
+                    Fitur guru SimpatiSans sekarang digunakan melalui aplikasi Android Ta'lim. Halaman web ini hanya menampilkan ringkasan singkat dan tautan instalasi aplikasi.
+                </p>
+            </div>
+
+            <div class="rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur">
+                <p class="text-sm font-bold text-indigo-100">Install Aplikasi Ta'lim</p>
+                <p class="mt-2 text-sm text-white/80">Gunakan aplikasi Android untuk jadwal, kalender, pengingat, kinerja, dan fitur guru lainnya.</p>
+                <a href="{{ $playStoreUrl }}" target="_blank" rel="noopener"
+                    class="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-extrabold text-indigo-700 shadow-lg transition hover:bg-indigo-50">
+                    Buka di Google Play
+                </a>
+            </div>
+        </div>
+        <div class="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-white/10 blur-3xl"></div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-8 xl:grid-cols-[1fr,420px]">
+        <div class="rounded-[28px] border border-slate-100 bg-white p-6 shadow-sm">
+            <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <p class="text-xs font-black uppercase tracking-[0.2em] text-slate-400">{{ $hariIni }}</p>
+                    <h3 class="mt-1 text-2xl font-extrabold text-slate-900">Ringkasan Jadwal Hari Ini</h3>
+                </div>
+                @if($semester)
+                    <span class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                        {{ $semester->nama_tahun }} - {{ $semester->tipe }}
+                    </span>
+                @endif
+            </div>
+
+            @if($jadwalHariIni->isEmpty())
+                <div class="rounded-3xl border border-dashed border-slate-200 bg-slate-50/70 px-6 py-14 text-center">
+                    <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-indigo-500 shadow-sm">
+                        <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <h4 class="text-lg font-bold text-slate-800">Tidak ada jadwal mengajar hari ini.</h4>
+                    <p class="mt-2 text-sm text-slate-500">Detail jadwal lengkap tetap tersedia di aplikasi Android Ta'lim.</p>
+                </div>
+            @else
+                <div class="space-y-3">
+                    @foreach($jadwalHariIni as $jadwal)
+                        <div class="flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p class="text-xs font-black uppercase tracking-[0.18em] text-indigo-500">Jam ke {{ $jadwal['jam_ke'] }}</p>
+                                <p class="mt-1 text-lg font-extrabold text-slate-900">{{ $jadwal['mapel'] ?? 'Pelajaran' }}</p>
+                                <p class="text-sm font-medium text-slate-500">{{ $jadwal['kelas'] ?? 'Kelas belum tersedia' }}</p>
+                            </div>
+                            <span class="rounded-full bg-white px-3 py-1.5 text-sm font-bold text-slate-600 shadow-sm">
+                                {{ $jadwal['waktu'] ?? 'Waktu belum tersedia' }}
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        <div class="space-y-6">
+            <div class="rounded-[28px] border {{ $statusCardClass }} p-6 shadow-sm">
+                <div class="mb-4 flex items-center gap-3">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white {{ $statusIconClass }} shadow-sm">
+                        @if($isEligible)
+                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        @elseif($isIneligible)
+                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        @else
+                            <svg class="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.4" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        @endif
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-extrabold {{ $statusTitleClass }}">Status Kelayakan TPG</h3>
+                        <p class="text-sm font-semibold {{ $statusSubtitleClass }}">
+                            Semester {{ $semester?->tipe ?? '-' }} TP {{ $semester?->nama_tahun ?? '-' }}
+                        </p>
                     </div>
                 </div>
-            </div>
-            
-            <div class="w-48 h-48 sm:w-56 sm:h-56 relative group">
-                @if(Auth::user()->foto)
-                    <img src="{{ Storage::url(Auth::user()->foto) }}" class="w-full h-full object-cover rounded-[40px] shadow-2xl border-4 border-white/20 transform group-hover:scale-105 transition-transform duration-500">
-                @else
-                    <div class="w-full h-full bg-indigo-500 rounded-[40px] flex items-center justify-center border-4 border-white/20 shadow-2xl">
-                        <svg class="w-24 h-24 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                <p class="text-sm font-medium leading-6 text-slate-700">
+                    {{ $tpgStatus['message'] ?? 'Status kelayakan TPG sedang disinkronkan dari SimpatiSans.' }}
+                </p>
+                @if($tpgStatus)
+                    <div class="mt-5 grid grid-cols-2 gap-3">
+                        <div class="rounded-2xl bg-white/75 p-4">
+                            <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Linear</p>
+                            <p class="mt-1 text-xl font-extrabold text-slate-900">{{ $tpgStatus['total_linear_jam'] }} jam</p>
+                        </div>
+                        <div class="rounded-2xl bg-white/75 p-4">
+                            <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Target</p>
+                            <p class="mt-1 text-xl font-extrabold text-slate-900">{{ $tpgStatus['target_jam'] }} jam</p>
+                        </div>
                     </div>
                 @endif
-                <!-- Abstract Glow -->
-                <div class="absolute -inset-4 bg-white/20 blur-3xl rounded-full -z-10 group-hover:bg-white/30 transition-colors"></div>
-            </div>
-        </div>
-        
-        <!-- Decoration Icons -->
-        <svg class="absolute -right-20 -bottom-20 w-96 h-96 text-white/5 opacity-10 rotate-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-    </div>
-
-    <!-- MAIN CONTENT GRID -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        <!-- PERSONAL SCHEDULE PREVIEW (Placeholder for now) -->
-        <div class="lg:col-span-2 space-y-6">
-            <div class="flex justify-between items-end px-2">
-                <h3 class="text-2xl font-extrabold text-slate-900 tracking-tight">Jadwal Hari Ini</h3>
-                <a href="#" class="text-sm font-bold text-indigo-600 hover:text-indigo-700 underline decoration-2 underline-offset-4 decoration-indigo-600/30">Lihat Semua Jadwal</a>
             </div>
 
-            <div class="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden p-4">
-                <div class="flex flex-col items-center justify-center py-20 px-8 text-center bg-slate-50/50 rounded-[24px] border border-dashed border-slate-200">
-                    <div class="w-20 h-20 bg-white rounded-2xl flex items-center justify-center shadow-md mb-6">
-                        <svg class="w-10 h-10 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v14a2 2 0 002 2z"></path></svg>
-                    </div>
-                    <h4 class="text-xl font-bold text-slate-800 mb-2">Belum Ada Jadwal Mengajar Aktif</h4>
-                    <p class="text-slate-500 max-w-sm mx-auto">Admin belum merilis jadwal untuk semester ini. Silakan hubungi bagian kurikulum untuk informasi lebih lanjut.</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- QUICK INFO / SIDEBAR -->
-        <div class="space-y-6 text-sm font-medium">
-             <div class="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8">
-                <h3 class="text-lg font-black uppercase tracking-widest text-slate-400 mb-6 border-b border-slate-50 pb-4">Status Pengajar</h3>
-                <ul class="space-y-6">
-                    <li class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        </div>
-                        <div>
-                            <p class="text-slate-400 text-[10px] font-black uppercase tracking-wider">Status Akun</p>
-                            <p class="text-slate-900 font-bold">Aktif</p>
-                        </div>
+            <div class="rounded-[28px] border border-slate-100 bg-white p-6 shadow-sm">
+                <h3 class="text-lg font-extrabold text-slate-900">Informasi Penggunaan</h3>
+                <ul class="mt-4 space-y-3 text-sm font-medium text-slate-600">
+                    <li class="flex gap-3">
+                        <span class="mt-1 h-2 w-2 rounded-full bg-indigo-500"></span>
+                        Menu guru di web dinonaktifkan agar semua fitur guru terpusat di aplikasi Android.
                     </li>
-                    <li class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                        </div>
-                        <div>
-                            <p class="text-slate-400 text-[10px] font-black uppercase tracking-wider">Unit Kerja</p>
-                            <p class="text-slate-900 font-bold">MTsN 11 Majalengka</p>
-                        </div>
+                    <li class="flex gap-3">
+                        <span class="mt-1 h-2 w-2 rounded-full bg-indigo-500"></span>
+                        Login aplikasi menggunakan username dan password SimpatiSans yang sama.
+                    </li>
+                    <li class="flex gap-3">
+                        <span class="mt-1 h-2 w-2 rounded-full bg-indigo-500"></span>
+                        Jika Play Store belum menampilkan aplikasi, tunggu sampai rilis testing/production aktif.
                     </li>
                 </ul>
-                
-                <div class="mt-10 pt-6 border-t border-slate-50 text-center">
-                    <button class="w-full py-4 px-6 bg-slate-50 text-slate-600 font-bold rounded-2xl hover:bg-slate-100 transition-colors border border-slate-100 flex items-center justify-center gap-2">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                        Lengkapi Profil
-                    </button>
-                    <p class="mt-4 text-[10px] text-slate-400 font-medium">Bantu kami memperlengkap data Anda.</p>
-                </div>
             </div>
         </div>
-
     </div>
 </div>
-
 @endsection

@@ -172,7 +172,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span x-show="sidebarOpen">Kalender App</span>
+                    <span x-show="sidebarOpen">Kalender di SimpatiSans</span>
                 </a>
                 <a href="/pengaturan/update-app"
                     class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('pengaturan/update-app*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
@@ -215,21 +215,9 @@
             </div>
         </div>
     @else
-        <!-- KATEGORI GURU -->
-        <div class="space-y-1">
-            <div class="px-5 py-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
-                <span x-show="sidebarOpen">MENU GURU</span>
-            </div>
-            <div class="px-4 space-y-1">
-                <a href="/guru"
-                    class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('guru') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
-                    <svg class="w-4 h-4 mr-3 {{ request()->is('guru') ? 'text-indigo-400' : 'text-slate-500 group-hover:text-indigo-400' }}"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span x-show="sidebarOpen">Jadwal Saya</span>
-                </a>
+        <div class="px-4">
+            <div class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-400">
+                <span x-show="sidebarOpen">Gunakan aplikasi Android Ta'lim untuk fitur guru.</span>
             </div>
         </div>
     @endif
