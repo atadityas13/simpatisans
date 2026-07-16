@@ -113,7 +113,6 @@
                 min-height: 45mm !important;
             }
             thead { display: table-header-group; }
-            tfoot { display: table-footer-group; }
             tr { page-break-inside: avoid; break-inside: avoid; }
             .kelas-footer-block {
                 page-break-inside: avoid !important;
@@ -123,13 +122,21 @@
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }
-            .kelas-page-footer td {
-                border-left: 1pt solid #000 !important;
-                border-right: 1pt solid #000 !important;
-                border-bottom: 1pt solid #000 !important;
-                border-top: none !important;
+            .kelas-page-footer-screen {
+                display: none !important;
             }
-            .page-info::before {
+            .kelas-print-footer {
+                display: block !important;
+                position: fixed;
+                bottom: 2mm;
+                left: 0;
+                right: 0;
+                text-align: center;
+                font-size: 8pt;
+                font-style: italic;
+                color: #333;
+            }
+            .kelas-print-footer .page-info::before {
                 content: "Halaman " counter(page) " dari " counter(pages);
             }
         }
@@ -256,23 +263,10 @@
         td.center { text-align: center; vertical-align: middle; }
         .waktu-line { font-size: 8pt; margin-top: 2px; }
 
-        tfoot { display: table-footer-group; }
-        .kelas-page-footer td {
-            text-align: center;
-            font-size: 8pt;
-            font-style: italic;
-            padding: 2mm 3px;
-            background: #fff;
-            border-top: none;
+        .kelas-print-footer {
+            display: none;
         }
         @media screen {
-            .page-info::before {
-                content: "Halaman — dari —";
-            }
-            .kelas-table-main tfoot,
-            .kelas-table-ending tfoot {
-                display: none;
-            }
             .kelas-page-footer-screen {
                 display: block;
                 text-align: center;
@@ -431,11 +425,6 @@
                             </tr>
                         @endif
                     </tbody>
-                    <tfoot>
-                        <tr class="kelas-page-footer">
-                            <td colspan="7">Kelas {{ $namaKelas }} — <span class="page-info"></span></td>
-                        </tr>
-                    </tfoot>
                 </table>
 
                 <div class="kelas-footer-block">
@@ -466,11 +455,6 @@
                                     <td>{{ $lastRow['catatan_guru'] ?: '—' }}</td>
                                 </tr>
                             </tbody>
-                            <tfoot>
-                                <tr class="kelas-page-footer">
-                                    <td colspan="7">Kelas {{ $namaKelas }} — <span class="page-info"></span></td>
-                                </tr>
-                            </tfoot>
                         </table>
                     @endif
 
@@ -492,7 +476,8 @@
                     </div>
                 </div>
 
-                <div class="kelas-page-footer-screen">Kelas {{ $namaKelas }} — Halaman — dari —</div>
+                <div class="kelas-page-footer-screen">Kelas {{ $namaKelas }}</div>
+                <div class="kelas-print-footer">Kelas {{ $namaKelas }} — <span class="page-info"></span></div>
             </div>
         @endforeach
     </div>
