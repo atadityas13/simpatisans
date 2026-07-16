@@ -79,10 +79,12 @@
                 box-shadow: none !important;
             }
             .kelas-paper {
-                min-height: 0 !important;
-                padding: 0 !important;
+                min-height: 194mm !important;
+                padding: 0.8cm !important;
                 page-break-before: always !important;
                 break-before: page !important;
+                display: flex !important;
+                flex-direction: column !important;
             }
             .kelas-paper:last-child {
                 page-break-after: auto !important;
@@ -125,19 +127,14 @@
             .kelas-page-footer-screen {
                 display: none !important;
             }
-            .kelas-print-footer {
+            .kelas-bottom-left {
                 display: block !important;
-                position: fixed;
-                bottom: 2mm;
-                left: 0;
-                right: 0;
-                text-align: center;
+                margin-top: auto !important;
+                text-align: left;
                 font-size: 8pt;
                 font-style: italic;
                 color: #333;
-            }
-            .kelas-print-footer .page-info::before {
-                content: "Halaman " counter(page) " dari " counter(pages);
+                padding-bottom: 1mm;
             }
         }
 
@@ -263,7 +260,7 @@
         td.center { text-align: center; vertical-align: middle; }
         .waktu-line { font-size: 8pt; margin-top: 2px; }
 
-        .kelas-print-footer {
+        .kelas-bottom-left {
             display: none;
         }
         @media screen {
@@ -477,7 +474,7 @@
                 </div>
 
                 <div class="kelas-page-footer-screen">Kelas {{ $namaKelas }}</div>
-                <div class="kelas-print-footer">Kelas {{ $namaKelas }} — <span class="page-info"></span></div>
+                <div class="kelas-bottom-left">Kelas {{ $namaKelas }}</div>
             </div>
         @endforeach
     </div>
