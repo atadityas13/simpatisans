@@ -70,6 +70,9 @@ class GuruJurnalController extends Controller
                 'tipe' => $semester->tipe,
             ],
             'data' => $kelasGroups,
+            'message' => $kelasGroups->isEmpty()
+                ? 'Belum ada kelas diampu pada semester aktif. Pastikan Pembagian Tugas (beban mengajar) sudah diisi untuk TA/semester ini.'
+                : null,
         ]);
     }
 
@@ -244,12 +247,12 @@ class GuruJurnalController extends Controller
     {
         $guru = Guru::where('username', $request->user()->username)->first();
         if (! $guru) {
-            return [null, null, response()->json(['success' => false, 'message' => 'Profil guru tidak ditemukan.'], 404)];
+            return [null, null, response()->json(['success' => false, 'message' => 'Profil guru tidak ditemukan.'], 422)];
         }
 
         $semester = $this->semesterService->getActiveSemester();
         if (! $semester) {
-            return [null, null, response()->json(['success' => false, 'message' => 'Tidak ada semester aktif.'], 404)];
+            return [null, null, response()->json(['success' => false, 'message' => 'Tidak ada semester aktif.'], 422)];
         }
 
         return [$guru, $semester, null];
