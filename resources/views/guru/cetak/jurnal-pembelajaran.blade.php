@@ -124,20 +124,9 @@
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
             }
-            .kelas-page-footer-screen {
-                display: none !important;
-            }
+            .kelas-page-footer-screen,
             .kelas-bottom-left {
-                display: block !important;
-                margin-top: auto !important;
-                text-align: left;
-                font-size: 8pt;
-                font-style: italic;
-                color: #333;
-                padding-bottom: 1mm;
-            }
-            .kelas-bottom-left .page-number::before {
-                content: counter(page);
+                display: none !important;
             }
         }
 
@@ -216,6 +205,9 @@
             font-weight: 700;
             text-transform: uppercase;
         }
+        .cover-bottom {
+            margin-top: -14mm;
+        }
 
         /* ===== ISI PER KELAS ===== */
         .section-title {
@@ -263,20 +255,7 @@
         td.center { text-align: center; vertical-align: middle; }
         .waktu-line { font-size: 8pt; margin-top: 2px; }
 
-        .kelas-bottom-left {
-            display: none;
-        }
         @media screen {
-            .kelas-page-footer-screen {
-                display: block;
-                text-align: center;
-                font-size: 8pt;
-                font-style: italic;
-                margin-top: 5mm;
-                color: #444;
-            }
-        }
-        .kelas-page-footer-screen {
             display: none;
         }
 
@@ -474,11 +453,6 @@
                             <div class="sign-nip">NIP. {{ $guru->username }}</div>
                         </div>
                     </div>
-                </div>
-
-                <div class="kelas-page-footer-screen">Kelas {{ $namaKelas }}</div>
-                <div class="kelas-bottom-left">
-                    Kelas {{ $namaKelas }} — Halaman <span class="page-number"></span>
                 </div>
             </div>
         @endforeach
