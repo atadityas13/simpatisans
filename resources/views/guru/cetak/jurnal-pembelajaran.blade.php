@@ -2,144 +2,111 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    {{-- Lebar ≈ A4 landscape 297mm @96dpi agar WebView bisa fit-to-width --}}
+    <meta name="viewport" content="width=1123, initial-scale=1, maximum-scale=4, user-scalable=yes">
     <title>Jurnal Pembelajaran - {{ $guru->nama_lengkap }}</title>
     <style>
         @page {
             size: A4 landscape;
             margin: 8mm;
         }
-        * { box-sizing: border-box; }
-        body {
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
             font-family: 'Times New Roman', Times, serif;
             color: #000;
-            margin: 0;
+            background: #fff;
         }
 
-        /* Layar: muat lebar viewport, bisa digeser/zoom */
         @media screen {
-            html, body {
-                width: 100%;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-            }
             body {
-                background: #e8ecf1;
-                padding: 12px;
-                display: block;
+                background: #dfe3e8;
+                padding: 10px 0 24px;
             }
             .sheet {
-                width: 100%;
-                max-width: 100%;
-                margin: 0 auto 16px;
-                background: #fff;
-                box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-            }
-            .cover, .paper {
-                width: 100% !important;
-                max-width: 100%;
-                min-height: 0 !important;
-                height: auto !important;
-                aspect-ratio: 297 / 210;
+                box-shadow: 0 4px 18px rgba(0,0,0,0.15);
+                margin: 0 auto 14px;
             }
         }
 
         @media print {
             body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            .sheet { box-shadow: none !important; margin: 0 !important; }
-            .cover {
-                page-break-after: always;
-                page-break-inside: avoid;
-            }
-            .section-page {
-                page-break-before: always;
-                page-break-inside: auto;
-            }
-            .sign-wrap {
-                page-break-before: avoid;
-                page-break-inside: avoid;
-            }
+            .sheet { box-shadow: none; margin: 0; }
+            .cover { page-break-after: always; page-break-inside: avoid; }
+            .section-page { page-break-before: always; }
+            .sign-wrap { page-break-before: avoid; page-break-inside: avoid; }
         }
 
-        .cover, .paper {
+        /* A4 landscape tetap: 297 × 210 mm */
+        .sheet {
             width: 297mm;
-            background: #fff;
-        }
-        .cover {
             height: 210mm;
+            background: #fff;
+            position: relative;
             overflow: hidden;
         }
-        .paper {
-            min-height: 210mm;
-            height: auto;
-            overflow: visible;
-        }
 
+        /* ===== COVER ===== */
         .cover {
-            padding: 10mm 16mm 8mm;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            padding: 12mm 18mm 10mm;
             text-align: center;
         }
-        .cover-title {
-            width: 100%;
-            line-height: 1.25;
-        }
         .cover-title h1 {
-            margin: 0;
-            font-size: 22pt;
+            font-size: 24pt;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.8px;
+            letter-spacing: 1px;
+            line-height: 1.2;
         }
         .cover-title h2 {
-            margin: 4px 0 0;
-            font-size: 13pt;
+            margin-top: 6px;
+            font-size: 14pt;
             font-weight: 700;
             text-transform: uppercase;
+            line-height: 1.25;
         }
         .cover-kelas {
-            margin-top: 2.2em; /* ~2 enter */
+            margin-top: 2.4em; /* jarak 2 enter */
             font-size: 13pt;
             font-weight: 700;
             text-transform: uppercase;
             line-height: 1.35;
-            max-width: 90%;
-        }
-        .cover-logo-wrap {
-            margin: 8mm auto 0;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            padding: 0 10mm;
         }
         .cover-logo {
-            width: 32mm;
-            height: 32mm;
+            position: absolute;
+            left: 50%;
+            top: 52%;
+            transform: translate(-50%, -50%);
+            width: 36mm;
+            height: 36mm;
             object-fit: contain;
-            display: block;
-            margin: 0 auto;
         }
-        .cover-spacer { flex: 1 1 auto; min-height: 4mm; }
-        .cover-guru .nama {
-            font-size: 13pt;
+        .cover-bottom {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 12mm;
+            text-align: center;
+        }
+        .cover-bottom .nama {
+            font-size: 14pt;
             font-weight: 700;
             margin-bottom: 2px;
         }
-        .cover-guru .nip { font-size: 11pt; }
-        .cover-school .school {
+        .cover-bottom .nip { font-size: 11pt; margin-bottom: 10mm; }
+        .cover-bottom .school {
             font-size: 13pt;
             font-weight: 700;
             text-transform: uppercase;
         }
-        .cover-school .agency {
+        .cover-bottom .agency {
+            margin-top: 3px;
             font-size: 11pt;
             font-weight: 700;
             text-transform: uppercase;
-            margin-top: 2px;
         }
 
+        /* ===== ISI PER KELAS ===== */
         .paper {
             padding: 8mm 10mm 7mm;
             display: flex;
@@ -147,39 +114,41 @@
         }
         .title {
             text-align: center;
-            margin-bottom: 6px;
-            line-height: 1.25;
             flex: 0 0 auto;
+            margin-bottom: 5mm;
         }
         .title h1 {
-            margin: 0;
             font-size: 14pt;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.4px;
         }
         .title h2 {
-            margin: 3px 0 0;
+            margin-top: 3px;
             font-size: 11pt;
             font-weight: 700;
             text-transform: uppercase;
         }
         .title .kelas-line {
-            margin-top: 1.6em; /* jarak 2 enter dari baris semester */
+            margin-top: 1.8em;
         }
         .table-wrap {
-            flex: 0 0 auto;
+            flex: 1 1 auto;
+            min-height: 0;
         }
         table {
             width: 100%;
             border-collapse: collapse;
             border: 1.5pt solid #000;
             font-size: 9pt;
+            table-layout: fixed;
         }
         th, td {
             border: 1pt solid #000;
             padding: 4px 3px;
             vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         th {
             background: #f3f4f6;
@@ -190,32 +159,26 @@
             line-height: 1.2;
         }
         td.center { text-align: center; vertical-align: middle; }
+        .waktu-line { font-size: 8pt; margin-top: 2px; }
 
-        /* KM 1 tab kiri, Guru 1 tab kanan */
         .sign-wrap {
-            margin-top: 10mm;
+            flex: 0 0 auto;
+            margin-top: 8mm;
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            padding-left: 12.7mm;  /* ~1 tab */
-            padding-right: 12.7mm;
-            flex: 0 0 auto;
+            padding-left: 12.7mm;  /* 1 tab kiri */
+            padding-right: 12.7mm; /* 1 tab kanan */
         }
         .sign-box {
-            width: 72mm;
+            width: 70mm;
             text-align: left;
             font-size: 10pt;
             line-height: 1.3;
         }
-        .sign-space { height: 48px; }
+        .sign-space { height: 46px; }
         .sign-name {
             font-weight: 700;
             text-decoration: underline;
-            margin-top: 2px;
-        }
-        .sign-nip { margin-top: 1px; }
-        .waktu-line {
-            font-size: 8pt;
             margin-top: 2px;
         }
     </style>
@@ -243,31 +206,23 @@
         ->implode(', ');
 @endphp
 
-<div class="sheet cover">
+{{-- COVER --}}
+<section class="sheet cover">
     <div class="cover-title">
         <h1>Jurnal Pembelajaran</h1>
         <h2>Semester {{ $activeSemester->tipe }} Tahun Pelajaran {{ $activeSemester->nama_tahun }}</h2>
         <div class="cover-kelas">Kelas : {{ $daftarKelas !== '' ? $daftarKelas : '—' }}</div>
     </div>
 
-    <div class="cover-logo-wrap">
-        <img src="{{ asset('img/logo-kemenag.png') }}" alt="Logo Kemenag" class="cover-logo">
-    </div>
+    <img src="{{ asset('img/logo-kemenag.png') }}" alt="Logo Kemenag" class="cover-logo">
 
-    <div class="cover-spacer"></div>
-
-    <div class="cover-guru">
+    <div class="cover-bottom">
         <div class="nama">{{ $guru->nama_lengkap }}</div>
         <div class="nip">NIP. {{ $guru->username }}</div>
-    </div>
-
-    <div class="cover-spacer"></div>
-
-    <div class="cover-school">
         <div class="school">MTsN 11 Majalengka</div>
         <div class="agency">Kementerian Agama Kabupaten Majalengka</div>
     </div>
-</div>
+</section>
 
 @foreach($sections as $section)
     @php
@@ -275,7 +230,7 @@
         $rows = $section['rows'] ?? [];
         $namaKelas = $kelasShort($kelas?->nama_kelas);
     @endphp
-    <div class="sheet paper section-page">
+    <section class="sheet paper section-page">
         <div class="title">
             <h1>Jurnal Pembelajaran</h1>
             <h2>Semester {{ $activeSemester->tipe }} Tahun Pelajaran {{ $activeSemester->nama_tahun }}</h2>
@@ -284,15 +239,24 @@
 
         <div class="table-wrap">
             <table>
+                <colgroup>
+                    <col style="width:4%">
+                    <col style="width:15%">
+                    <col style="width:14%">
+                    <col style="width:23%">
+                    <col style="width:12%">
+                    <col style="width:16%">
+                    <col style="width:16%">
+                </colgroup>
                 <thead>
                     <tr>
-                        <th style="width:4%">No</th>
-                        <th style="width:15%">Hari, Tanggal<br>Waktu</th>
-                        <th style="width:14%">Mata Pelajaran</th>
-                        <th style="width:23%">Materi Pokok Bahasan</th>
-                        <th style="width:12%">Ketercapaian</th>
-                        <th style="width:16%">Penugasan Siswa</th>
-                        <th style="width:16%">Catatan Guru</th>
+                        <th>No</th>
+                        <th>Hari, Tanggal<br>Waktu</th>
+                        <th>Mata Pelajaran</th>
+                        <th>Materi Pokok Bahasan</th>
+                        <th>Ketercapaian</th>
+                        <th>Penugasan Siswa</th>
+                        <th>Catatan Guru</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -336,7 +300,36 @@
                 <div class="sign-nip">NIP. {{ $guru->username }}</div>
             </div>
         </div>
-    </div>
+    </section>
 @endforeach
+
+<script>
+(function () {
+    function fitToScreen() {
+        if (window.matchMedia && window.matchMedia('print').matches) {
+            document.body.style.zoom = '';
+            return;
+        }
+        var sheet = document.querySelector('.sheet');
+        if (!sheet) return;
+        var pageW = sheet.offsetWidth || 1123;
+        var vw = window.innerWidth || pageW;
+        var scale = (vw - 12) / pageW;
+        if (scale > 0 && scale < 1.01) {
+            document.body.style.zoom = String(Math.max(0.25, Math.min(scale, 1)));
+        }
+    }
+    window.fitToScreen = fitToScreen;
+    window.addEventListener('load', fitToScreen);
+    window.addEventListener('resize', fitToScreen);
+    window.prepareGuruPrint = function (done) {
+        document.body.style.zoom = '';
+        if (typeof done === 'function') setTimeout(done, 50);
+    };
+    window.finishGuruPrint = function () { fitToScreen(); };
+    setTimeout(fitToScreen, 80);
+    setTimeout(fitToScreen, 300);
+})();
+</script>
 </body>
 </html>
