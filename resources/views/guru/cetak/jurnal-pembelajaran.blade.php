@@ -71,29 +71,46 @@
             }
             .jurnal-doc {
                 transform: none !important;
+                width: 100% !important;
             }
             .main-paper {
                 width: 100% !important;
-                min-height: 0 !important;
                 margin: 0 !important;
-                padding: 0 !important;
                 box-shadow: none !important;
             }
-            .cover-paper {
-                height: auto !important;
-                min-height: 0 !important;
-                page-break-after: always !important;
-                break-after: page !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-            }
             .kelas-paper {
+                min-height: 0 !important;
+                padding: 0 !important;
                 page-break-before: always !important;
                 break-before: page !important;
             }
             .kelas-paper:last-child {
                 page-break-after: auto !important;
                 break-after: auto !important;
+            }
+            /* Cover: pertahankan tinggi penuh + flex agar logo tengah & nama di bawah (seperti LKB) */
+            .main-paper.cover-paper {
+                /* 210mm halaman - margin @page 8mm atas + 8mm bawah */
+                height: 194mm !important;
+                min-height: 194mm !important;
+                padding: 16mm 18mm 14mm !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
+            .cover-paper .cover-title {
+                padding-top: 4mm;
+            }
+            .cover-paper .cover-logo-area {
+                flex: 1 1 auto !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                min-height: 45mm !important;
             }
             thead { display: table-header-group; }
             tr { page-break-inside: avoid; break-inside: avoid; }
