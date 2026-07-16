@@ -60,6 +60,9 @@ class GuruDashboardController extends Controller
             'jtm_hari_ini' => $jadwalHariIni->count(),
             'tpg_status' => $tpgStatus,
             'jadwal_hari_ini' => $jadwalHariIni->map(fn ($j) => [
+                'jadwal_id' => $j->id,
+                'kelas_id' => $j->bebanMengajar?->kelas_id,
+                'mapel_id' => $j->bebanMengajar?->mapel_id,
                 'jam_ke' => $j->jam_ke,
                 'waktu' => $this->jamPelajaranService->waktuFor($hariIni, (int) $j->jam_ke),
                 'mapel' => $j->bebanMengajar?->mapel?->nama_mapel,
@@ -89,6 +92,9 @@ class GuruDashboardController extends Controller
             ->orderBy('jam_ke')
             ->get()
             ->map(fn ($j) => [
+                'jadwal_id' => $j->id,
+                'kelas_id' => $j->bebanMengajar?->kelas_id,
+                'mapel_id' => $j->bebanMengajar?->mapel_id,
                 'hari' => $j->hari,
                 'jam_ke' => $j->jam_ke,
                 'waktu' => $this->jamPelajaranService->waktuFor($j->hari, (int) $j->jam_ke),
