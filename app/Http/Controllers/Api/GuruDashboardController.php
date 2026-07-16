@@ -41,7 +41,7 @@ class GuruDashboardController extends Controller
         $tpgStatus = $this->buildTpgStatus($guru, $semester?->id);
         if ($semester) {
             $jadwalHariIni = Jadwal::where('semester_id', $semester->id)
-                ->whereRaw('LOWER(hari) = ?', [strtolower($hariIni)])
+                ->whereRaw('LOWER(TRIM(hari)) = ?', [strtolower($hariIni)])
                 ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $guru->id))
                 ->with(['bebanMengajar.mapel:id,nama_mapel', 'bebanMengajar.kelas:id,nama_kelas'])
                 ->orderBy('jam_ke')
@@ -63,7 +63,7 @@ class GuruDashboardController extends Controller
                 'jadwal_id' => $j->id,
                 'kelas_id' => $j->bebanMengajar?->kelas_id,
                 'mapel_id' => $j->bebanMengajar?->mapel_id,
-                'jam_ke' => $j->jam_ke,
+                'jam_ke' => (int) $j->jam_ke,
                 'waktu' => $this->jamPelajaranService->waktuFor($hariIni, (int) $j->jam_ke),
                 'mapel' => $j->bebanMengajar?->mapel?->nama_mapel,
                 'kelas' => $j->bebanMengajar?->kelas?->nama_kelas,
@@ -77,40 +77,64 @@ class GuruDashboardController extends Controller
         $guru = Guru::where('username', $user->username)->first();
 
         if (!$guru) {
-            return response()->json(['success' => true, 'jadwal' => []]);
+            return response()->json(['success' => true, 'jadwal' => [], 'meta' => ['total' => 0]]);
         }
 
         $semester = $this->semesterService->getActiveSemester();
         if (!$semester) {
-            return response()->json(['success' => true, 'jadwal' => []]);
+            return response()->json(['success' => true, 'jadwal' => [], 'meta' => ['total' => 0]]);
         }
 
         $jadwal = Jadwal::where('semester_id', $semester->id)
             ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $guru->id))
             ->with(['bebanMengajar.mapel:id,nama_mapel', 'bebanMengajar.kelas:id,nama_kelas'])
-            ->orderByRaw("FIELD(hari, 'Senin','Selasa','Rabu','Kamis','Jumat','Sabtu')")
+            ->orderByRaw("FIELD(LOWER(TRIM(hari)), 'senin','selasa','rabu','kamis','jumat','sabtu')")
             ->orderBy('jam_ke')
             ->get()
             ->map(fn ($j) => [
                 'jadwal_id' => $j->id,
                 'kelas_id' => $j->bebanMengajar?->kelas_id,
                 'mapel_id' => $j->bebanMengajar?->mapel_id,
-                'hari' => $j->hari,
-                'jam_ke' => $j->jam_ke,
+                'hari' => $this->normalizeHari((string) $j->hari),
+                'jam_ke' => (int) $j->jam_ke,
                 'waktu' => $this->jamPelajaranService->waktuFor($j->hari, (int) $j->jam_ke),
                 'mapel' => $j->bebanMengajar?->mapel?->nama_mapel,
                 'kelas' => $j->bebanMengajar?->kelas?->nama_kelas,
             ])
             ->values();
 
-        return response()->json(['success' => true, 'jadwal' => $jadwal]);
+        return response()->json([
+            'success' => true,
+            'jadwal' => $jadwal,
+            'meta' => [
+                'total' => $jadwal->count(),
+                'semester_id' => $semester->id,
+                'guru_id' => $guru->id,
+            ],
+        ]);
     }
 
     private function hariIndonesia(): string
     {
         $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
-        return $days[(int) date('w')];
+        return $days[(int) now('Asia/Jakarta')->format('w')];
+    }
+
+    private function normalizeHari(string $hari): string
+    {
+        $cleaned = strtolower(trim(str_replace(["'", '`'], '', $hari)));
+
+        return match ($cleaned) {
+            'senin' => 'Senin',
+            'selasa' => 'Selasa',
+            'rabu' => 'Rabu',
+            'kamis' => 'Kamis',
+            'jumat' => 'Jumat',
+            'sabtu' => 'Sabtu',
+            'minggu' => 'Minggu',
+            default => ucfirst($cleaned),
+        };
     }
 
     private function buildTpgStatus(Guru $guru, ?int $semesterId): array
