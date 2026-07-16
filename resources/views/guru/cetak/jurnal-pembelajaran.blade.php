@@ -136,6 +136,9 @@
                 color: #333;
                 padding-bottom: 1mm;
             }
+            .kelas-bottom-left .page-number::before {
+                content: counter(page);
+            }
         }
 
         .jurnal-doc {
@@ -474,7 +477,9 @@
                 </div>
 
                 <div class="kelas-page-footer-screen">Kelas {{ $namaKelas }}</div>
-                <div class="kelas-bottom-left">Kelas {{ $namaKelas }}</div>
+                <div class="kelas-bottom-left">
+                    Kelas {{ $namaKelas }} — Halaman <span class="page-number"></span>
+                </div>
             </div>
         @endforeach
     </div>
