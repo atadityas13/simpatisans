@@ -113,10 +113,24 @@
                 min-height: 45mm !important;
             }
             thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
             tr { page-break-inside: avoid; break-inside: avoid; }
+            .kelas-footer-block {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            }
             .sign-wrap {
                 page-break-inside: avoid !important;
                 break-inside: avoid !important;
+            }
+            .kelas-page-footer td {
+                border-left: 1pt solid #000 !important;
+                border-right: 1pt solid #000 !important;
+                border-bottom: 1pt solid #000 !important;
+                border-top: none !important;
+            }
+            .page-info::before {
+                content: "Halaman " counter(page) " dari " counter(pages);
             }
         }
 
@@ -242,6 +256,52 @@
         td.center { text-align: center; vertical-align: middle; }
         .waktu-line { font-size: 8pt; margin-top: 2px; }
 
+        tfoot { display: table-footer-group; }
+        .kelas-page-footer td {
+            text-align: center;
+            font-size: 8pt;
+            font-style: italic;
+            padding: 2mm 3px;
+            background: #fff;
+            border-top: none;
+        }
+        @media screen {
+            .page-info::before {
+                content: "Halaman — dari —";
+            }
+            .kelas-table-main tfoot,
+            .kelas-table-ending tfoot {
+                display: none;
+            }
+            .kelas-page-footer-screen {
+                display: block;
+                text-align: center;
+                font-size: 8pt;
+                font-style: italic;
+                margin-top: 5mm;
+                color: #444;
+            }
+        }
+        .kelas-page-footer-screen {
+            display: none;
+        }
+
+        .kelas-table-main.no-body-rows {
+            border-bottom: none;
+        }
+        .kelas-table-main.has-body-rows {
+            margin-bottom: 0;
+        }
+        .kelas-table-ending {
+            border-top: none;
+            margin-top: -1.5pt;
+        }
+
+        .kelas-footer-block {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
         .sign-wrap {
             margin-top: 8mm;
             display: flex;
@@ -313,6 +373,11 @@
                 $kelas = $section['kelas'];
                 $rows = $section['rows'] ?? [];
                 $namaKelas = $kelasShort($kelas?->nama_kelas);
+                $rowCount = count($rows);
+                $mainRows = $rowCount > 1 ? array_slice($rows, 0, -1) : [];
+                $lastRow = $rowCount > 0 ? $rows[$rowCount - 1] : null;
+                $lastIndex = $rowCount - 1;
+                $mainTableClass = 'kelas-table kelas-table-main' . ($rowCount > 1 ? ' has-body-rows' : ' no-body-rows');
             @endphp
             <div class="main-paper kelas-paper">
                 <div class="section-title">
@@ -321,7 +386,7 @@
                     <h2 class="kelas-line">Kelas {{ $namaKelas }}</h2>
                 </div>
 
-                <table>
+                <table class="{{ $mainTableClass }}">
                     <colgroup>
                         <col style="width:4%">
                         <col style="width:15%">
@@ -343,45 +408,91 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($rows as $index => $row)
-                            <tr>
-                                <td class="center">{{ $index + 1 }}</td>
-                                <td>
-                                    {{ $row['hari'] }}, {{ $formatTanggal($row['tanggal']) }}
-                                    @if(!empty($row['waktu']))
-                                        <div class="waktu-line">{{ $row['waktu'] }}</div>
-                                    @endif
-                                </td>
-                                <td>{{ $row['mapel'] ?? '—' }}</td>
-                                <td>{{ $row['materi_pokok'] }}</td>
-                                <td class="center">{{ $labelKetercapaian($row['ketercapaian'] ?? '') }}</td>
-                                <td>{{ $row['penugasan_siswa'] ?: '—' }}</td>
-                                <td>{{ $row['catatan_guru'] ?: '—' }}</td>
-                            </tr>
-                        @empty
+                        @if($rowCount > 1)
+                            @foreach($mainRows as $index => $row)
+                                <tr>
+                                    <td class="center">{{ $index + 1 }}</td>
+                                    <td>
+                                        {{ $row['hari'] }}, {{ $formatTanggal($row['tanggal']) }}
+                                        @if(!empty($row['waktu']))
+                                            <div class="waktu-line">{{ $row['waktu'] }}</div>
+                                        @endif
+                                    </td>
+                                    <td>{{ $row['mapel'] ?? '—' }}</td>
+                                    <td>{{ $row['materi_pokok'] }}</td>
+                                    <td class="center">{{ $labelKetercapaian($row['ketercapaian'] ?? '') }}</td>
+                                    <td>{{ $row['penugasan_siswa'] ?: '—' }}</td>
+                                    <td>{{ $row['catatan_guru'] ?: '—' }}</td>
+                                </tr>
+                            @endforeach
+                        @elseif($rowCount === 0)
                             <tr>
                                 <td colspan="7" class="center">Belum ada entri jurnal.</td>
                             </tr>
-                        @endforelse
+                        @endif
                     </tbody>
+                    <tfoot>
+                        <tr class="kelas-page-footer">
+                            <td colspan="7">Kelas {{ $namaKelas }} — <span class="page-info"></span></td>
+                        </tr>
+                    </tfoot>
                 </table>
 
-                <div class="sign-wrap">
-                    <div class="sign-box">
-                        <div>Mengetahui,</div>
-                        <div>{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }}</div>
-                        <div class="sign-space"></div>
-                        <div class="sign-name">{{ $kepalaMadrasah?->nama_lengkap ?? '................................' }}</div>
-                        <div class="sign-nip">NIP. {{ $kepalaMadrasah?->username ?? '................' }}</div>
-                    </div>
-                    <div class="sign-box">
-                        <div>{{ $tempatCetak }}, {{ $formatTanggal($tanggalCetak) }}</div>
-                        <div>Guru Pengampu</div>
-                        <div class="sign-space"></div>
-                        <div class="sign-name">{{ $guru->nama_lengkap }}</div>
-                        <div class="sign-nip">NIP. {{ $guru->username }}</div>
+                <div class="kelas-footer-block">
+                    @if($lastRow)
+                        <table class="kelas-table kelas-table-ending">
+                            <colgroup>
+                                <col style="width:4%">
+                                <col style="width:15%">
+                                <col style="width:14%">
+                                <col style="width:23%">
+                                <col style="width:12%">
+                                <col style="width:16%">
+                                <col style="width:16%">
+                            </colgroup>
+                            <tbody>
+                                <tr>
+                                    <td class="center">{{ $lastIndex + 1 }}</td>
+                                    <td>
+                                        {{ $lastRow['hari'] }}, {{ $formatTanggal($lastRow['tanggal']) }}
+                                        @if(!empty($lastRow['waktu']))
+                                            <div class="waktu-line">{{ $lastRow['waktu'] }}</div>
+                                        @endif
+                                    </td>
+                                    <td>{{ $lastRow['mapel'] ?? '—' }}</td>
+                                    <td>{{ $lastRow['materi_pokok'] }}</td>
+                                    <td class="center">{{ $labelKetercapaian($lastRow['ketercapaian'] ?? '') }}</td>
+                                    <td>{{ $lastRow['penugasan_siswa'] ?: '—' }}</td>
+                                    <td>{{ $lastRow['catatan_guru'] ?: '—' }}</td>
+                                </tr>
+                            </tbody>
+                            <tfoot>
+                                <tr class="kelas-page-footer">
+                                    <td colspan="7">Kelas {{ $namaKelas }} — <span class="page-info"></span></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    @endif
+
+                    <div class="sign-wrap">
+                        <div class="sign-box">
+                            <div>Mengetahui,</div>
+                            <div>{{ $cetakPejabatLabel ?? 'Kepala Madrasah' }}</div>
+                            <div class="sign-space"></div>
+                            <div class="sign-name">{{ $kepalaMadrasah?->nama_lengkap ?? '................................' }}</div>
+                            <div class="sign-nip">NIP. {{ $kepalaMadrasah?->username ?? '................' }}</div>
+                        </div>
+                        <div class="sign-box">
+                            <div>{{ $tempatCetak }}, {{ $formatTanggal($tanggalCetak) }}</div>
+                            <div>Guru Pengampu</div>
+                            <div class="sign-space"></div>
+                            <div class="sign-name">{{ $guru->nama_lengkap }}</div>
+                            <div class="sign-nip">NIP. {{ $guru->username }}</div>
+                        </div>
                     </div>
                 </div>
+
+                <div class="kelas-page-footer-screen">Kelas {{ $namaKelas }} — Halaman — dari —</div>
             </div>
         @endforeach
     </div>
