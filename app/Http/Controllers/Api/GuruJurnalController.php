@@ -9,10 +9,12 @@ use App\Models\JurnalPembelajaran;
 use App\Models\Kelas;
 use App\Models\TugasTambahan;
 use App\Services\CetakPresetService;
+use App\Services\JamPelajaranService;
 use App\Services\SemesterService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -21,6 +23,7 @@ class GuruJurnalController extends Controller
     public function __construct(
         private SemesterService $semesterService,
         private CetakPresetService $cetakPresetService,
+        private JamPelajaranService $jamPelajaranService,
     ) {
     }
 
@@ -190,6 +193,46 @@ class GuruJurnalController extends Controller
         ]);
     }
 
+    public function cetakSemua(Request $request): Response
+    {
+        $guru = Guru::where('username', $request->user()->username)->first();
+        if (! $guru) {
+            return response('Profil guru tidak ditemukan.', 404);
+        }
+
+        $semester = $this->semesterService->getActiveSemester();
+        if (! $semester) {
+            return response('Tidak ada semester aktif.', 404);
+        }
+
+        $entries = JurnalPembelajaran::where('guru_id', $guru->id)
+            ->where('semester_id', $semester->id)
+            ->with(['mapel:id,nama_mapel', 'kelas:id,nama_kelas,tingkat'])
+            ->orderBy('kelas_id')
+            ->orderBy('tanggal')
+            ->orderBy('jam_ke')
+            ->get();
+
+        if ($entries->isEmpty()) {
+            return response('Belum ada entri jurnal untuk dicetak. Isi jurnal minimal satu kelas terlebih dahulu.', 422);
+        }
+
+        $sections = $entries
+            ->groupBy('kelas_id')
+            ->map(function (Collection $kelasEntries) {
+                $kelas = $kelasEntries->first()?->kelas;
+
+                return [
+                    'kelas' => $kelas,
+                    'rows' => $this->buildCetakRows($kelasEntries),
+                ];
+            })
+            ->sortBy(fn ($section) => $section['kelas']?->nama_kelas ?? '')
+            ->values();
+
+        return $this->renderJurnalCetak($guru, $semester, $sections);
+    }
+
     public function cetak(Request $request, Kelas $kelas): Response
     {
         $guru = Guru::where('username', $request->user()->username)->first();
@@ -209,7 +252,7 @@ class GuruJurnalController extends Controller
         $entries = JurnalPembelajaran::where('guru_id', $guru->id)
             ->where('semester_id', $semester->id)
             ->where('kelas_id', $kelas->id)
-            ->with(['mapel:id,nama_mapel'])
+            ->with(['mapel:id,nama_mapel', 'kelas:id,nama_kelas,tingkat'])
             ->orderBy('tanggal')
             ->orderBy('jam_ke')
             ->get();
@@ -218,6 +261,19 @@ class GuruJurnalController extends Controller
             return response('Belum ada entri jurnal untuk kelas ini.', 422);
         }
 
+        $sections = collect([[
+            'kelas' => $kelas,
+            'rows' => $this->buildCetakRows($entries),
+        ]]);
+
+        return $this->renderJurnalCetak($guru, $semester, $sections);
+    }
+
+    /**
+     * @param  Collection<int, array{kelas:?Kelas, rows:list<array<string, mixed>>}>  $sections
+     */
+    private function renderJurnalCetak(Guru $guru, $semester, Collection $sections): Response
+    {
         $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semester) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
                 ->where('semester_id', $semester->id);
@@ -228,9 +284,8 @@ class GuruJurnalController extends Controller
             array_merge(
                 [
                     'activeSemester' => $semester,
-                    'kelas' => $kelas,
                     'guru' => $guru,
-                    'entries' => $entries,
+                    'sections' => $sections,
                     'kepalaMadrasah' => $kepalaMadrasah,
                     'tempatCetak' => 'Majalengka',
                     'tanggalCetak' => now('Asia/Jakarta'),
@@ -238,6 +293,82 @@ class GuruJurnalController extends Controller
                 $this->cetakPresetService->viewData(),
             )
         );
+    }
+
+    /**
+     * Gabungkan baris jam berurutan pada tanggal+mapel yang sama.
+     *
+     * @return list<array{hari:string, tanggal:?Carbon, waktu:?string, mapel:?string, materi_pokok:string, ketercapaian:string, penugasan_siswa:?string, catatan_guru:?string}>
+     */
+    private function buildCetakRows(Collection $entries): array
+    {
+        $sorted = $entries->sortBy([
+            fn ($e) => optional($e->tanggal)->format('Y-m-d') ?? '',
+            fn ($e) => (int) $e->mapel_id,
+            fn ($e) => (int) $e->jam_ke,
+            fn ($e) => (int) $e->id,
+        ])->values();
+
+        $rows = [];
+        $buffer = null;
+
+        $flush = function () use (&$buffer, &$rows) {
+            if ($buffer === null) {
+                return;
+            }
+            $hari = (string) ($buffer['hari'] ?? '');
+            $rows[] = [
+                'hari' => $hari,
+                'tanggal' => $buffer['tanggal'],
+                'waktu' => $this->jamPelajaranService->waktuRangeFor($hari, $buffer['jam_list']),
+                'mapel' => $buffer['mapel'],
+                'materi_pokok' => $buffer['materi_pokok'],
+                'ketercapaian' => $buffer['ketercapaian'],
+                'penugasan_siswa' => $buffer['penugasan_siswa'],
+                'catatan_guru' => $buffer['catatan_guru'],
+            ];
+            $buffer = null;
+        };
+
+        foreach ($sorted as $entry) {
+            $tanggalKey = optional($entry->tanggal)->format('Y-m-d');
+            $mapelId = (int) $entry->mapel_id;
+            $jamKe = (int) $entry->jam_ke;
+            $canMerge = $buffer !== null
+                && $buffer['tanggal_key'] === $tanggalKey
+                && $buffer['mapel_id'] === $mapelId
+                && $buffer['materi_pokok'] === (string) $entry->materi_pokok
+                && $buffer['ketercapaian'] === (string) $entry->ketercapaian
+                && $jamKe === (max($buffer['jam_list']) + 1);
+
+            if ($canMerge) {
+                $buffer['jam_list'][] = $jamKe;
+                if (filled($entry->penugasan_siswa) && blank($buffer['penugasan_siswa'])) {
+                    $buffer['penugasan_siswa'] = $entry->penugasan_siswa;
+                }
+                if (filled($entry->catatan_guru) && blank($buffer['catatan_guru'])) {
+                    $buffer['catatan_guru'] = $entry->catatan_guru;
+                }
+                continue;
+            }
+
+            $flush();
+            $buffer = [
+                'tanggal_key' => $tanggalKey,
+                'tanggal' => $entry->tanggal,
+                'hari' => $entry->hari,
+                'mapel_id' => $mapelId,
+                'mapel' => $entry->mapel?->nama_mapel,
+                'jam_list' => [$jamKe],
+                'materi_pokok' => (string) $entry->materi_pokok,
+                'ketercapaian' => (string) $entry->ketercapaian,
+                'penugasan_siswa' => $entry->penugasan_siswa,
+                'catatan_guru' => $entry->catatan_guru,
+            ];
+        }
+        $flush();
+
+        return $rows;
     }
 
     /**

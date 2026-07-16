@@ -15,6 +15,36 @@ class JamPelajaranService
         return $map[$jamKe] ?? null;
     }
 
+    /**
+     * Gabungkan rentang waktu untuk jam ke berurutan (mis. 1+2 → 07.15-08.25 WIB).
+     *
+     * @param  list<int>  $jamKeList
+     */
+    public function waktuRangeFor(string $hari, array $jamKeList): ?string
+    {
+        $jamKeList = array_values(array_unique(array_map('intval', $jamKeList)));
+        sort($jamKeList);
+        if ($jamKeList === []) {
+            return null;
+        }
+
+        $slots = [];
+        foreach ($jamKeList as $jamKe) {
+            $waktu = $this->waktuFor($hari, $jamKe);
+            if ($waktu === null || ! str_contains($waktu, '-')) {
+                continue;
+            }
+            [$mulai, $selesai] = array_map('trim', explode('-', $waktu, 2));
+            $slots[] = compact('mulai', 'selesai');
+        }
+
+        if ($slots === []) {
+            return null;
+        }
+
+        return $slots[0]['mulai'].'-'.$slots[array_key_last($slots)]['selesai'].' WIB';
+    }
+
     private function normalizeHari(string $hari): string
     {
         return ucfirst(strtolower(trim($hari)));
