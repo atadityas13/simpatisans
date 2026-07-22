@@ -103,7 +103,8 @@ class GuruJurnalController extends Controller
         $entries = $this->groupJournalEntries($entries)
             ->map(fn (Collection $group) => $this->formatGroupedEntry($group))
             ->sortByDesc('id')
-            ->values();
+            ->values()
+            ->all();
 
         $mapels = BebanMengajar::where('guru_id', $guru->id)
             ->where('semester_id', $semester->id)
@@ -298,8 +299,19 @@ class GuruJurnalController extends Controller
             return response()->json(['success' => false, 'message' => 'Jurnal tidak ditemukan.'], 404);
         }
 
-        $group = $this->findGroupForEntry($jurnal);
-        JurnalPembelajaran::whereIn('id', $group->pluck('id')->all())->delete();
+        // Hapus seluruh sesi pertemuan (semua jam di tanggal+mapel+materi yang sama),
+        // termasuk sisa baris orphan dari hapus sebagian sebelumnya.
+        $deleted = JurnalPembelajaran::where('guru_id', $jurnal->guru_id)
+            ->where('semester_id', $jurnal->semester_id)
+            ->where('kelas_id', $jurnal->kelas_id)
+            ->where('mapel_id', $jurnal->mapel_id)
+            ->whereDate('tanggal', optional($jurnal->tanggal)->format('Y-m-d'))
+            ->where('materi_pokok', $jurnal->materi_pokok)
+            ->delete();
+
+        if ($deleted === 0) {
+            $jurnal->delete();
+        }
 
         return response()->json([
             'success' => true,
