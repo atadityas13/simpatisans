@@ -52,10 +52,12 @@ class GuruJurnalController extends Controller
                     'nama' => $b->mapel?->nama_mapel,
                 ]);
 
-            $entryCount = JurnalPembelajaran::where('guru_id', $guru->id)
+            $kelasEntries = JurnalPembelajaran::where('guru_id', $guru->id)
                 ->where('semester_id', $semester->id)
                 ->where('kelas_id', $kelasId)
-                ->count();
+                ->get();
+
+            $entryCount = $this->groupJournalEntries($kelasEntries)->count();
 
             return [
                 'kelas_id' => (int) $kelasId,
@@ -96,8 +98,12 @@ class GuruJurnalController extends Controller
             ->where('kelas_id', $kelas->id)
             ->with(['mapel:id,nama_mapel'])
             ->orderByDesc('id')
-            ->get()
-            ->map(fn ($item) => $this->formatEntry($item));
+            ->get();
+
+        $entries = $this->groupJournalEntries($entries)
+            ->map(fn (Collection $group) => $this->formatGroupedEntry($group))
+            ->sortByDesc('id')
+            ->values();
 
         $mapels = BebanMengajar::where('guru_id', $guru->id)
             ->where('semester_id', $semester->id)
@@ -183,6 +189,8 @@ class GuruJurnalController extends Controller
         $jadwalIds = $validated['jadwal_ids'] ?? [];
         unset($validated['jam_list'], $validated['jadwal_ids']);
 
+        $originalGroupIds = $this->findGroupForEntry($jurnal)->pluck('id')->all();
+
         $primary = null;
         foreach ($jamList as $index => $jamKe) {
             $payload = $validated;
@@ -208,6 +216,12 @@ class GuruJurnalController extends Controller
             } else {
                 JurnalPembelajaran::create($payload);
             }
+        }
+
+        if ($originalGroupIds !== []) {
+            JurnalPembelajaran::whereIn('id', $originalGroupIds)
+                ->whereNotIn('jam_ke', $jamList)
+                ->delete();
         }
 
         return response()->json([
@@ -284,7 +298,8 @@ class GuruJurnalController extends Controller
             return response()->json(['success' => false, 'message' => 'Jurnal tidak ditemukan.'], 404);
         }
 
-        $jurnal->delete();
+        $group = $this->findGroupForEntry($jurnal);
+        JurnalPembelajaran::whereIn('id', $group->pluck('id')->all())->delete();
 
         return response()->json([
             'success' => true,
@@ -378,28 +393,52 @@ class GuruJurnalController extends Controller
                 ->where('semester_id', $semester->id);
         })->first();
 
-        return response()->view(
-            'guru.cetak.jurnal-pembelajaran',
-            array_merge(
-                [
-                    'activeSemester' => $semester,
-                    'guru' => $guru,
-                    'sections' => $sections,
-                    'kepalaMadrasah' => $kepalaMadrasah,
-                    'tempatCetak' => 'Majalengka',
-                    'tanggalCetak' => now('Asia/Jakarta'),
-                ],
-                $this->cetakPresetService->viewData(),
+        return response()
+            ->view(
+                'guru.cetak.jurnal-pembelajaran',
+                array_merge(
+                    [
+                        'activeSemester' => $semester,
+                        'guru' => $guru,
+                        'sections' => $sections,
+                        'kepalaMadrasah' => $kepalaMadrasah,
+                        'tempatCetak' => 'Majalengka',
+                        'tanggalCetak' => now('Asia/Jakarta'),
+                    ],
+                    $this->cetakPresetService->viewData(),
+                )
             )
-        );
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            ->header('Pragma', 'no-cache');
+    }
+
+    private function buildCetakRows(Collection $entries): array
+    {
+        return $this->groupJournalEntries($entries)
+            ->map(function (Collection $group) {
+                $primary = $group->sortBy('jam_ke')->first();
+                $jamList = $group->pluck('jam_ke')->map(fn ($j) => (int) $j)->sort()->values()->all();
+                $hari = (string) ($primary->hari ?? '');
+
+                return [
+                    'hari' => $hari,
+                    'tanggal' => $primary->tanggal,
+                    'waktu' => $this->jamPelajaranService->waktuRangeFor($hari, $jamList),
+                    'mapel' => $primary->mapel?->nama_mapel,
+                    'materi_pokok' => (string) $primary->materi_pokok,
+                    'ketercapaian' => (string) $primary->ketercapaian,
+                    'penugasan_siswa' => $group->pluck('penugasan_siswa')->first(fn ($v) => filled($v)),
+                    'catatan_guru' => $group->pluck('catatan_guru')->first(fn ($v) => filled($v)),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**
-     * Gabungkan baris jam berurutan pada tanggal+mapel yang sama.
-     *
-     * @return list<array{hari:string, tanggal:?Carbon, waktu:?string, mapel:?string, materi_pokok:string, ketercapaian:string, penugasan_siswa:?string, catatan_guru:?string}>
+     * @return Collection<int, Collection<int, JurnalPembelajaran>>
      */
-    private function buildCetakRows(Collection $entries): array
+    private function groupJournalEntries(Collection $entries): Collection
     {
         $sorted = $entries->sortBy([
             fn ($e) => optional($e->tanggal)->format('Y-m-d') ?? '',
@@ -408,66 +447,90 @@ class GuruJurnalController extends Controller
             fn ($e) => (int) $e->id,
         ])->values();
 
-        $rows = [];
-        $buffer = null;
-
-        $flush = function () use (&$buffer, &$rows) {
-            if ($buffer === null) {
-                return;
-            }
-            $hari = (string) ($buffer['hari'] ?? '');
-            $rows[] = [
-                'hari' => $hari,
-                'tanggal' => $buffer['tanggal'],
-                'waktu' => $this->jamPelajaranService->waktuRangeFor($hari, $buffer['jam_list']),
-                'mapel' => $buffer['mapel'],
-                'materi_pokok' => $buffer['materi_pokok'],
-                'ketercapaian' => $buffer['ketercapaian'],
-                'penugasan_siswa' => $buffer['penugasan_siswa'],
-                'catatan_guru' => $buffer['catatan_guru'],
-            ];
-            $buffer = null;
-        };
+        $groups = collect();
+        $current = collect();
 
         foreach ($sorted as $entry) {
-            $tanggalKey = optional($entry->tanggal)->format('Y-m-d');
-            $mapelId = (int) $entry->mapel_id;
-            $jamKe = (int) $entry->jam_ke;
-            $canMerge = $buffer !== null
-                && $buffer['tanggal_key'] === $tanggalKey
-                && $buffer['mapel_id'] === $mapelId
-                && $buffer['materi_pokok'] === (string) $entry->materi_pokok
-                && $buffer['ketercapaian'] === (string) $entry->ketercapaian
-                && $jamKe === (max($buffer['jam_list']) + 1);
-
-            if ($canMerge) {
-                $buffer['jam_list'][] = $jamKe;
-                if (filled($entry->penugasan_siswa) && blank($buffer['penugasan_siswa'])) {
-                    $buffer['penugasan_siswa'] = $entry->penugasan_siswa;
-                }
-                if (filled($entry->catatan_guru) && blank($buffer['catatan_guru'])) {
-                    $buffer['catatan_guru'] = $entry->catatan_guru;
-                }
+            if ($current->isEmpty()) {
+                $current->push($entry);
                 continue;
             }
 
-            $flush();
-            $buffer = [
-                'tanggal_key' => $tanggalKey,
-                'tanggal' => $entry->tanggal,
-                'hari' => $entry->hari,
-                'mapel_id' => $mapelId,
-                'mapel' => $entry->mapel?->nama_mapel,
-                'jam_list' => [$jamKe],
-                'materi_pokok' => (string) $entry->materi_pokok,
-                'ketercapaian' => (string) $entry->ketercapaian,
-                'penugasan_siswa' => $entry->penugasan_siswa,
-                'catatan_guru' => $entry->catatan_guru,
-            ];
-        }
-        $flush();
+            $last = $current->last();
+            $tanggalKey = optional($entry->tanggal)->format('Y-m-d');
+            $lastTanggalKey = optional($last->tanggal)->format('Y-m-d');
+            $jamKe = (int) $entry->jam_ke;
+            $lastJamKe = (int) $last->jam_ke;
+            $canMerge = $lastTanggalKey === $tanggalKey
+                && (int) $last->mapel_id === (int) $entry->mapel_id
+                && (string) $last->materi_pokok === (string) $entry->materi_pokok
+                && (string) $last->ketercapaian === (string) $entry->ketercapaian
+                && $jamKe === ($lastJamKe + 1);
 
-        return $rows;
+            if ($canMerge) {
+                $current->push($entry);
+                continue;
+            }
+
+            $groups->push($current);
+            $current = collect([$entry]);
+        }
+
+        if ($current->isNotEmpty()) {
+            $groups->push($current);
+        }
+
+        return $groups;
+    }
+
+    /**
+     * @return Collection<int, JurnalPembelajaran>
+     */
+    private function findGroupForEntry(JurnalPembelajaran $jurnal): Collection
+    {
+        $entries = JurnalPembelajaran::where('guru_id', $jurnal->guru_id)
+            ->where('semester_id', $jurnal->semester_id)
+            ->where('kelas_id', $jurnal->kelas_id)
+            ->where('mapel_id', $jurnal->mapel_id)
+            ->whereDate('tanggal', optional($jurnal->tanggal)->format('Y-m-d'))
+            ->orderBy('jam_ke')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($this->groupJournalEntries($entries) as $group) {
+            if ($group->contains('id', $jurnal->id)) {
+                return $group;
+            }
+        }
+
+        return collect([$jurnal]);
+    }
+
+    /**
+     * @param  Collection<int, JurnalPembelajaran>  $group
+     */
+    private function formatGroupedEntry(Collection $group): array
+    {
+        $primary = $group->sortBy('id')->first();
+        $jamList = $group->pluck('jam_ke')->map(fn ($j) => (int) $j)->sort()->values()->all();
+        $jadwalIds = $group->sortBy('jam_ke')->pluck('jadwal_id')->filter()->map(fn ($id) => (int) $id)->values()->all();
+
+        return [
+            'id' => $primary->id,
+            'kelas_id' => $primary->kelas_id,
+            'mapel_id' => $primary->mapel_id,
+            'mapel' => $primary->mapel?->nama_mapel,
+            'jadwal_id' => $jadwalIds[0] ?? $primary->jadwal_id,
+            'jadwal_ids' => $jadwalIds,
+            'tanggal' => optional($primary->tanggal)->format('Y-m-d'),
+            'hari' => $primary->hari,
+            'jam_ke' => $jamList[0] ?? (int) $primary->jam_ke,
+            'jam_list' => $jamList,
+            'materi_pokok' => $primary->materi_pokok,
+            'ketercapaian' => $primary->ketercapaian,
+            'penugasan_siswa' => $group->pluck('penugasan_siswa')->first(fn ($v) => filled($v)),
+            'catatan_guru' => $group->pluck('catatan_guru')->first(fn ($v) => filled($v)),
+        ];
     }
 
     /**
