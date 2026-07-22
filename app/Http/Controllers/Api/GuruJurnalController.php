@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\BebanMengajar;
 use App\Models\Guru;
+use App\Models\Jadwal;
 use App\Models\JurnalPembelajaran;
 use App\Models\Kelas;
 use App\Models\TugasTambahan;
@@ -139,12 +140,26 @@ class GuruJurnalController extends Controller
             return $validated;
         }
 
-        $entry = JurnalPembelajaran::create($validated);
+        $jamList = $validated['jam_list'];
+        $jadwalIds = $validated['jadwal_ids'] ?? [];
+        unset($validated['jam_list'], $validated['jadwal_ids']);
+
+        $created = [];
+        foreach ($jamList as $index => $jamKe) {
+            $payload = $validated;
+            $payload['jam_ke'] = $jamKe;
+            $payload['jadwal_id'] = $jadwalIds[$index] ?? $validated['jadwal_id'] ?? null;
+            $created[] = JurnalPembelajaran::create($payload)->load('mapel:id,nama_mapel');
+        }
+
+        $entry = $created[0];
 
         return response()->json([
             'success' => true,
-            'message' => 'Jurnal berhasil disimpan.',
-            'data' => $this->formatEntry($entry->load('mapel:id,nama_mapel')),
+            'message' => count($created) > 1
+                ? 'Jurnal berhasil disimpan untuk '.count($created).' jam pelajaran.'
+                : 'Jurnal berhasil disimpan.',
+            'data' => $this->formatEntry($entry),
         ], 201);
     }
 
@@ -164,12 +179,97 @@ class GuruJurnalController extends Controller
             return $validated;
         }
 
-        $jurnal->update($validated);
+        $jamList = $validated['jam_list'];
+        $jadwalIds = $validated['jadwal_ids'] ?? [];
+        unset($validated['jam_list'], $validated['jadwal_ids']);
+
+        $primary = null;
+        foreach ($jamList as $index => $jamKe) {
+            $payload = $validated;
+            $payload['jam_ke'] = $jamKe;
+            $payload['jadwal_id'] = $jadwalIds[$index] ?? $validated['jadwal_id'] ?? null;
+
+            if ($index === 0) {
+                $jurnal->update($payload);
+                $primary = $jurnal->fresh()->load('mapel:id,nama_mapel');
+                continue;
+            }
+
+            $existing = JurnalPembelajaran::where('guru_id', $guru->id)
+                ->where('semester_id', $semester->id)
+                ->where('kelas_id', $validated['kelas_id'])
+                ->where('mapel_id', $validated['mapel_id'])
+                ->whereDate('tanggal', $validated['tanggal'])
+                ->where('jam_ke', $jamKe)
+                ->first();
+
+            if ($existing) {
+                $existing->update($payload);
+            } else {
+                JurnalPembelajaran::create($payload);
+            }
+        }
 
         return response()->json([
             'success' => true,
             'message' => 'Jurnal berhasil diperbarui.',
-            'data' => $this->formatEntry($jurnal->fresh()->load('mapel:id,nama_mapel')),
+            'data' => $this->formatEntry($primary ?? $jurnal->fresh()->load('mapel:id,nama_mapel')),
+        ]);
+    }
+
+    public function jamOptions(Request $request, Kelas $kelas): JsonResponse
+    {
+        [$guru, $semester, $error] = $this->resolveContext($request);
+        if ($error) {
+            return $error;
+        }
+
+        if (! $this->guruOwnsKelas($guru->id, $semester->id, $kelas->id)) {
+            return response()->json(['success' => false, 'message' => 'Kelas tidak diampu pada semester aktif.'], 403);
+        }
+
+        $validated = $request->validate([
+            'tanggal' => ['required', 'date'],
+            'mapel_id' => ['required', 'integer', 'exists:mapels,id'],
+        ]);
+
+        $mapelId = (int) $validated['mapel_id'];
+        if (! $this->guruOwnsMapelKelas($guru->id, $semester->id, $kelas->id, $mapelId)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Mapel/kelas tidak diampu pada semester aktif.',
+            ], 422);
+        }
+
+        $tanggal = Carbon::parse($validated['tanggal'], 'Asia/Jakarta')->startOfDay();
+        $hari = $this->hariIndonesiaFromDate($tanggal);
+
+        $slots = Jadwal::where('semester_id', $semester->id)
+            ->where('hari', $hari)
+            ->whereHas('bebanMengajar', function ($q) use ($guru, $kelas, $mapelId) {
+                $q->where('guru_id', $guru->id)
+                    ->where('kelas_id', $kelas->id)
+                    ->where('mapel_id', $mapelId);
+            })
+            ->with(['bebanMengajar:id,guru_id,kelas_id,mapel_id'])
+            ->orderBy('jam_ke')
+            ->get();
+
+        $groups = $this->groupConsecutiveJamSlots($slots, $hari);
+
+        return response()->json([
+            'success' => true,
+            'hari' => $hari,
+            'kelas' => [
+                'id' => $kelas->id,
+                'nama_kelas' => $kelas->nama_kelas,
+            ],
+            'mapel_id' => $mapelId,
+            'tanggal' => $tanggal->toDateString(),
+            'data' => $groups,
+            'message' => $groups === []
+                ? 'Tidak ada jadwal mengajar untuk mapel/hari ini di kelas tersebut.'
+                : null,
         ]);
     }
 
@@ -411,8 +511,12 @@ class GuruJurnalController extends Controller
             'kelas_id' => ['required', 'integer', 'exists:kelas,id'],
             'mapel_id' => ['required', 'integer', 'exists:mapels,id'],
             'jadwal_id' => ['nullable', 'integer', 'exists:jadwals,id'],
+            'jadwal_ids' => ['nullable', 'array'],
+            'jadwal_ids.*' => ['integer', 'exists:jadwals,id'],
             'tanggal' => ['required', 'date'],
             'jam_ke' => ['nullable', 'integer', 'min:0', 'max:12'],
+            'jam_list' => ['nullable', 'array', 'min:1'],
+            'jam_list.*' => ['integer', 'min:1', 'max:12'],
             'materi_pokok' => ['required', 'string', 'max:5000'],
             'ketercapaian' => ['required', Rule::in(['tercapai', 'belum'])],
             'penugasan_siswa' => ['nullable', 'string', 'max:5000'],
@@ -421,7 +525,34 @@ class GuruJurnalController extends Controller
 
         $kelasId = (int) $validated['kelas_id'];
         $mapelId = (int) $validated['mapel_id'];
-        $jamKe = (int) ($validated['jam_ke'] ?? 0);
+
+        $jamList = collect($validated['jam_list'] ?? [])
+            ->map(fn ($j) => (int) $j)
+            ->filter(fn ($j) => $j > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($jamList === [] && isset($validated['jam_ke']) && (int) $validated['jam_ke'] > 0) {
+            $jamList = [(int) $validated['jam_ke']];
+        }
+
+        if ($jamList === []) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pilih jam pelajaran dari jadwal.',
+            ], 422);
+        }
+
+        sort($jamList);
+        for ($i = 1; $i < count($jamList); $i++) {
+            if ($jamList[$i] !== $jamList[$i - 1] + 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Jam pelajaran harus berurutan.',
+                ], 422);
+            }
+        }
 
         if (! $this->guruOwnsMapelKelas($guruId, $semesterId, $kelasId, $mapelId)) {
             return response()->json([
@@ -441,36 +572,91 @@ class GuruJurnalController extends Controller
 
         $hari = $this->hariIndonesiaFromDate($tanggal);
 
-        $duplicate = JurnalPembelajaran::where('guru_id', $guruId)
-            ->where('semester_id', $semesterId)
-            ->where('kelas_id', $kelasId)
-            ->where('mapel_id', $mapelId)
-            ->whereDate('tanggal', $tanggal->toDateString())
-            ->where('jam_ke', $jamKe)
-            ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
-            ->exists();
+        if ($ignoreId === null) {
+            $duplicate = JurnalPembelajaran::where('guru_id', $guruId)
+                ->where('semester_id', $semesterId)
+                ->where('kelas_id', $kelasId)
+                ->where('mapel_id', $mapelId)
+                ->whereDate('tanggal', $tanggal->toDateString())
+                ->whereIn('jam_ke', $jamList)
+                ->exists();
 
-        if ($duplicate) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Jurnal untuk mapel, tanggal, dan jam ke tersebut sudah ada.',
-            ], 422);
+            if ($duplicate) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Jurnal untuk mapel, tanggal, dan jam tersebut sudah ada.',
+                ], 422);
+            }
         }
+
+        $jadwalIds = collect($validated['jadwal_ids'] ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
 
         return [
             'guru_id' => $guruId,
             'semester_id' => $semesterId,
             'kelas_id' => $kelasId,
             'mapel_id' => $mapelId,
-            'jadwal_id' => $validated['jadwal_id'] ?? null,
+            'jadwal_id' => $validated['jadwal_id'] ?? ($jadwalIds[0] ?? null),
+            'jadwal_ids' => $jadwalIds,
             'tanggal' => $tanggal->toDateString(),
             'hari' => $hari,
-            'jam_ke' => $jamKe,
+            'jam_ke' => $jamList[0],
+            'jam_list' => $jamList,
             'materi_pokok' => trim($validated['materi_pokok']),
             'ketercapaian' => $validated['ketercapaian'],
             'penugasan_siswa' => isset($validated['penugasan_siswa']) ? trim((string) $validated['penugasan_siswa']) : null,
             'catatan_guru' => isset($validated['catatan_guru']) ? trim((string) $validated['catatan_guru']) : null,
         ];
+    }
+
+    /**
+     * @param  Collection<int, Jadwal>  $slots
+     * @return list<array{jam_list:list<int>, label:string, waktu:?string, jadwal_ids:list<int>}>
+     */
+    private function groupConsecutiveJamSlots(Collection $slots, string $hari): array
+    {
+        $groups = [];
+        $currentJam = [];
+        $currentIds = [];
+
+        $flush = function () use (&$groups, &$currentJam, &$currentIds, $hari) {
+            if ($currentJam === []) {
+                return;
+            }
+            $label = count($currentJam) === 1
+                ? 'Jam ke '.$currentJam[0]
+                : 'Jam ke '.$currentJam[0].'–'.$currentJam[array_key_last($currentJam)];
+
+            $groups[] = [
+                'jam_list' => $currentJam,
+                'label' => $label,
+                'waktu' => $this->jamPelajaranService->waktuRangeFor($hari, $currentJam),
+                'jadwal_ids' => $currentIds,
+            ];
+            $currentJam = [];
+            $currentIds = [];
+        };
+
+        foreach ($slots as $slot) {
+            $jamKe = (int) $slot->jam_ke;
+            if ($jamKe <= 0) {
+                continue;
+            }
+            if ($currentJam === [] || $jamKe === $currentJam[array_key_last($currentJam)] + 1) {
+                $currentJam[] = $jamKe;
+                $currentIds[] = (int) $slot->id;
+                continue;
+            }
+            $flush();
+            $currentJam[] = $jamKe;
+            $currentIds[] = (int) $slot->id;
+        }
+        $flush();
+
+        return $groups;
     }
 
     private function formatEntry(JurnalPembelajaran $item): array

@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->prefix('guru')->group(function () {
     Route::post('/jurnal', [GuruJurnalController::class, 'store']);
     Route::get('/jurnal/cetak', [GuruJurnalController::class, 'cetakSemua']);
     Route::get('/jurnal/{kelas}/cetak', [GuruJurnalController::class, 'cetak']);
+    Route::get('/jurnal/{kelas}/jam-options', [GuruJurnalController::class, 'jamOptions']);
     Route::get('/jurnal/{kelas}', [GuruJurnalController::class, 'show']);
     Route::put('/jurnal/{jurnal}', [GuruJurnalController::class, 'update']);
     Route::delete('/jurnal/{jurnal}', [GuruJurnalController::class, 'destroy']);
