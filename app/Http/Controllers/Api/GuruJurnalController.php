@@ -94,8 +94,7 @@ class GuruJurnalController extends Controller
             ->where('semester_id', $semester->id)
             ->where('kelas_id', $kelas->id)
             ->with(['mapel:id,nama_mapel'])
-            ->orderBy('tanggal')
-            ->orderBy('jam_ke')
+            ->orderByDesc('id')
             ->get()
             ->map(fn ($item) => $this->formatEntry($item));
 
