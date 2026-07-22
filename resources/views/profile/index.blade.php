@@ -92,7 +92,7 @@
 
                             @php
                                 $items = [
-                                    ['label' => 'NIP / NIK', 'value' => $guru->username ?? '—'],
+                                    ['label' => in_array($guru->status_pegawai ?? '', ['PNS', 'PPPK'], true) ? 'NIP' : 'NIK', 'value' => $guru->username ?? '—'],
                                     ['label' => 'Kode Guru', 'value' => $guru->kode_guru ?? '—', 'badge' => true],
                                     ['label' => 'NUPTK', 'value' => $guru->nuptk ?? '—'],
                                     ['label' => 'DUK', 'value' => $guru->duk ?? '—'],
