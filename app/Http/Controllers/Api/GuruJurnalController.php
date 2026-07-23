@@ -151,22 +151,20 @@ class GuruJurnalController extends Controller
         $jadwalIds = $validated['jadwal_ids'] ?? [];
         unset($validated['jam_list'], $validated['jadwal_ids']);
 
-        $created = [];
+        $created = collect();
         foreach ($jamList as $index => $jamKe) {
             $payload = $validated;
             $payload['jam_ke'] = $jamKe;
             $payload['jadwal_id'] = $jadwalIds[$index] ?? $validated['jadwal_id'] ?? null;
-            $created[] = JurnalPembelajaran::create($payload)->load('mapel:id,nama_mapel');
+            $created->push(JurnalPembelajaran::create($payload)->load('mapel:id,nama_mapel'));
         }
-
-        $entry = $created[0];
 
         return response()->json([
             'success' => true,
-            'message' => count($created) > 1
-                ? 'Jurnal berhasil disimpan untuk '.count($created).' jam pelajaran.'
+            'message' => $created->count() > 1
+                ? 'Jurnal berhasil disimpan untuk '.$created->count().' jam pelajaran.'
                 : 'Jurnal berhasil disimpan.',
-            'data' => $this->formatEntry($entry),
+            'data' => $this->formatGroupedEntry($created),
         ], 201);
     }
 
@@ -225,10 +223,13 @@ class GuruJurnalController extends Controller
                 ->delete();
         }
 
+        $primary = ($primary ?? $jurnal->fresh())->load('mapel:id,nama_mapel');
+        $group = $this->findGroupForEntry($primary);
+
         return response()->json([
             'success' => true,
             'message' => 'Jurnal berhasil diperbarui.',
-            'data' => $this->formatEntry($primary ?? $jurnal->fresh()->load('mapel:id,nama_mapel')),
+            'data' => $this->formatGroupedEntry($group),
         ]);
     }
 
@@ -426,9 +427,13 @@ class GuruJurnalController extends Controller
 
     private function buildCetakRows(Collection $entries): array
     {
+        // PDF: urut dari yang terdahulu ke terbaru (tanggal lalu jam paling awal).
         return $this->groupJournalEntries($entries)
             ->map(function (Collection $group) {
-                $primary = $group->sortBy('jam_ke')->first();
+                $primary = $group->sortBy([
+                    ['jam_ke', 'asc'],
+                    ['id', 'asc'],
+                ])->first();
                 $jamList = $group->pluck('jam_ke')->map(fn ($j) => (int) $j)->sort()->values()->all();
                 $hari = (string) ($primary->hari ?? '');
 
@@ -441,7 +446,18 @@ class GuruJurnalController extends Controller
                     'ketercapaian' => (string) $primary->ketercapaian,
                     'penugasan_siswa' => $group->pluck('penugasan_siswa')->first(fn ($v) => filled($v)),
                     'catatan_guru' => $group->pluck('catatan_guru')->first(fn ($v) => filled($v)),
+                    '_sort_tanggal' => optional($primary->tanggal)->format('Y-m-d') ?? '',
+                    '_sort_jam' => $jamList[0] ?? 0,
                 ];
+            })
+            ->sortBy([
+                ['_sort_tanggal', 'asc'],
+                ['_sort_jam', 'asc'],
+            ])
+            ->map(function (array $row) {
+                unset($row['_sort_tanggal'], $row['_sort_jam']);
+
+                return $row;
             })
             ->values()
             ->all();
@@ -452,12 +468,17 @@ class GuruJurnalController extends Controller
      */
     private function groupJournalEntries(Collection $entries): Collection
     {
-        $sorted = $entries->sortBy([
-            fn ($e) => optional($e->tanggal)->format('Y-m-d') ?? '',
-            fn ($e) => (int) $e->mapel_id,
-            fn ($e) => (int) $e->jam_ke,
-            fn ($e) => (int) $e->id,
-        ])->values();
+        // Jangan pakai sortBy([fn, fn, ...]) — Laravel menganggap itu sortByMultiple
+        // dan menghasilkan urutan acak, sehingga jam 3-4-5 gagal digabung.
+        $sorted = $entries
+            ->sortBy(fn ($e) => sprintf(
+                '%s-%010d-%03d-%010d',
+                optional($e->tanggal)->format('Y-m-d') ?? '',
+                (int) $e->mapel_id,
+                (int) $e->jam_ke,
+                (int) $e->id
+            ))
+            ->values();
 
         $groups = collect();
         $current = collect();
@@ -505,6 +526,7 @@ class GuruJurnalController extends Controller
             ->where('kelas_id', $jurnal->kelas_id)
             ->where('mapel_id', $jurnal->mapel_id)
             ->whereDate('tanggal', optional($jurnal->tanggal)->format('Y-m-d'))
+            ->with(['mapel:id,nama_mapel'])
             ->orderBy('jam_ke')
             ->orderBy('id')
             ->get();
