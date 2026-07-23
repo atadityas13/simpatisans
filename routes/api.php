@@ -40,6 +40,7 @@ Route::middleware('auth:sanctum')->prefix('guru')->group(function () {
 
     Route::get('/jurnal', [GuruJurnalController::class, 'index']);
     Route::post('/jurnal', [GuruJurnalController::class, 'store']);
+    Route::get('/jurnal/reminder-hari-ini', [GuruJurnalController::class, 'reminderHariIni']);
     Route::get('/jurnal/cetak', [GuruJurnalController::class, 'cetakSemua']);
     Route::get('/jurnal/{kelas}/cetak', [GuruJurnalController::class, 'cetak']);
     Route::get('/jurnal/{kelas}/jam-options', [GuruJurnalController::class, 'jamOptions']);

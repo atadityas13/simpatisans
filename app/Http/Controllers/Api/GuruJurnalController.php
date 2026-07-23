@@ -289,6 +289,95 @@ class GuruJurnalController extends Controller
         ]);
     }
 
+    /**
+     * Pertemuan hari ini (kelompok jam berurutan) yang belum punya jurnal lengkap.
+     */
+    public function reminderHariIni(Request $request): JsonResponse
+    {
+        [$guru, $semester, $error] = $this->resolveContext($request);
+        if ($error) {
+            return $error;
+        }
+
+        $today = now('Asia/Jakarta')->startOfDay();
+        $hari = $this->hariIndonesiaFromDate($today);
+
+        $slots = Jadwal::where('semester_id', $semester->id)
+            ->whereRaw('LOWER(TRIM(hari)) = ?', [strtolower($hari)])
+            ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $guru->id))
+            ->with([
+                'bebanMengajar:id,guru_id,kelas_id,mapel_id',
+                'bebanMengajar.kelas:id,nama_kelas',
+                'bebanMengajar.mapel:id,nama_mapel',
+            ])
+            ->orderBy('jam_ke')
+            ->get();
+
+        $coveredByKelasMapel = JurnalPembelajaran::where('guru_id', $guru->id)
+            ->where('semester_id', $semester->id)
+            ->whereDate('tanggal', $today->toDateString())
+            ->get()
+            ->groupBy(fn ($e) => ((int) $e->kelas_id).'-'.((int) $e->mapel_id))
+            ->map(fn (Collection $rows) => $rows->pluck('jam_ke')->map(fn ($j) => (int) $j)->unique()->values()->all());
+
+        $pending = [];
+        $groupedSlots = $slots->groupBy(function (Jadwal $jadwal) {
+            $beban = $jadwal->bebanMengajar;
+
+            return ((int) ($beban?->kelas_id ?? 0)).'-'.((int) ($beban?->mapel_id ?? 0));
+        });
+
+        foreach ($groupedSlots as $kelasMapelSlots) {
+            /** @var Collection<int, Jadwal> $kelasMapelSlots */
+            $sorted = $kelasMapelSlots->sortBy('jam_ke')->values();
+            $beban = $sorted->first()?->bebanMengajar;
+            if (! $beban) {
+                continue;
+            }
+
+            $kelasId = (int) $beban->kelas_id;
+            $mapelId = (int) $beban->mapel_id;
+            $covered = $coveredByKelasMapel->get($kelasId.'-'.$mapelId, []);
+            $groups = $this->groupConsecutiveJamSlots($sorted, $hari);
+
+            foreach ($groups as $group) {
+                $jamList = $group['jam_list'];
+                $allCovered = collect($jamList)->every(fn ($jam) => in_array((int) $jam, $covered, true));
+                if ($allCovered) {
+                    continue;
+                }
+
+                $pending[] = [
+                    'kelas_id' => $kelasId,
+                    'nama_kelas' => $beban->kelas?->nama_kelas,
+                    'mapel_id' => $mapelId,
+                    'nama_mapel' => $beban->mapel?->nama_mapel,
+                    'jam_list' => $jamList,
+                    'label' => $group['label'],
+                    'waktu' => $group['waktu'],
+                ];
+            }
+        }
+
+        usort($pending, function (array $a, array $b) {
+            $jamA = $a['jam_list'][0] ?? 0;
+            $jamB = $b['jam_list'][0] ?? 0;
+            if ($jamA !== $jamB) {
+                return $jamA <=> $jamB;
+            }
+
+            return strcmp((string) ($a['nama_kelas'] ?? ''), (string) ($b['nama_kelas'] ?? ''));
+        });
+
+        return response()->json([
+            'success' => true,
+            'tanggal' => $today->toDateString(),
+            'hari' => $hari,
+            'jumlah' => count($pending),
+            'data' => array_values($pending),
+        ]);
+    }
+
     public function destroy(Request $request, JurnalPembelajaran $jurnal): JsonResponse
     {
         [$guru, $semester, $error] = $this->resolveContext($request);
