@@ -193,6 +193,11 @@ class EmisGtkExportService
             return '';
         }
 
+        // Sudah format EMIS unik: 8-01, 9-06
+        if (preg_match('/^\d+-\d+$/', $rombel)) {
+            return $rombel;
+        }
+
         if (ctype_digit($rombel)) {
             return str_pad((string) (int) $rombel, 2, '0', STR_PAD_LEFT);
         }

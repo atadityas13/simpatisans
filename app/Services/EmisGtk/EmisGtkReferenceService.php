@@ -245,9 +245,13 @@ class EmisGtkReferenceService
         }
 
         if (preg_match('/\.(\d+)/', $namaKelas, $m)) {
-            $rombel = str_pad((string) (int) $m[1], 2, '0', STR_PAD_LEFT);
+            $rombelNum = str_pad((string) (int) $m[1], 2, '0', STR_PAD_LEFT);
 
-            return ['tingkat_emis' => $tingkatEmis, 'rombel_emis' => $rombel];
+            // EMIS-GTK lookup rombel by nama unik lintas tingkat → format 8-01, 9-02, …
+            return [
+                'tingkat_emis' => $tingkatEmis,
+                'rombel_emis' => $tingkatEmis.'-'.$rombelNum,
+            ];
         }
 
         return null;

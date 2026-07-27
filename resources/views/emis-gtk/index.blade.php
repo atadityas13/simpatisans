@@ -9,8 +9,8 @@
             <h2 class="text-2xl font-black text-gray-900 mb-2">Export Jadwal ke EMIS-GTK</h2>
             <p class="text-gray-500 font-medium max-w-3xl">
                 Generate file Excel sesuai template EMIS-GTK dari jadwal SimpatiSans.
-                Struktur mengikuti template resmi (boleh banyak tingkat dengan nama rombel sama, mis. 8/01 dan 9/01).
-                Pilih kelas yang akan diisi, lalu unduh dan upload ke EMIS-GTK.
+                Struktur mengikuti template resmi (kolom Kelas = tingkat, Rombel = nama unik seperti <strong>8-01</strong>, <strong>9-02</strong>).
+                Pastikan nama rombel di EMIS-GTK sudah memakai format ini agar import tidak error.
             </p>
         </div>
         <div class="absolute top-0 right-0 -translate-y-12 translate-x-12 w-64 h-64 bg-teal-50 rounded-full blur-3xl opacity-50"></div>
