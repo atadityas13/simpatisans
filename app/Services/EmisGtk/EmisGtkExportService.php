@@ -4,6 +4,7 @@ namespace App\Services\EmisGtk;
 
 use App\Models\Jadwal;
 use App\Models\Kelas;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
@@ -111,8 +112,8 @@ class EmisGtkExportService
                         continue;
                     }
 
-                    $sheet->setCellValue('D'.$row, $idGtk);
-                    $sheet->setCellValue($mapelCell, $idMapel);
+                    $sheet->setCellValueExplicit('D'.$row, (string) $idGtk, DataType::TYPE_STRING);
+                    $sheet->setCellValueExplicit($mapelCell, (string) $idMapel, DataType::TYPE_STRING);
                     $report['filled']++;
                 }
             }
@@ -206,8 +207,8 @@ class EmisGtkExportService
             $refRow = $refRows[$jam];
             $newRow = $sheet->getHighestRow() + 1;
 
-            $sheet->setCellValue('A'.$newRow, $tingkat);
-            $sheet->setCellValue('B'.$newRow, $rombel);
+            $sheet->setCellValueExplicit('A'.$newRow, (string) $tingkat, DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('B'.$newRow, (string) $rombel, DataType::TYPE_STRING);
             $sheet->setCellValue('C'.$newRow, $jam);
 
             $templateMapel = (string) $sheet->getCell('E'.$refRow)->getValue();
