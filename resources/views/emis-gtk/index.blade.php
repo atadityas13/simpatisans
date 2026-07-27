@@ -9,7 +9,8 @@
             <h2 class="text-2xl font-black text-gray-900 mb-2">Export Jadwal ke EMIS-GTK</h2>
             <p class="text-gray-500 font-medium max-w-3xl">
                 Generate file Excel sesuai template EMIS-GTK dari jadwal SimpatiSans.
-                Pilih kelas yang akan diekspor, lalu unduh dan upload ke EMIS-GTK.
+                Struktur mengikuti template resmi (boleh banyak tingkat dengan nama rombel sama, mis. 8/01 dan 9/01).
+                Pilih kelas yang akan diisi, lalu unduh dan upload ke EMIS-GTK.
             </p>
         </div>
         <div class="absolute top-0 right-0 -translate-y-12 translate-x-12 w-64 h-64 bg-teal-50 rounded-full blur-3xl opacity-50"></div>
@@ -26,6 +27,9 @@
         <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm space-y-2">
             <p class="font-black text-slate-800 uppercase text-xs tracking-widest">Laporan Export Terakhir</p>
             <p class="text-emerald-700 font-bold">Slot terisi: {{ $emisReport['filled'] ?? 0 }}</p>
+            @if(!empty($emisReport['skipped_tingkat_belum_di_template']))
+                <p class="text-amber-700"><strong>Belum ada di template EMIS:</strong> {{ implode(', ', $emisReport['skipped_tingkat_belum_di_template']) }}</p>
+            @endif
             @if(($emisReport['skipped_template'] ?? 0) > 0)
                 <p class="text-slate-600">Slot template dilewati: {{ $emisReport['skipped_template'] }}</p>
             @endif
