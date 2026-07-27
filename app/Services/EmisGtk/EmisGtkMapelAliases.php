@@ -28,6 +28,8 @@ class EmisGtkMapelAliases
             'Bahasa Sunda' => 'Muatan Lokal Bahasa Sunda',
             "Tahfidz Al-Qur'an" => "Tahfidz Alqur'an",
             "Baca Tulis Al-Qur'an" => "Muatan Lokal Baca Tulis Al-Qur'an",
+            'KKA' => 'Koding dan Kecerdasan Artifisial',
+            'Koding dan Kecerdasan Artifisial' => 'Koding dan Kecerdasan Artifisial',
         ];
     }
 
