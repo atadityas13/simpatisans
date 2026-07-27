@@ -57,6 +57,7 @@ Route::group(['middleware' => 'auth'], function () {
             Route::post('jadwal/update-slots-batch', [JadwalController::class, 'updateSlotsBatch'])->name('jadwal.update-slots-batch');
             Route::delete('jadwal/clear', [JadwalController::class, 'clear'])->name('jadwal.clear');
             Route::post('jadwal/toggle-constraint', [JadwalController::class, 'toggleConstraint'])->name('jadwal.toggle-constraint');
+            Route::get('emis-gtk', [EmisGtkController::class, 'index'])->name('emis-gtk.index');
             Route::post('emis-gtk/export', [EmisGtkController::class, 'export'])->name('emis-gtk.export');
             Route::post('emis-gtk/import-references', [EmisGtkController::class, 'importReferences'])->name('emis-gtk.import-references');
 

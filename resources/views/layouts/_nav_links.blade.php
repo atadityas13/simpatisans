@@ -1,4 +1,4 @@
-<div x-data="{ activeCategory: '{{ request()->is('master/*') ? 'master' : (request()->is('pengaturan/*') ? 'config' : 'manajemen') }}' }"
+<div x-data="{ activeCategory: '{{ request()->is('master/*') ? 'master' : (request()->is('pengaturan/*') || request()->is('config/*') ? 'config' : 'manajemen') }}' }"
     class="space-y-6">
 
     <!-- DASHBOARD (Standalone) -->
@@ -62,6 +62,15 @@
                             d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                     </svg>
                     <span x-show="sidebarOpen">Cetak</span>
+                </a>
+                <a href="/emis-gtk"
+                    class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('emis-gtk*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
+                    <svg class="transition-all duration-300 nav-icon-v06 w-4 h-4 mr-3 {{ request()->is('emis-gtk*') ? 'text-indigo-400' : 'text-slate-500 group-hover:text-indigo-400' }}"
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <span x-show="sidebarOpen">EMIS-GTK</span>
                 </a>
             </div>
         </div>
