@@ -9,7 +9,7 @@ class Guru extends Model
     protected $fillable = [
         'username', 'kode_guru', 'duk', 'status_pegawai', 'nama_guru', 'gelar_depan', 'gelar_belakang',
         'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir', 'agama', 'nomor_hp', 'email', 'alamat',
-        'nuptk', 'jabatan', 'golongan', 'status_sertifikasi', 'is_bk', 'mapel_ijazah_id', 'rumpun_ijazah_id', 'mapel_sertifikasi_id',
+        'nuptk', 'id_gtk', 'jabatan', 'golongan', 'status_sertifikasi', 'is_bk', 'mapel_ijazah_id', 'rumpun_ijazah_id', 'mapel_sertifikasi_id',
     ];
 
     protected $casts = [

@@ -57,6 +57,11 @@
                 </button>
 
                 @if($selectedSemester->is_active)
+                    <button @click="showEmisExport = true"
+                        class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 bg-teal-600 hover:bg-teal-700 text-white">
+                        <span>EXPORT EMIS-GTK</span>
+                    </button>
+
                     <button @click="showConstraintModal = true"
                         class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 bg-orange-500 hover:bg-orange-600 text-white">
                         <span>PRESET JADWAL</span>
@@ -120,6 +125,116 @@
                 <div class="mt-8 flex items-center justify-center gap-2 text-xs text-amber-600 font-bold animate-bounce">
                     <span>⚡</span>
                     <span>Mencari kombinasi matriks jadwal terbaik...</span>
+                </div>
+            </div>
+        </div>
+
+        @if(session('success'))
+            <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-4 text-sm font-medium">
+                {{ session('success') }}
+            </div>
+        @endif
+
+        @if(session('emis_export_report'))
+            @php $emisReport = session('emis_export_report'); @endphp
+            <div class="mb-4 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm space-y-2">
+                <p class="font-black text-slate-800 uppercase text-xs tracking-widest">Laporan Export EMIS-GTK</p>
+                <p class="text-emerald-700 font-bold">Slot terisi: {{ $emisReport['filled'] ?? 0 }}</p>
+                @if(($emisReport['skipped_template'] ?? 0) > 0)
+                    <p class="text-slate-600">Slot template dilewati: {{ $emisReport['skipped_template'] }}</p>
+                @endif
+                @if(!empty($emisReport['skipped_no_gtk']))
+                    <p class="text-amber-700"><strong>Tanpa ID GTK:</strong> {{ count($emisReport['skipped_no_gtk']) }} entri</p>
+                @endif
+                @if(!empty($emisReport['skipped_no_mapel']))
+                    <p class="text-amber-700"><strong>Tanpa ID Mapel EMIS:</strong> {{ count($emisReport['skipped_no_mapel']) }} entri</p>
+                @endif
+                @if(!empty($emisReport['skipped_no_emis_kelas']))
+                    <p class="text-red-700"><strong>Kelas tanpa kode EMIS:</strong> {{ implode(', ', $emisReport['skipped_no_emis_kelas']) }}</p>
+                @endif
+            </div>
+        @endif
+
+        @if(session('emis_import_summary'))
+            @php $emisImport = session('emis_import_summary'); @endphp
+            <div class="mb-4 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm space-y-1">
+                <p class="font-black text-blue-900 uppercase text-xs tracking-widest">Import Referensi EMIS</p>
+                <p>Mapel: {{ $emisImport['mapels']['updated'] ?? 0 }} diperbarui</p>
+                <p>Guru ID GTK: {{ $emisImport['gurus']['matched'] ?? 0 }} cocok</p>
+                <p>Kelas kode EMIS: {{ $emisImport['kelas']['updated'] ?? 0 }} diperbarui</p>
+            </div>
+        @endif
+
+        <!-- Modal Export EMIS-GTK -->
+        <div x-show="showEmisExport" x-cloak
+            class="fixed inset-0 z-[115] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md"
+            @keydown.escape.window="showEmisExport = false">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border-t-8 border-teal-600"
+                @click.away="showEmisExport = false">
+                <div class="p-4 border-b bg-teal-50 flex justify-between items-center shrink-0">
+                    <div>
+                        <h3 class="text-xl font-black text-teal-900 tracking-tighter uppercase">Export Jadwal EMIS-GTK</h3>
+                        <p class="text-[10px] text-teal-700 font-bold">Pilih kelas yang akan diekspor ke format template EMIS-GTK.</p>
+                    </div>
+                    <button @click="showEmisExport = false"
+                        class="text-teal-900 hover:bg-teal-200 p-2 rounded-full text-2xl transition">&times;</button>
+                </div>
+
+                <form method="POST" action="{{ route('emis-gtk.export') }}" class="flex-1 overflow-y-auto p-6 space-y-6">
+                    @csrf
+                    <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+
+                    @foreach($kelasList as $tingkat => $kelases)
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-xs font-black uppercase tracking-widest text-slate-500">Tingkat {{ $tingkat }}</h4>
+                                <button type="button"
+                                    class="text-[10px] font-bold text-teal-600 hover:text-teal-800"
+                                    onclick="document.querySelectorAll('.emis-kelas-{{ $tingkat }}').forEach(c => c.checked = true)">Pilih semua</button>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                @foreach($kelases as $kelas)
+                                    <label class="flex items-center gap-2 p-2 rounded-lg border border-slate-200 hover:bg-teal-50 cursor-pointer text-xs font-bold text-slate-700">
+                                        <input type="checkbox" name="kelas_ids[]" value="{{ $kelas->id }}"
+                                            class="emis-kelas-{{ $tingkat }} rounded border-teal-300 text-teal-600 focus:ring-teal-500"
+                                            checked>
+                                        <span>{{ str_replace('Kelas ', '', $kelas->nama_kelas) }}</span>
+                                        @if($kelas->tingkat_emis && $kelas->rombel_emis)
+                                            <span class="text-[9px] text-slate-400 font-mono">{{ $kelas->tingkat_emis }}/{{ $kelas->rombel_emis }}</span>
+                                        @endif
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endforeach
+
+                    <div class="flex gap-3 pt-2 border-t">
+                        <button type="submit"
+                            class="flex-1 bg-teal-600 hover:bg-teal-700 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-md">
+                            Download Excel
+                        </button>
+                        <button type="button" @click="showEmisExport = false"
+                            class="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-slate-500 hover:bg-slate-100">
+                            Batal
+                        </button>
+                    </div>
+                </form>
+
+                <div class="border-t bg-slate-50 p-4 text-[10px] text-slate-500 leading-relaxed">
+                    <p class="font-bold text-slate-600 uppercase tracking-widest mb-1">Update referensi EMIS</p>
+                    <form method="POST" action="{{ route('emis-gtk.import-references') }}" enctype="multipart/form-data" class="space-y-2">
+                        @csrf
+                        <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <label class="block"><span class="font-bold">PTK</span>
+                                <input type="file" name="referensi_ptk" accept=".xlsx" class="text-[10px] w-full"></label>
+                            <label class="block"><span class="font-bold">Mapel</span>
+                                <input type="file" name="referensi_pelajaran" accept=".xlsx" class="text-[10px] w-full"></label>
+                            <label class="block"><span class="font-bold">Template jadwal</span>
+                                <input type="file" name="template_jadwal" accept=".xlsx" class="text-[10px] w-full"></label>
+                        </div>
+                        <button type="submit" class="mt-2 text-teal-700 font-bold hover:text-teal-900">Upload & sinkronkan ke database</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -822,6 +937,7 @@
                         lastEditing: null,
                         showAnalysis: false,
                         showConstraintModal: false,
+                        showEmisExport: false,
                         // MODAL LOADING STATE (V2.6)
                         showLoading: false,
                         loadingCounter: 0,

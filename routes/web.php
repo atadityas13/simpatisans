@@ -8,6 +8,7 @@ use App\Http\Controllers\KelasController;
 use App\Http\Controllers\TugasTambahanController;
 use App\Http\Controllers\PembagianTugasController;
 use App\Http\Controllers\JadwalController;
+use App\Http\Controllers\EmisGtkController;
 
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\AdminController;
@@ -56,6 +57,8 @@ Route::group(['middleware' => 'auth'], function () {
             Route::post('jadwal/update-slots-batch', [JadwalController::class, 'updateSlotsBatch'])->name('jadwal.update-slots-batch');
             Route::delete('jadwal/clear', [JadwalController::class, 'clear'])->name('jadwal.clear');
             Route::post('jadwal/toggle-constraint', [JadwalController::class, 'toggleConstraint'])->name('jadwal.toggle-constraint');
+            Route::post('emis-gtk/export', [EmisGtkController::class, 'export'])->name('emis-gtk.export');
+            Route::post('emis-gtk/import-references', [EmisGtkController::class, 'importReferences'])->name('emis-gtk.import-references');
 
             Route::get('cetak', [App\Http\Controllers\CetakController::class, 'index'])->name('cetak.index');
             Route::get('cetak/jadwal-pelajaran', [App\Http\Controllers\CetakController::class, 'jadwalPelajaran'])->name('cetak.jadwal-pelajaran');
