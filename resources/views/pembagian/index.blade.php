@@ -49,7 +49,7 @@
             </form>
         </div>
 
-        @if($selectedSemester->is_locked)
+        @if(!($canEdit ?? false))
             <div class="mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3">
                 <div class="bg-red-100 p-2 rounded-lg text-red-600">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -59,6 +59,15 @@
                 </div>
                 <div>
                     <p class="text-red-900 font-bold text-sm uppercase tracking-tight">Terkunci</p>
+                    <p class="text-red-700 text-xs mt-0.5">
+                        @if($selectedSemester->is_locked ?? false)
+                            Semester terkunci — semua versi tidak bisa diedit.
+                        @elseif(($selectedVersion->is_locked ?? false))
+                            Versi &quot;{{ $selectedVersion->name }}&quot; terkunci. Versi lain masih bisa diedit jika semester terbuka.
+                        @else
+                            Mode baca saja.
+                        @endif
+                    </p>
                 </div>
             </div>
         @endif
@@ -127,8 +136,8 @@
                             <td class="px-5 py-4 text-right">
                                 <a href="{{ route('pembagian.show', ['guru' => $guru->id, 'semester_id' => $selectedSemester->id, 'version_id' => $selectedVersion->id ?? null]) }}"
                                     class="inline-flex items-center gap-1 p-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl transition shadow-sm"
-                                    title="{{ $selectedSemester->isEditable() ? 'Atur Pembagian Tugas' : 'Lihat Detail Pembagian' }}">
-                                    @if($selectedSemester->isEditable())
+                                    title="{{ $canEdit ? 'Atur Pembagian Tugas' : 'Lihat Detail Pembagian' }}">
+                                    @if($canEdit)
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />

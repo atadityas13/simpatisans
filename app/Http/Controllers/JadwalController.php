@@ -47,6 +47,7 @@ class JadwalController extends Controller
         $versions = $this->versionService->listForSemester($semesterId);
         $selectedVersion = $this->versionService->resolveForSemester($semesterId, $request->integer('version_id') ?: null);
         $versionId = $selectedVersion->id;
+        $canEdit = $selectedSemester->isVersionEditable($selectedVersion);
 
         $jadwals = Jadwal::where('semester_id', $semesterId)
             ->where('version_id', $versionId)
@@ -162,7 +163,7 @@ class JadwalController extends Controller
         $hasWarnings = $totalWarnings > 0;
         $hasCriticalWarnings = $criticalWarnings > 0;
 
-        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'slotData', 'slotIssueMap', 'kelasFlat', 'guruList', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
+        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'slotData', 'slotIssueMap', 'kelasFlat', 'guruList', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion', 'canEdit', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
     }
 
     public function toggleConstraint(Request $request)

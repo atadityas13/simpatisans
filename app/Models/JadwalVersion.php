@@ -14,10 +14,12 @@ class JadwalVersion extends Model
         'semester_id',
         'name',
         'is_default',
+        'is_locked',
     ];
 
     protected $casts = [
         'is_default' => 'boolean',
+        'is_locked' => 'boolean',
     ];
 
     public function semester(): BelongsTo
@@ -38,5 +40,21 @@ class JadwalVersion extends Model
     public function guruTugasTambahans(): HasMany
     {
         return $this->hasMany(GuruTugasTambahan::class, 'version_id');
+    }
+
+    /**
+     * Boleh diedit hanya jika versi terbuka DAN semester terbuka.
+     */
+    public function isEditable(): bool
+    {
+        if ((bool) ($this->is_locked ?? false)) {
+            return false;
+        }
+
+        $semester = $this->relationLoaded('semester')
+            ? $this->semester
+            : $this->semester()->first();
+
+        return $semester ? $semester->isEditable() : true;
     }
 }

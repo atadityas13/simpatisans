@@ -92,6 +92,7 @@ Route::group(['middleware' => 'auth'], function () {
             Route::post('pengaturan/semester/{semester}/activate', [SemesterController::class, 'activate'])->name('semester.activate');
             Route::post('pengaturan/semester/{semester}/toggle-lock', [SemesterController::class, 'toggleLock'])->name('semester.toggle-lock');
             Route::post('pengaturan/semester/{semester}/versions', [SemesterController::class, 'storeVersion'])->name('semester.versions.store');
+            Route::post('pengaturan/semester/{semester}/versions/{version}/toggle-lock', [SemesterController::class, 'toggleVersionLock'])->name('semester.versions.toggle-lock');
             Route::delete('pengaturan/semester/{semester}/versions/{version}', [SemesterController::class, 'destroyVersion'])->name('semester.versions.destroy');
             Route::resource('pengaturan/semester', SemesterController::class)->except(['create', 'show', 'edit']);
 

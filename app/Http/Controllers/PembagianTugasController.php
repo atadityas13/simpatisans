@@ -64,8 +64,9 @@ class PembagianTugasController extends Controller
         }
 
         $guruSearchBlobs = $this->buildGuruSearchBlobs($gurus);
+        $canEdit = $selectedSemester->isVersionEditable($selectedVersion);
 
-        return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion', 'guruSearchBlobs'));
+        return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion', 'canEdit', 'guruSearchBlobs'));
     }
 
     /**
@@ -133,8 +134,9 @@ class PembagianTugasController extends Controller
             ->first();
 
         $occupiedMap = (object)$occupiedMap;
+        $canEdit = $selectedSemester->isVersionEditable($selectedVersion);
 
-        return view('pembagian.show', compact('guru', 'kelas', 'mapels', 'occupiedMap', 'tugases', 'metrik', 'existingEkuivalen', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion'));
+        return view('pembagian.show', compact('guru', 'kelas', 'mapels', 'occupiedMap', 'tugases', 'metrik', 'existingEkuivalen', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion', 'canEdit'));
     }
 
 

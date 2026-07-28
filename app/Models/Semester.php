@@ -23,11 +23,27 @@ class Semester extends Model
     ];
 
     /**
-     * Apakah pembagian tugas & jadwal boleh diedit.
+     * Apakah pembagian tugas & jadwal boleh diedit (level semester).
      */
     public function isEditable(): bool
     {
         return ! (bool) ($this->is_locked ?? false);
+    }
+
+    /**
+     * Editable untuk versi tertentu: semester terbuka + versi terbuka.
+     */
+    public function isVersionEditable(?JadwalVersion $version = null): bool
+    {
+        if (! $this->isEditable()) {
+            return false;
+        }
+
+        if ($version && (bool) ($version->is_locked ?? false)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

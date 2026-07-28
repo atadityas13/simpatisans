@@ -26,6 +26,7 @@ class JadwalVersionService
             'semester_id' => $semester->id,
             'name' => JadwalVersion::NAME_DEFAULT,
             'is_default' => true,
+            'is_locked' => false,
         ]);
     }
 
@@ -97,6 +98,7 @@ class JadwalVersionService
                 'semester_id' => $semester->id,
                 'name' => $name,
                 'is_default' => false,
+                'is_locked' => false,
             ]);
 
             if ($copyFromDefault) {

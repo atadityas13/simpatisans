@@ -53,7 +53,7 @@
             </form>
         </div>
 
-        @if($selectedSemester->is_locked)
+        @if(!($canEdit ?? false))
             <div class="mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3">
                 <div class="bg-red-100 p-2 rounded-lg text-red-600">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,6 +63,15 @@
                 </div>
                 <div>
                     <p class="text-red-900 font-bold text-sm uppercase tracking-tight">Terkunci</p>
+                    <p class="text-red-700 text-xs mt-0.5">
+                        @if($selectedSemester->is_locked ?? false)
+                            Semester terkunci — semua versi tidak bisa diedit.
+                        @elseif(($selectedVersion->is_locked ?? false))
+                            Versi &quot;{{ $selectedVersion->name }}&quot; terkunci. Versi lain masih bisa diedit jika semester terbuka.
+                        @else
+                            Mode baca saja.
+                        @endif
+                    </p>
                 </div>
             </div>
         @endif
@@ -116,7 +125,7 @@
                     <div class="flex items-center justify-between px-5 py-4 bg-indigo-50 border-b border-indigo-100">
                         <h3 class="font-bold text-indigo-900 leading-tight">Rekap Jam Tatap Muka (KBM)</h3>
                         <div class="flex gap-2">
-                            @if($selectedSemester->isEditable())
+                            @if($canEdit)
                                 <button onclick="document.getElementById('modal-non-satminkal').classList.remove('hidden')"
                                     class="text-white text-xs font-semibold px-4 py-2 rounded-lg transition hover:opacity-90"
                                     style="background-color: #0ea5e9;">
@@ -137,7 +146,7 @@
                                 <th class="px-4 py-3 text-center">JTM</th>
                                 <th class="px-4 py-3 text-center">Linearitas</th>
                                 <th class="px-4 py-3 text-right">
-                                    @if($selectedSemester->isEditable() && $guru->bebanMengajars->count() > 0)
+                                    @if($canEdit && $guru->bebanMengajars->count() > 0)
                                         <form action="{{ route('pembagian.kbm.clear', $guru->id) }}?semester_id={{ $selectedSemester->id }}&version_id={{ $selectedVersion->id }}" method="POST"
                                             data-confirm="Hapus SEMUA penugasan KBM guru ini untuk semester ini?">
                                             @csrf @method('DELETE')
@@ -213,7 +222,7 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        @if($selectedSemester->isEditable())
+                                        @if($canEdit)
                                             @if($bm->is_satminkal)
                                                 <form action="{{ route('pembagian.kbm.destroy', $bm->id) }}" method="POST"
                                                     data-confirm="Hapus penugasan ini?">
@@ -257,7 +266,7 @@
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden sticky top-6">
                     <div class="px-5 py-4 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
                         <h3 class="font-bold text-amber-900 leading-tight">Tugas Tambahan & Ekuivalen</h3>
-                        @if($selectedSemester->isEditable())
+                        @if($canEdit)
                             <button onclick="document.getElementById('modal-tugas').classList.remove('hidden')"
                                 class="bg-amber-600 text-white text-[10px] font-bold px-3 py-1.5 rounded uppercase tracking-wider hover:bg-amber-700 transition">
                                 + Tugas
@@ -302,7 +311,7 @@
                                     </div>
                                 </div>
                                 <div class="absolute top-3 right-3">
-                                    @if($selectedSemester->isEditable())
+                                    @if($canEdit)
                                         <form
                                             action="{{ route('pembagian.tugas.destroy', ['guru' => $guru->id, 'tugas' => $t->id, 'semester_id' => $selectedSemester->id, 'version_id' => $selectedVersion->id]) }}"
                                             method="POST" data-confirm="Hapus tugas tambahan ini?">

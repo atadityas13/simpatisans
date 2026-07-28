@@ -73,7 +73,7 @@
                     </button>
                 @endif
 
-                @if($selectedSemester->isEditable())
+                @if($canEdit)
                     <button @click="showConstraintModal = true"
                         class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 bg-orange-500 hover:bg-orange-600 text-white">
                         <span>PRESET JADWAL</span>
@@ -92,13 +92,22 @@
             </div>
         </div>
 
-        @if($selectedSemester->is_locked)
+        @if(!($canEdit ?? false))
             <div class="mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3">
                 <div class="bg-red-100 p-2 rounded-lg text-red-600">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 </div>
                 <div>
                     <p class="text-red-900 font-bold text-sm uppercase tracking-tight">Terkunci</p>
+                    <p class="text-red-700 text-xs mt-0.5">
+                        @if($selectedSemester->is_locked ?? false)
+                            Semester terkunci — semua versi tidak bisa diedit.
+                        @elseif($selectedVersion->is_locked ?? false)
+                            Versi &quot;{{ $selectedVersion->name }}&quot; terkunci. Versi lain masih bisa diedit jika semester terbuka.
+                        @else
+                            Mode baca saja.
+                        @endif
+                    </p>
                 </div>
             </div>
         @endif
@@ -576,7 +585,7 @@
 
         @include('jadwal.partials.manual-editor')
 
-        @if($selectedSemester->isEditable())
+        @if($canEdit)
             <div class="flex justify-start mb-1.5 px-0.5">
                 <form action="{{ route('jadwal.clear') }}" method="POST" 
                     data-confirm="Hapus SEMUA jadwal yang sudah terinput ke matriks untuk semester ini?">
@@ -778,8 +787,8 @@
                                                 $bg = 'cell-jumat-5';
                                             }
                                         @endphp
-                                        <td class="border border-gray-800 p-0 text-center font-bold {{ $bg }} {{ $issueCritical ? 'shadow-[inset_0_0_4px_rgba(239,68,68,0.5)]' : ($issueInfo ? 'shadow-[inset_0_0_3px_rgba(234,179,8,0.5)]' : '') }} {{ $selectedSemester->isEditable() ? 'hover:bg-indigo-200 cursor-pointer' : 'cursor-default opacity-80' }} transition-colors leading-tight relative"
-                                            @if($selectedSemester->isEditable())
+                                        <td class="border border-gray-800 p-0 text-center font-bold {{ $bg }} {{ $issueCritical ? 'shadow-[inset_0_0_4px_rgba(239,68,68,0.5)]' : ($issueInfo ? 'shadow-[inset_0_0_3px_rgba(234,179,8,0.5)]' : '') }} {{ $canEdit ? 'hover:bg-indigo-200 cursor-pointer' : 'cursor-default opacity-80' }} transition-colors leading-tight relative"
+                                            @if($canEdit)
                                                 @dblclick="editCell('{{ $hari }}', {{ $jam }}, {{ $kItem->id }}, '{{ $kg }}', $event)"
                                             @endif
                                             @if($issueTooltip) title="{{ e($issueTooltip) }}" @elseif($slot) title="[{{ $kg }}] {{ e($tName) }} - {{ e($mName) }}" @else title="Kosong" @endif>
@@ -846,9 +855,9 @@
                         loadingInterval: null,
                         semester_id: '{{ $selectedSemester->id }}',
                         version_id: '{{ $selectedVersion->id }}',
-                        is_active: {{ $selectedSemester->isEditable() ? 'true' : 'false' }},
-                        can_edit: {{ $selectedSemester->isEditable() ? 'true' : 'false' }},
-                        semester_locked: {{ $selectedSemester->is_locked ? 'true' : 'false' }},
+                        is_active: {{ ($canEdit ?? false) ? 'true' : 'false' }},
+                        can_edit: {{ ($canEdit ?? false) ? 'true' : 'false' }},
+                        semester_locked: {{ (!($canEdit ?? false)) ? 'true' : 'false' }},
 
                         startLoading() {
                             this.showLoading = true;

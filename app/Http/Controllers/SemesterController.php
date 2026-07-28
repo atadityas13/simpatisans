@@ -189,6 +189,31 @@ class SemesterController extends Controller
         }
     }
 
+    public function toggleVersionLock(Semester $semester, JadwalVersion $version)
+    {
+        if ((int) $version->semester_id !== (int) $semester->id) {
+            return redirect()->back()->with('error', 'Versi tidak cocok dengan semester.');
+        }
+
+        if (! Schema::hasColumn('jadwal_versions', 'is_locked')) {
+            return redirect()->route('semester.index')->with(
+                'error',
+                'Kolom kunci versi belum tersedia. Jalankan migrasi: php artisan migrate --path=database/migrations/2026_07_28_100000_add_is_locked_to_jadwal_versions_table.php --force'
+            );
+        }
+
+        try {
+            $version->update(['is_locked' => ! (bool) $version->is_locked]);
+            $status = $version->is_locked ? 'dikunci' : 'dibuka';
+
+            return redirect()->route('semester.index')
+                ->with('success', "Versi \"{$version->name}\" {$status}.");
+        } catch (\Exception $e) {
+            return redirect()->route('semester.index')
+                ->with('error', 'Gagal mengubah kunci versi: '.$e->getMessage());
+        }
+    }
+
     public function storeVersion(Request $request, Semester $semester)
     {
         if (! Schema::hasTable('jadwal_versions')) {

@@ -91,25 +91,35 @@
                                 <td class="px-6 py-4">
                                     <div class="flex flex-wrap gap-1.5 max-w-xs">
                                         @forelse($sem->versions as $ver)
-                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border {{ $ver->is_default ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-50 text-slate-700 border-slate-200' }}">
+                                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium border {{ $ver->is_default ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-slate-50 text-slate-700 border-slate-200' }} {{ ($ver->is_locked ?? false) ? 'opacity-80' : '' }}">
                                                 {{ $ver->name }}
                                                 @if($ver->is_default)
                                                     <span class="text-[9px] uppercase tracking-wide opacity-70">default</span>
-                                                @else
+                                                @endif
+                                                <form action="{{ route('semester.versions.toggle-lock', [$sem, $ver]) }}" method="POST" class="inline">
+                                                    @csrf
+                                                    <button type="submit"
+                                                        class="text-[9px] font-bold uppercase tracking-wide {{ ($ver->is_locked ?? false) ? 'text-red-600 hover:text-red-800' : 'text-emerald-600 hover:text-emerald-800' }}"
+                                                        title="{{ ($ver->is_locked ?? false) ? 'Buka kunci versi' : 'Kunci versi' }}">
+                                                        {{ ($ver->is_locked ?? false) ? '🔒' : '🔓' }}
+                                                    </button>
+                                                </form>
+                                                @unless($ver->is_default)
                                                     <form action="{{ route('semester.versions.destroy', [$sem, $ver]) }}" method="POST" class="inline"
                                                         data-confirm="Hapus versi &quot;{{ $ver->name }}&quot; beserta pembagian tugas & jadwal di dalamnya?">
                                                         @csrf @method('DELETE')
                                                         <button type="submit" class="text-red-500 hover:text-red-700" title="Hapus versi">×</button>
                                                     </form>
-                                                @endif
+                                                @endunless
                                             </span>
                                         @empty
                                             <span class="text-xs text-gray-400">Belum ada versi</span>
                                         @endforelse
                                     </div>
+                                    <p class="text-[10px] text-gray-400 mt-1">🔓/🔒 = kunci per versi. Kolom “Kunci Jadwal” = kunci seluruh semester.</p>
                                     <button type="button"
                                         @click="showVersionModal = true; versionSemester = { id: {{ $sem->id }}, label: '{{ $sem->nama_tahun }} — {{ $sem->tipe }}' }"
-                                        class="mt-2 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800">
+                                        class="mt-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800">
                                         + Tambah versi
                                     </button>
                                 </td>
