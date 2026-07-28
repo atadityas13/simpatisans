@@ -124,9 +124,9 @@
                                     <form action="{{ route('semester.toggle-lock', $sem) }}" method="POST" class="inline-block">
                                         @csrf
                                         <button type="submit"
-                                            class="px-2.5 py-1 text-xs font-bold rounded-full border uppercase tracking-wider transition {{ $sem->is_locked ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200' }}"
-                                            title="{{ $sem->is_locked ? 'Klik untuk membuka kunci' : 'Klik untuk mengunci' }}">
-                                            {{ $sem->is_locked ? 'Terkunci' : 'Terbuka' }}
+                                            class="px-2.5 py-1 text-xs font-bold rounded-full border uppercase tracking-wider transition {{ ($sem->is_locked ?? false) ? 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200' }}"
+                                            title="{{ ($sem->is_locked ?? false) ? 'Klik untuk membuka kunci' : 'Klik untuk mengunci' }}">
+                                            {{ ($sem->is_locked ?? false) ? 'Terkunci' : 'Terbuka' }}
                                         </button>
                                     </form>
                                 </td>
@@ -142,7 +142,7 @@
                                     @endif
 
                                     <button
-                                        @click="showEditModal = true; editData = { id: {{ $sem->id }}, nama_tahun: '{{ $sem->nama_tahun }}', tipe: '{{ $sem->tipe }}', is_active: {{ $sem->is_active ? 'true' : 'false' }}, is_locked: {{ $sem->is_locked ? 'true' : 'false' }} }"
+                                        @click="showEditModal = true; editData = { id: {{ $sem->id }}, nama_tahun: @js($sem->nama_tahun), tipe: @js($sem->tipe), is_active: {{ $sem->is_active ? 'true' : 'false' }}, is_locked: {{ ($sem->is_locked ?? false) ? 'true' : 'false' }} }"
                                         class="text-indigo-600 hover:text-indigo-900 transition-colors" title="Edit Detail">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                     </button>

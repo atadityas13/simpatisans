@@ -8,6 +8,7 @@ use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class SemesterController extends Controller
@@ -19,12 +20,21 @@ class SemesterController extends Controller
 
     public function index()
     {
-        $semesters = Semester::with(['versions' => function ($q) {
-            $q->orderByDesc('is_default')->orderBy('name');
-        }])
+        $query = Semester::query()
             ->orderBy('nama_tahun', 'desc')
-            ->orderBy('tipe', 'desc')
-            ->get();
+            ->orderBy('tipe', 'desc');
+
+        if (Schema::hasTable('jadwal_versions')) {
+            $query->with(['versions' => function ($q) {
+                $q->orderByDesc('is_default')->orderBy('name');
+            }]);
+        }
+
+        $semesters = $query->get();
+
+        if (! Schema::hasTable('jadwal_versions')) {
+            $semesters->each(fn (Semester $s) => $s->setRelation('versions', collect()));
+        }
 
         return view('semester.index', compact('semesters'));
     }
@@ -53,19 +63,25 @@ class SemesterController extends Controller
                 Semester::query()->update(['is_active' => false]);
             }
 
-            $semester = Semester::create([
+            $payload = [
                 'nama_tahun' => $request->nama_tahun,
                 'tipe' => $request->tipe,
                 'is_active' => $isActive,
-                'is_locked' => $isLocked,
-            ]);
+            ];
+            if (Schema::hasColumn('semesters', 'is_locked')) {
+                $payload['is_locked'] = $isLocked;
+            }
 
-            $targetVersion = $this->versionService->ensureDefault($semester);
+            $semester = Semester::create($payload);
 
-            if ($request->clone_from_id) {
-                $sourceVersion = $this->versionService->getDefaultForSemester((int) $request->clone_from_id);
-                if ($sourceVersion) {
-                    $this->versionService->cloneVersionData($sourceVersion, $targetVersion);
+            if (Schema::hasTable('jadwal_versions')) {
+                $targetVersion = $this->versionService->ensureDefault($semester);
+
+                if ($request->clone_from_id) {
+                    $sourceVersion = $this->versionService->getDefaultForSemester((int) $request->clone_from_id);
+                    if ($sourceVersion) {
+                        $this->versionService->cloneVersionData($sourceVersion, $targetVersion);
+                    }
                 }
             }
 
@@ -85,24 +101,36 @@ class SemesterController extends Controller
         $request->validate([
             'nama_tahun' => 'required|string',
             'tipe' => 'required|in:Ganjil,Genap',
-            'is_active' => 'boolean',
-            'is_locked' => 'boolean',
+            'is_active' => 'nullable|boolean',
+            'is_locked' => 'nullable|boolean',
         ]);
 
-        if ($request->boolean('is_active') && ! $semester->is_active) {
-            Semester::query()->update(['is_active' => false]);
+        try {
+            if ($request->boolean('is_active') && ! $semester->is_active) {
+                Semester::query()->update(['is_active' => false]);
+            }
+
+            $payload = [
+                'nama_tahun' => $request->nama_tahun,
+                'tipe' => $request->tipe,
+                'is_active' => $request->boolean('is_active'),
+            ];
+            if (Schema::hasColumn('semesters', 'is_locked')) {
+                $payload['is_locked'] = $request->boolean('is_locked');
+            }
+
+            $semester->update($payload);
+
+            if (Schema::hasTable('jadwal_versions')) {
+                $this->versionService->ensureDefault($semester);
+            }
+
+            $this->semesterService->clearCache();
+
+            return redirect()->route('semester.index')->with('success', 'Semester berhasil diperbarui!');
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal memperbarui semester: '.$e->getMessage());
         }
-
-        $semester->update([
-            'nama_tahun' => $request->nama_tahun,
-            'tipe' => $request->tipe,
-            'is_active' => $request->boolean('is_active'),
-            'is_locked' => $request->boolean('is_locked'),
-        ]);
-        $this->versionService->ensureDefault($semester);
-        $this->semesterService->clearCache();
-
-        return redirect()->route('semester.index')->with('success', 'Semester berhasil diperbarui!');
     }
 
     public function destroy(Semester $semester)
@@ -121,11 +149,16 @@ class SemesterController extends Controller
     {
         DB::beginTransaction();
         Semester::query()->update(['is_active' => false]);
-        $semester->update([
-            'is_active' => true,
-            'is_locked' => false,
-        ]);
-        $this->versionService->ensureDefault($semester);
+
+        $payload = ['is_active' => true];
+        if (Schema::hasColumn('semesters', 'is_locked')) {
+            $payload['is_locked'] = false;
+        }
+        $semester->update($payload);
+
+        if (Schema::hasTable('jadwal_versions')) {
+            $this->versionService->ensureDefault($semester);
+        }
         DB::commit();
 
         $this->semesterService->clearCache();
@@ -135,17 +168,36 @@ class SemesterController extends Controller
 
     public function toggleLock(Semester $semester)
     {
-        $semester->update(['is_locked' => ! $semester->is_locked]);
-        $this->semesterService->clearCache();
+        if (! Schema::hasColumn('semesters', 'is_locked')) {
+            return redirect()->route('semester.index')->with(
+                'error',
+                'Kolom kunci belum tersedia di database. Jalankan migrasi: php artisan migrate --path=database/migrations/2026_07_28_080000_add_is_locked_to_semesters_table.php --force'
+            );
+        }
 
-        $status = $semester->is_locked ? 'dikunci' : 'dibuka';
+        try {
+            $semester->update(['is_locked' => ! (bool) $semester->is_locked]);
+            $this->semesterService->clearCache();
 
-        return redirect()->route('semester.index')
-            ->with('success', "Pembagian tugas & jadwal semester {$semester->nama_tahun} - {$semester->tipe} {$status}.");
+            $status = $semester->is_locked ? 'dikunci' : 'dibuka';
+
+            return redirect()->route('semester.index')
+                ->with('success', "Pembagian tugas & jadwal semester {$semester->nama_tahun} - {$semester->tipe} {$status}.");
+        } catch (\Exception $e) {
+            return redirect()->route('semester.index')
+                ->with('error', 'Gagal mengubah kunci semester: '.$e->getMessage());
+        }
     }
 
     public function storeVersion(Request $request, Semester $semester)
     {
+        if (! Schema::hasTable('jadwal_versions')) {
+            return redirect()->back()->with(
+                'error',
+                'Tabel versi belum tersedia. Jalankan migrasi jadwal_versions terlebih dahulu.'
+            );
+        }
+
         $request->validate([
             'name' => 'required|string|max:100',
             'copy_operational' => 'nullable|boolean',

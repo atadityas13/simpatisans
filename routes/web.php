@@ -89,11 +89,11 @@ Route::group(['middleware' => 'auth'], function () {
             Route::resource('master/kelas', KelasController::class);
             Route::resource('master/tugas-tambahan', TugasTambahanController::class);
 
-            Route::resource('pengaturan/semester', SemesterController::class);
             Route::post('pengaturan/semester/{semester}/activate', [SemesterController::class, 'activate'])->name('semester.activate');
             Route::post('pengaturan/semester/{semester}/toggle-lock', [SemesterController::class, 'toggleLock'])->name('semester.toggle-lock');
             Route::post('pengaturan/semester/{semester}/versions', [SemesterController::class, 'storeVersion'])->name('semester.versions.store');
             Route::delete('pengaturan/semester/{semester}/versions/{version}', [SemesterController::class, 'destroyVersion'])->name('semester.versions.destroy');
+            Route::resource('pengaturan/semester', SemesterController::class)->except(['create', 'show', 'edit']);
 
             Route::get('pengaturan/pengumuman', [App\Http\Controllers\PengumumanController::class, 'index'])->name('pengumuman.index');
             Route::post('pengaturan/pengumuman', [App\Http\Controllers\PengumumanController::class, 'store'])->name('pengumuman.store');

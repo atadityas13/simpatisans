@@ -9,9 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('semesters', function (Blueprint $table) {
-            $table->boolean('is_locked')->default(false)->after('is_active');
-        });
+        if (! Schema::hasColumn('semesters', 'is_locked')) {
+            Schema::table('semesters', function (Blueprint $table) {
+                $table->boolean('is_locked')->default(false)->after('is_active');
+            });
+        }
 
         // Default: semester aktif → tidak terkunci; non-aktif → terkunci
         DB::table('semesters')->where('is_active', true)->update(['is_locked' => false]);
@@ -20,8 +22,10 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('semesters', function (Blueprint $table) {
-            $table->dropColumn('is_locked');
-        });
+        if (Schema::hasColumn('semesters', 'is_locked')) {
+            Schema::table('semesters', function (Blueprint $table) {
+                $table->dropColumn('is_locked');
+            });
+        }
     }
 };

@@ -27,7 +27,7 @@ class Semester extends Model
      */
     public function isEditable(): bool
     {
-        return ! $this->is_locked;
+        return ! (bool) ($this->is_locked ?? false);
     }
 
     /**

@@ -70,11 +70,19 @@ class GuruWebDashboardController extends Controller
     private function buildTpgStatus(Guru $guru, int $semesterId, ?int $versionId = null): array
     {
         $guru->loadMissing([
-            'bebanMengajars' => fn ($q) => $q->where('semester_id', $semesterId)
-                ->when($versionId, fn ($q2) => $q2->where('version_id', $versionId)),
+            'bebanMengajars' => function ($q) use ($semesterId, $versionId) {
+                $q->where('semester_id', $semesterId);
+                if ($versionId) {
+                    $q->where('version_id', $versionId);
+                }
+            },
             'bebanMengajars.mapel.rumpuns',
-            'tugasTambahans' => fn ($q) => $q->wherePivot('semester_id', $semesterId)
-                ->when($versionId, fn ($q2) => $q2->wherePivot('version_id', $versionId)),
+            'tugasTambahans' => function ($q) use ($semesterId, $versionId) {
+                $q->wherePivot('semester_id', $semesterId);
+                if ($versionId) {
+                    $q->wherePivot('version_id', $versionId);
+                }
+            },
             'mapelSertifikasi.rumpuns',
             'mapelIjazah.rumpuns',
         ]);

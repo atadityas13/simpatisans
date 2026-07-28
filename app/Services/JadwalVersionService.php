@@ -151,13 +151,29 @@ class JadwalVersionService
 
         foreach ($gurus as $guru) {
             foreach ($guru->tugasTambahans as $tugas) {
-                $guru->tugasTambahans()->attach($tugas->id, [
-                    'semester_id' => $target->semester_id,
-                    'version_id' => $target->id,
-                    'is_ekuivalen' => $tugas->pivot->is_ekuivalen,
-                    'detail' => $tugas->pivot->detail,
-                    'hari' => $tugas->pivot->hari,
-                ]);
+                try {
+                    DB::table('guru_tugas_tambahans')->updateOrInsert(
+                        [
+                            'guru_id' => $guru->id,
+                            'tugas_tambahan_id' => $tugas->id,
+                            'semester_id' => $target->semester_id,
+                            'version_id' => $target->id,
+                        ],
+                        [
+                            'is_ekuivalen' => $tugas->pivot->is_ekuivalen,
+                            'detail' => $tugas->pivot->detail,
+                            'hari' => $tugas->pivot->hari,
+                            'updated_at' => now(),
+                            'created_at' => now(),
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    throw new \RuntimeException(
+                        'Gagal menyalin tugas tambahan. Pastikan migrasi unique constraint versi sudah selesai dijalankan. Detail: '.$e->getMessage(),
+                        0,
+                        $e
+                    );
+                }
             }
         }
 
