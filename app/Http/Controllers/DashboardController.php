@@ -49,7 +49,10 @@ class DashboardController extends Controller
         }
 
         $semesterId = $activeSemester->id;
-        $versionId = $this->versionService->resolveForSemester($semesterId)->id;
+        // Dashboard selalu memakai versi Operasional (bukan versi EMIS/lain).
+        $operationalVersion = $this->versionService->getDefaultForSemester($semesterId)
+            ?? $this->versionService->ensureDefault($activeSemester);
+        $versionId = $operationalVersion->id;
 
         $stats = [
             'total_guru'  => Guru::count(),
@@ -115,6 +118,6 @@ class DashboardController extends Controller
         }
         $rekomendasi['defisit_tpg'] = collect($defisitTpg)->sortByDesc('kurang');
 
-        return view('welcome', compact('stats', 'rekomendasi', 'analisa', 'activeSemester'));
+        return view('welcome', compact('stats', 'rekomendasi', 'analisa', 'activeSemester', 'operationalVersion'));
     }
 }

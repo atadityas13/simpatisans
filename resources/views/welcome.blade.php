@@ -60,6 +60,7 @@
                             {{ $stats['health_score'] > 90 ? 'Sempurna' : 'Butuh Perbaikan' }}
                         </span>
                     </div>
+                    <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-2">Versi {{ $operationalVersion->name ?? 'Operasional' }}</p>
                     <div class="flex items-end gap-2">
                         <p
                             class="text-4xl font-black {{ $stats['health_score'] == 100 ? 'text-green-600' : ($stats['health_score'] > 80 ? 'text-indigo-900' : 'text-red-600') }}">
