@@ -115,7 +115,7 @@ class Guru extends Model
 
     public function user() { return $this->hasOne(User::class, 'username', 'username'); }
     public function mapelDiampu() { return $this->belongsToMany(Mapel::class, 'guru_mapels', 'guru_id', 'mapel_id')->orderBy('mapels.id'); }
-    public function tugasTambahans() { return $this->belongsToMany(TugasTambahan::class, 'guru_tugas_tambahans', 'guru_id', 'tugas_tambahan_id')->withPivot('is_ekuivalen', 'detail', 'hari', 'semester_id'); }
+    public function tugasTambahans() { return $this->belongsToMany(TugasTambahan::class, 'guru_tugas_tambahans', 'guru_id', 'tugas_tambahan_id')->withPivot('is_ekuivalen', 'detail', 'hari', 'semester_id', 'version_id'); }
     public function bebanMengajars() { return $this->hasMany(BebanMengajar::class, 'guru_id'); }
 
     /**

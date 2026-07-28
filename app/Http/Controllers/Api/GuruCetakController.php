@@ -9,6 +9,7 @@ use App\Models\Kelas;
 use App\Models\Mapel;
 use App\Models\TugasTambahan;
 use App\Services\CetakPresetService;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,6 +19,7 @@ class GuruCetakController extends Controller
     public function __construct(
         private SemesterService $semesterService,
         private CetakPresetService $cetakPresetService,
+        private JadwalVersionService $versionService,
     ) {
     }
 
@@ -34,6 +36,7 @@ class GuruCetakController extends Controller
         }
 
         $semesterId = $activeSemester->id;
+        $versionId = $this->versionService->resolveForSemester($semesterId)->id;
 
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
@@ -45,6 +48,7 @@ class GuruCetakController extends Controller
             ->get();
 
         $jadwals = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->with(['bebanMengajar.guru', 'bebanMengajar.mapel'])
             ->get();
 
@@ -62,15 +66,17 @@ class GuruCetakController extends Controller
 
         $gurus = Guru::orderedByDuk()->get();
 
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
-                ->where('semester_id', $semesterId);
+                ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
-        $wakaKurikulum = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $wakaKurikulum = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::WAKA_ID)
                 ->where('detail', 'LIKE', '%Kurikulum%')
-                ->where('semester_id', $semesterId);
+                ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
         return response()->view('admin.cetak.jadwal-pelajaran', array_merge(
@@ -105,6 +111,7 @@ class GuruCetakController extends Controller
         }
 
         $semesterId = $activeSemester->id;
+        $versionId = $this->versionService->resolveForSemester($semesterId)->id;
 
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
@@ -116,11 +123,12 @@ class GuruCetakController extends Controller
             ->get();
 
         $gurus = Guru::with([
-            'bebanMengajars' => function ($q) use ($semesterId) {
-                $q->where('semester_id', $semesterId)->with(['mapel.rumpuns', 'kelas']);
+            'bebanMengajars' => function ($q) use ($semesterId, $versionId) {
+                $q->where('semester_id', $semesterId)->where('version_id', $versionId)->with(['mapel.rumpuns', 'kelas']);
             },
-            'tugasTambahans' => function ($q) use ($semesterId) {
+            'tugasTambahans' => function ($q) use ($semesterId, $versionId) {
                 $q->where('semester_id', $semesterId)
+                    ->where('version_id', $versionId)
                     ->orderByPivot('is_ekuivalen', 'desc');
             },
             'mapelSertifikasi',
@@ -128,9 +136,10 @@ class GuruCetakController extends Controller
             ->orderedByDuk()
             ->get();
 
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
-                ->where('semester_id', $semesterId);
+                ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
         return response()->view('admin.cetak.lampiran-sk', array_merge(

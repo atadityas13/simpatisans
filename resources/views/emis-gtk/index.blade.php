@@ -78,7 +78,7 @@
         </div>
     @else
         <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
-            <form action="{{ route('emis-gtk.index') }}" method="GET" class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <form action="{{ route('emis-gtk.index') }}" method="GET" class="flex flex-col sm:flex-row sm:items-center gap-3 flex-wrap">
                 <label class="text-[10px] font-black uppercase tracking-widest text-gray-400">Semester sumber jadwal</label>
                 <select name="semester_id" onchange="this.form.submit()"
                     class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 font-bold">
@@ -88,11 +88,25 @@
                         </option>
                     @endforeach
                 </select>
+                @if(isset($versions) && $versions->count() > 1)
+                    <label class="text-[10px] font-black uppercase tracking-widest text-gray-400">Versi</label>
+                    <select name="version_id" onchange="this.form.submit()"
+                        class="bg-indigo-50 border border-indigo-200 text-indigo-900 text-sm rounded-lg focus:ring-indigo-500 p-2.5 font-bold">
+                        @foreach($versions as $ver)
+                            <option value="{{ $ver->id }}" {{ ($selectedVersion->id ?? null) == $ver->id ? 'selected' : '' }}>
+                                {{ $ver->name }}{{ $ver->is_default ? ' ★' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                @elseif(isset($selectedVersion))
+                    <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
+                @endif
             </form>
 
             <form method="POST" action="{{ route('emis-gtk.export') }}" class="space-y-6">
                 @csrf
                 <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+                <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
 
                 <div class="flex items-center justify-between">
                     <h3 class="text-sm font-black uppercase tracking-widest text-gray-700">Pilih Kelas</h3>

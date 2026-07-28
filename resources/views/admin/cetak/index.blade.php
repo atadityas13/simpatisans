@@ -9,6 +9,25 @@
             <div>
                 <h2 class="text-2xl font-black text-gray-900 mb-2">Pusat Pencetakan Dokumen</h2>
                 <p class="text-gray-500 font-medium max-w-2xl">Silakan pilih dokumen atau jadwal yang ingin Anda cetak. Pastikan data pembagian tugas dan penjadwalan sudah final sebelum mencetak.</p>
+                @if($activeSemester ?? null)
+                    <form method="GET" action="{{ route('cetak.index') }}" class="mt-4 flex flex-wrap items-center gap-2">
+                        <span class="text-[10px] font-black uppercase tracking-widest text-gray-400">Versi jadwal</span>
+                        @if(isset($versions) && $versions->count() > 1)
+                            <select name="version_id" onchange="this.form.submit()"
+                                class="bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs rounded-lg p-2 font-bold">
+                                @foreach($versions as $ver)
+                                    <option value="{{ $ver->id }}" {{ ($selectedVersion->id ?? null) == $ver->id ? 'selected' : '' }}>
+                                        {{ $ver->name }}{{ $ver->is_default ? ' ★' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        @elseif(isset($selectedVersion))
+                            <span class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-lg">{{ $selectedVersion->name }}</span>
+                            <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
+                        @endif
+                        <span class="text-xs text-gray-400">{{ $activeSemester->full_label }}</span>
+                    </form>
+                @endif
             </div>
             <button @click="showPresets = true" class="px-6 py-3 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
@@ -46,7 +65,7 @@
                 <h3 class="text-lg font-bold text-gray-900 mb-2">Lampiran SK</h3>
                 <p class="text-sm text-gray-500 mb-6 italic">Daftar rincian beban mengajar dan tugas tambahan guru.</p>
             </div>
-            <a href="{{ route('cetak.lampiran-sk') }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
+            <a href="{{ route('cetak.lampiran-sk', ['version_id' => $selectedVersion->id ?? null]) }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
                 <span>Cetak Lampiran</span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
             </a>
@@ -61,7 +80,7 @@
                 <h3 class="text-lg font-bold text-gray-900 mb-2">Jadwal Pelajaran</h3>
                 <p class="text-sm text-gray-500 mb-6 italic">Mencetak seluruh matriks jadwal pelajaran dalam satu lembar A4.</p>
             </div>
-            <a href="{{ route('cetak.jadwal-pelajaran') }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
+            <a href="{{ route('cetak.jadwal-pelajaran', ['version_id' => $selectedVersion->id ?? null]) }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
                 <span>Cetak Jadwal</span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
             </a>
@@ -76,7 +95,7 @@
                 <h3 class="text-lg font-bold text-gray-900 mb-2">Jadwal Besar</h3>
                 <p class="text-sm text-gray-500 mb-6 italic">Format poster (split 12 halaman A4) untuk ditempel di ruang guru atau papan pengumuman.</p>
             </div>
-            <a href="{{ route('cetak.jadwal-besar') }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
+            <a href="{{ route('cetak.jadwal-besar', ['version_id' => $selectedVersion->id ?? null]) }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
                 <span>Cetak Poster</span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
             </a>
@@ -91,7 +110,7 @@
                 <h3 class="text-lg font-bold text-gray-900 mb-2">Jadwal Piket Guru</h3>
                 <p class="text-sm text-gray-500 mb-6 italic">Mencetak daftar guru piket harian selama satu semester.</p>
             </div>
-            <a href="{{ route('cetak.jadwal-piket') }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
+            <a href="{{ route('cetak.jadwal-piket', ['version_id' => $selectedVersion->id ?? null]) }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
                 <span>Cetak Piket</span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
             </a>
@@ -106,7 +125,7 @@
                 <h3 class="text-lg font-bold text-gray-900 mb-2">Daftar Wali Kelas</h3>
                 <p class="text-sm text-gray-500 mb-6 italic">Mencetak daftar wali kelas per rombel dari pembagian tugas semester aktif.</p>
             </div>
-            <a href="{{ route('cetak.daftar-wali-kelas') }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
+            <a href="{{ route('cetak.daftar-wali-kelas', ['version_id' => $selectedVersion->id ?? null]) }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
                 <span>Cetak Wali Kelas</span>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
             </a>

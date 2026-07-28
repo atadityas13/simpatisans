@@ -39,9 +39,10 @@ final class JadwalCspSolver
     private int $bestFilled = 0;
     private int $targetCapacity = 0;
 
-    public static function fromSemester(int $semesterId): self
+    public static function fromSemester(int $semesterId, int $versionId): self
     {
         $beban = BebanMengajar::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->where('is_satminkal', 1)
             ->with(['mapel', 'kelas'])
             ->get();

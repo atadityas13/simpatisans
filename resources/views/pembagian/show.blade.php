@@ -21,7 +21,7 @@
     @else
 
         <div class="mb-4 flex flex-col md:flex-row justify-between items-center gap-4">
-            <a href="{{ route('pembagian.index', ['semester_id' => $selectedSemester->id]) }}"
+            <a href="{{ route('pembagian.index', ['semester_id' => $selectedSemester->id, 'version_id' => $selectedVersion->id ?? null]) }}"
                 class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center">
                 <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -29,30 +29,40 @@
                 Kembali ke Daftar Distribusi
             </a>
 
-            <form action="{{ route('pembagian.show', $guru->id) }}" method="GET" class="flex items-center space-x-2">
+            <form action="{{ route('pembagian.show', $guru->id) }}" method="GET" class="flex items-center gap-2">
                 <select name="semester_id" onchange="this.form.submit()"
                     class="bg-white border border-gray-200 text-gray-900 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 font-bold shadow-sm">
                     @foreach($allSemesters as $sem)
                         <option value="{{ $sem->id }}" {{ $selectedSemester->id == $sem->id ? 'selected' : '' }}>
-                            {{ $sem->nama_tahun }} - {{ $sem->tipe }} {{ $sem->is_active ? '(Aktif)' : '' }}
+                            {{ $sem->nama_tahun }} - {{ $sem->tipe }}{{ $sem->is_active ? ' (Aktif)' : '' }}{{ $sem->is_locked ? ' 🔒' : '' }}
                         </option>
                     @endforeach
                 </select>
+                @if(isset($versions) && $versions->count() > 1)
+                    <select name="version_id" onchange="this.form.submit()"
+                        class="bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs rounded-lg focus:ring-indigo-500 block w-full p-2.5 font-bold shadow-sm">
+                        @foreach($versions as $ver)
+                            <option value="{{ $ver->id }}" {{ ($selectedVersion->id ?? null) == $ver->id ? 'selected' : '' }}>
+                                {{ $ver->name }}{{ $ver->is_default ? ' ★' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                @elseif(isset($selectedVersion))
+                    <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
+                @endif
             </form>
         </div>
 
-        @if(!$selectedSemester->is_active)
-            <div class="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3">
-                <div class="bg-amber-100 p-2 rounded-lg text-amber-600">
+        @if($selectedSemester->is_locked)
+            <div class="mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3">
+                <div class="bg-red-100 p-2 rounded-lg text-red-600">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 15v2m0 0v3m0-3h3m-3 0H9m12-3a9 9 0 11-18 0 9 9 0 0118 0zM15 7h.01M9 7h.01M15 11h.01M9 11h.01" />
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
                 <div>
-                    <p class="text-amber-900 font-bold text-sm text-sm uppercase tracking-tight">ARSIP</p>
-                    <p class="text-amber-700 text-xs mt-0.5">Anda sedang melihat data semester masa lain. Perubahan data tidak
-                        diizinkan.</p>
+                    <p class="text-red-900 font-bold text-sm uppercase tracking-tight">Terkunci</p>
                 </div>
             </div>
         @endif
@@ -106,7 +116,7 @@
                     <div class="flex items-center justify-between px-5 py-4 bg-indigo-50 border-b border-indigo-100">
                         <h3 class="font-bold text-indigo-900 leading-tight">Rekap Jam Tatap Muka (KBM)</h3>
                         <div class="flex gap-2">
-                            @if($selectedSemester->is_active)
+                            @if($selectedSemester->isEditable())
                                 <button onclick="document.getElementById('modal-non-satminkal').classList.remove('hidden')"
                                     class="text-white text-xs font-semibold px-4 py-2 rounded-lg transition hover:opacity-90"
                                     style="background-color: #0ea5e9;">
@@ -127,8 +137,8 @@
                                 <th class="px-4 py-3 text-center">JTM</th>
                                 <th class="px-4 py-3 text-center">Linearitas</th>
                                 <th class="px-4 py-3 text-right">
-                                    @if($selectedSemester->is_active && $guru->bebanMengajars->count() > 0)
-                                        <form action="{{ route('pembagian.kbm.clear', $guru->id) }}?semester_id={{ $selectedSemester->id }}" method="POST"
+                                    @if($selectedSemester->isEditable() && $guru->bebanMengajars->count() > 0)
+                                        <form action="{{ route('pembagian.kbm.clear', $guru->id) }}?semester_id={{ $selectedSemester->id }}&version_id={{ $selectedVersion->id }}" method="POST"
                                             data-confirm="Hapus SEMUA penugasan KBM guru ini untuk semester ini?">
                                             @csrf @method('DELETE')
                                             <button type="submit" class="text-red-500 hover:text-red-700 transition-colors" title="Bersihkan Semua KBM">
@@ -203,7 +213,7 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-right">
-                                        @if($selectedSemester->is_active)
+                                        @if($selectedSemester->isEditable())
                                             @if($bm->is_satminkal)
                                                 <form action="{{ route('pembagian.kbm.destroy', $bm->id) }}" method="POST"
                                                     data-confirm="Hapus penugasan ini?">
@@ -247,7 +257,7 @@
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden sticky top-6">
                     <div class="px-5 py-4 bg-amber-50 border-b border-amber-100 flex justify-between items-center">
                         <h3 class="font-bold text-amber-900 leading-tight">Tugas Tambahan & Ekuivalen</h3>
-                        @if($selectedSemester->is_active)
+                        @if($selectedSemester->isEditable())
                             <button onclick="document.getElementById('modal-tugas').classList.remove('hidden')"
                                 class="bg-amber-600 text-white text-[10px] font-bold px-3 py-1.5 rounded uppercase tracking-wider hover:bg-amber-700 transition">
                                 + Tugas
@@ -292,9 +302,9 @@
                                     </div>
                                 </div>
                                 <div class="absolute top-3 right-3">
-                                    @if($selectedSemester->is_active)
+                                    @if($selectedSemester->isEditable())
                                         <form
-                                            action="{{ route('pembagian.tugas.destroy', ['guru' => $guru->id, 'tugas' => $t->id, 'semester_id' => $selectedSemester->id]) }}"
+                                            action="{{ route('pembagian.tugas.destroy', ['guru' => $guru->id, 'tugas' => $t->id, 'semester_id' => $selectedSemester->id, 'version_id' => $selectedVersion->id]) }}"
                                             method="POST" data-confirm="Hapus tugas tambahan ini?">
                                             @csrf @method('DELETE')
                                             <button
@@ -335,6 +345,7 @@
                 <form action="{{ route('pembagian.kbm.store', $guru->id) }}" method="POST">
                     @csrf
                     <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+                    <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
                     <div class="p-5 space-y-4">
                         {{-- 1. Pilih Mapel (Hanya muncul jika > 1) --}}
                         @if(count($mapels) > 1)
@@ -444,6 +455,7 @@
                 <form action="{{ route('pembagian.tugas.store', $guru->id) }}" method="POST">
                     @csrf
                     <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+                    <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
                     <div class="p-5 space-y-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Jenis Tugas <span
@@ -627,6 +639,7 @@
                 <form action="{{ route('pembagian.non-satminkal.store', $guru->id) }}" method="POST">
                     @csrf
                     <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+                    <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
                     <div class="p-5 space-y-4">
                         <p class="text-[11px] text-gray-500">Gunakan fitur ini untuk mencatat beban mengajar guru di Madrasah
                             lain agar dapat dihitung kelayakan TPG-nya.</p>

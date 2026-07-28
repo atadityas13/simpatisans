@@ -7,6 +7,7 @@ use App\Models\Guru;
 use App\Models\Jadwal;
 use App\Services\GuruService;
 use App\Services\JamPelajaranService;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ class GuruDashboardController extends Controller
         private SemesterService $semesterService,
         private JamPelajaranService $jamPelajaranService,
         private GuruService $guruService,
+        private JadwalVersionService $versionService,
     ) {
     }
 
@@ -36,11 +38,13 @@ class GuruDashboardController extends Controller
 
         $semester = $this->semesterService->getActiveSemester();
         $hariIni = $this->hariIndonesia();
+        $versionId = $semester ? $this->versionService->resolveForSemester($semester->id)->id : null;
 
         $jadwalHariIni = collect();
-        $tpgStatus = $this->buildTpgStatus($guru, $semester?->id);
-        if ($semester) {
+        $tpgStatus = $this->buildTpgStatus($guru, $semester?->id, $versionId);
+        if ($semester && $versionId) {
             $jadwalHariIni = Jadwal::where('semester_id', $semester->id)
+                ->where('version_id', $versionId)
                 ->whereRaw('LOWER(TRIM(hari)) = ?', [strtolower($hariIni)])
                 ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $guru->id))
                 ->with(['bebanMengajar.mapel:id,nama_mapel', 'bebanMengajar.kelas:id,nama_kelas'])
@@ -85,7 +89,10 @@ class GuruDashboardController extends Controller
             return response()->json(['success' => true, 'jadwal' => [], 'meta' => ['total' => 0]]);
         }
 
+        $versionId = $this->versionService->resolveForSemester($semester->id)->id;
+
         $jadwal = Jadwal::where('semester_id', $semester->id)
+            ->where('version_id', $versionId)
             ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $guru->id))
             ->with(['bebanMengajar.mapel:id,nama_mapel', 'bebanMengajar.kelas:id,nama_kelas'])
             ->orderByRaw("FIELD(LOWER(TRIM(hari)), 'senin','selasa','rabu','kamis','jumat','sabtu')")
@@ -137,7 +144,7 @@ class GuruDashboardController extends Controller
         };
     }
 
-    private function buildTpgStatus(Guru $guru, ?int $semesterId): array
+    private function buildTpgStatus(Guru $guru, ?int $semesterId, ?int $versionId = null): array
     {
         if (! $semesterId) {
             return [
@@ -153,14 +160,16 @@ class GuruDashboardController extends Controller
         }
 
         $guru->loadMissing([
-            'bebanMengajars' => fn ($q) => $q->where('semester_id', $semesterId),
+            'bebanMengajars' => fn ($q) => $q->where('semester_id', $semesterId)
+                ->when($versionId, fn ($q2) => $q2->where('version_id', $versionId)),
             'bebanMengajars.mapel.rumpuns',
-            'tugasTambahans' => fn ($q) => $q->wherePivot('semester_id', $semesterId),
+            'tugasTambahans' => fn ($q) => $q->wherePivot('semester_id', $semesterId)
+                ->when($versionId, fn ($q2) => $q2->wherePivot('version_id', $versionId)),
             'mapelSertifikasi.rumpuns',
             'mapelIjazah.rumpuns',
         ]);
 
-        $metrik = $this->guruService->hitungMetrik($guru, $semesterId);
+        $metrik = $this->guruService->hitungMetrik($guru, $semesterId, $versionId);
         $target = (int) ($metrik['TARGET'] ?? 24);
         $totalLinear = (int) ($metrik['totalLinear'] ?? 0);
         $deficit = max(0, $target - $totalLinear);

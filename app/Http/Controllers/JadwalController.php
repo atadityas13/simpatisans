@@ -10,6 +10,7 @@ use App\Models\GuruConstraint;
 use App\Models\Semester;
 use App\Services\JadwalSAOService;
 use App\Services\JadwalService;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -18,11 +19,13 @@ class JadwalController extends Controller
 {
     protected $jadwalService;
     protected $semesterService;
+    protected $versionService;
 
-    public function __construct(JadwalService $jadwalService, SemesterService $semesterService)
+    public function __construct(JadwalService $jadwalService, SemesterService $semesterService, JadwalVersionService $versionService)
     {
         $this->jadwalService = $jadwalService;
         $this->semesterService = $semesterService;
+        $this->versionService = $versionService;
     }
 
     public function index(Request $request)
@@ -41,8 +44,12 @@ class JadwalController extends Controller
         }
 
         $selectedSemester = Semester::findOrFail($semesterId);
+        $versions = $this->versionService->listForSemester($semesterId);
+        $selectedVersion = $this->versionService->resolveForSemester($semesterId, $request->integer('version_id') ?: null);
+        $versionId = $selectedVersion->id;
 
         $jadwals = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->with(['bebanMengajar.guru', 'bebanMengajar.mapel', 'bebanMengajar.kelas'])
             ->get();
 
@@ -94,6 +101,7 @@ class JadwalController extends Controller
         // Ambil data beban mengajar per kelas UNTUK SEMESTER TERPILIH
         $bebanCounts = $jadwals->groupBy('beban_mengajar_id')->map->count();
         $bebanPerKelas = BebanMengajar::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->where('is_satminkal', 1)
             ->with(['guru', 'mapel', 'kelas'])
             ->get()
@@ -147,14 +155,14 @@ class JadwalController extends Controller
         ])->values();
 
         // LOGIKA ANALISA JADWAL (DELEGATED TO SERVICE)
-        $analisa = $this->jadwalService->analisaPenuh($semesterId);
-        $slotIssueMap = $this->jadwalService->buildSlotIssueMap($semesterId, $analisa);
+        $analisa = $this->jadwalService->analisaPenuh($semesterId, $versionId);
+        $slotIssueMap = $this->jadwalService->buildSlotIssueMap($semesterId, $versionId, $analisa);
         $totalWarnings = $analisa['summary']['total_warnings'] ?? 0;
         $criticalWarnings = $analisa['summary']['critical_warnings'] ?? 0;
         $hasWarnings = $totalWarnings > 0;
         $hasCriticalWarnings = $criticalWarnings > 0;
 
-        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'slotData', 'slotIssueMap', 'kelasFlat', 'guruList', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
+        return view('jadwal.index', compact('grid', 'kelasList', 'strukturHari', 'jamLabels', 'jadwals', 'bebanPerKelas', 'slotData', 'slotIssueMap', 'kelasFlat', 'guruList', 'analisa', 'gurus', 'constraints', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion', 'totalWarnings', 'hasWarnings', 'criticalWarnings', 'hasCriticalWarnings'));
     }
 
     public function toggleConstraint(Request $request)
@@ -189,6 +197,7 @@ class JadwalController extends Controller
             'jam_ke' => 'required|integer',
             'kelas_id' => 'required|integer',
             'semester_id' => 'required|exists:semesters,id',
+            'version_id' => 'required|exists:jadwal_versions,id',
             'beban_mengajar_id' => 'nullable'
         ]);
 
@@ -213,6 +222,7 @@ class JadwalController extends Controller
 
             // CEK BENTROK GURU (Soft Warning) - Hanya di semester yang sama
             $bentrok = Jadwal::where('semester_id', $request->semester_id)
+                ->where('version_id', $request->version_id)
                 ->where('hari', $hariNormalized)
                 ->where('jam_ke', $request->jam_ke)
                 ->whereHas('bebanMengajar', function ($q) use ($beban) {
@@ -238,6 +248,7 @@ class JadwalController extends Controller
 
         // Cari record jadwal lama untuk kelas ini di slot ini PADA SEMESTER TERPILIH
         $jadwal = Jadwal::where('semester_id', $request->semester_id)
+            ->where('version_id', $request->version_id)
             ->where('hari', $hariNormalized)
             ->where('jam_ke', $request->jam_ke)
             ->whereHas('bebanMengajar', function ($q) use ($request) {
@@ -255,6 +266,7 @@ class JadwalController extends Controller
         } else {
             Jadwal::create([
                 'semester_id' => $request->semester_id,
+                'version_id' => $request->version_id,
                 'hari' => $hariNormalized,
                 'jam_ke' => $request->jam_ke,
                 'beban_mengajar_id' => $request->beban_mengajar_id
@@ -272,6 +284,7 @@ class JadwalController extends Controller
     {
         $request->validate([
             'semester_id' => 'required|exists:semesters,id',
+            'version_id' => 'required|exists:jadwal_versions,id',
             'slots' => 'required|array|min:1',
             'slots.*.hari' => 'required|string',
             'slots.*.jam_ke' => 'required|integer|min:1',
@@ -282,7 +295,7 @@ class JadwalController extends Controller
         $slots = $request->input('slots');
 
         if (!$request->boolean('force')) {
-            $result = $this->jadwalService->validatePlacements((int) $request->semester_id, $slots);
+            $result = $this->jadwalService->validatePlacements((int) $request->semester_id, (int) $request->version_id, $slots);
             if (!empty($result['warnings'])) {
                 return response()->json([
                     'success' => false,
@@ -293,7 +306,7 @@ class JadwalController extends Controller
             }
         }
 
-        $this->jadwalService->applyPlacements((int) $request->semester_id, $slots);
+        $this->jadwalService->applyPlacements((int) $request->semester_id, (int) $request->version_id, $slots);
 
         return response()->json(['success' => true, 'message' => 'Jadwal disimpan.']);
     }
@@ -308,11 +321,15 @@ class JadwalController extends Controller
         if (!$semesterId) {
             return redirect()->back()->with('error', 'Semester tidak valid.');
         }
+        $versionId = (int) $request->get('version_id');
+        if (!$versionId) {
+            $versionId = $this->versionService->resolveForSemester($semesterId)->id;
+        }
 
         try {
-            $result = $saoService->generate($semesterId);
+            $result = $saoService->generate($semesterId, $versionId);
 
-            $analisa = $this->jadwalService->analisaPenuh($semesterId);
+            $analisa = $this->jadwalService->analisaPenuh($semesterId, $versionId);
             $criticalWarnings = $analisa['summary']['critical_warnings'] ?? 0;
             $infoWarnings = $analisa['summary']['info_warnings'] ?? 0;
             $terisi = $result['total_slot_terisi'];
@@ -327,7 +344,7 @@ class JadwalController extends Controller
                 if ($presetViolations > 0) {
                     $msg .= "<br>Preset dilanggar: {$presetViolations} slot (penanda, bukan error generate).";
                 }
-                return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('error', $msg);
+                return redirect()->route('jadwal.index', ['semester_id' => $semesterId, 'version_id' => $versionId])->with('error', $msg);
             }
 
             $msg = "<b>Penjadwalan Selesai!</b><br>Jam Terisi: {$terisi}/{$target}";
@@ -338,10 +355,10 @@ class JadwalController extends Controller
                 $msg .= "<br>Penanda kualitas (preset/JTM/kelelahan): {$infoWarnings} — sesuaikan manual bila perlu.";
             }
 
-            return redirect()->route('jadwal.index', ['semester_id' => $semesterId])->with('success', $msg);
+            return redirect()->route('jadwal.index', ['semester_id' => $semesterId, 'version_id' => $versionId])->with('success', $msg);
         } catch (\Throwable $e) {
             Log::error('Generate jadwal gagal: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
-            return redirect()->route('jadwal.index', ['semester_id' => $semesterId])
+            return redirect()->route('jadwal.index', ['semester_id' => $semesterId, 'version_id' => $versionId])
                 ->with('error', $e->getMessage());
         }
     }
@@ -352,10 +369,14 @@ class JadwalController extends Controller
         if (!$semesterId) {
             return redirect()->back()->with('error', 'Semester tidak valid.');
         }
+        $versionId = (int) $request->get('version_id');
+        if (!$versionId) {
+            $versionId = $this->versionService->resolveForSemester((int) $semesterId)->id;
+        }
 
-        Jadwal::where('semester_id', $semesterId)->delete();
+        Jadwal::where('semester_id', $semesterId)->where('version_id', $versionId)->delete();
 
-        return redirect()->route('jadwal.index', ['semester_id' => $semesterId])
+        return redirect()->route('jadwal.index', ['semester_id' => $semesterId, 'version_id' => $versionId])
             ->with('success', 'Semua jadwal di matriks berhasil dikosongkan.');
     }
 }

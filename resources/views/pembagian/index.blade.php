@@ -25,29 +25,40 @@
                 <p class="text-gray-500 text-xs mt-0.5">Distribusi JTM, tugas tambahan dan monitoring beban kerja guru.</p>
             </div>
 
-            <form action="{{ route('pembagian.index') }}" method="GET" class="flex items-center space-x-2">
+            <form action="{{ route('pembagian.index') }}" method="GET" class="flex items-center gap-2">
                 <select name="semester_id" onchange="this.form.submit()"
                     class="bg-gray-50 border border-gray-200 text-gray-900 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 font-bold">
                     @foreach($allSemesters as $sem)
                         <option value="{{ $sem->id }}" {{ $selectedSemester->id == $sem->id ? 'selected' : '' }}>
-                            {{ $sem->nama_tahun }} - {{ $sem->tipe }} {{ $sem->is_active ? '(Aktif)' : '' }}
+                            {{ $sem->nama_tahun }} - {{ $sem->tipe }}{{ $sem->is_active ? ' (Aktif)' : '' }}{{ $sem->is_locked ? ' 🔒' : '' }}
                         </option>
                     @endforeach
                 </select>
+                @if(isset($versions) && $versions->count() > 1)
+                    <select name="version_id" onchange="this.form.submit()"
+                        class="bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs rounded-lg focus:ring-indigo-500 block w-full p-2.5 font-bold">
+                        @foreach($versions as $ver)
+                            <option value="{{ $ver->id }}" {{ ($selectedVersion->id ?? null) == $ver->id ? 'selected' : '' }}>
+                                {{ $ver->name }}{{ $ver->is_default ? ' ★' : '' }}
+                            </option>
+                        @endforeach
+                    </select>
+                @elseif(isset($selectedVersion))
+                    <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
+                @endif
             </form>
         </div>
 
-        @if(!$selectedSemester->is_active)
-            <div class="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3">
-                <div class="bg-amber-100 p-2 rounded-lg text-amber-600">
+        @if($selectedSemester->is_locked)
+            <div class="mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3">
+                <div class="bg-red-100 p-2 rounded-lg text-red-600">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 15v2m0 0v3m0-3h3m-3 0H9m12-3a9 9 0 11-18 0 9 9 0 0118 0zM15 7h.01M9 7h.01M15 11h.01M9 11h.01" />
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
                 <div>
-                    <p class="text-amber-900 font-bold text-sm uppercase tracking-tight">ARSIP</p>
-                    <p class="text-amber-700 text-xs mt-0.5">Anda memilih filter semester lain. Hanya dapat melihat data.</p>
+                    <p class="text-red-900 font-bold text-sm uppercase tracking-tight">Terkunci</p>
                 </div>
             </div>
         @endif
@@ -114,10 +125,10 @@
                                 {{ $m['totalLinear'] }} Jam
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <a href="{{ route('pembagian.show', ['guru' => $guru->id, 'semester_id' => $selectedSemester->id]) }}"
+                                <a href="{{ route('pembagian.show', ['guru' => $guru->id, 'semester_id' => $selectedSemester->id, 'version_id' => $selectedVersion->id ?? null]) }}"
                                     class="inline-flex items-center gap-1 p-2 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl transition shadow-sm"
-                                    title="{{ $selectedSemester->is_active ? 'Atur Pembagian Tugas' : 'Lihat Detail Pembagian' }}">
-                                    @if($selectedSemester->is_active)
+                                    title="{{ $selectedSemester->isEditable() ? 'Atur Pembagian Tugas' : 'Lihat Detail Pembagian' }}">
+                                    @if($selectedSemester->isEditable())
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />

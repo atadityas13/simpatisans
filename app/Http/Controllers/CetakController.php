@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\TugasTambahan;
 use App\Models\Guru;
 use App\Services\CetakPresetService;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use App\Models\Jadwal;
+use App\Models\JadwalVersion;
 use App\Models\Kelas;
 use Illuminate\Http\Request;
 
@@ -14,19 +16,30 @@ class CetakController extends Controller
 {
     protected $semesterService;
     protected $cetakPresetService;
+    protected $versionService;
 
-    public function __construct(SemesterService $semesterService, CetakPresetService $cetakPresetService)
+    public function __construct(SemesterService $semesterService, CetakPresetService $cetakPresetService, JadwalVersionService $versionService)
     {
         $this->semesterService = $semesterService;
         $this->cetakPresetService = $cetakPresetService;
+        $this->versionService = $versionService;
     }
 
     /**
      * Display the print menu page.
      */
-    public function index()
+    public function index(Request $request)
     {
         $activeSemester = $this->semesterService->getActiveSemester();
+        $versions = collect();
+        $selectedVersion = null;
+        if ($activeSemester) {
+            $versions = $this->versionService->listForSemester($activeSemester->id);
+            $selectedVersion = $this->versionService->resolveForSemester(
+                $activeSemester->id,
+                $request->integer('version_id') ?: null
+            );
+        }
 
         $presets = [
             'ttd_kepala' => \Illuminate\Support\Facades\Storage::disk('public')->exists('presets/ttd_kepala.png') ? asset('storage/presets/ttd_kepala.png') : null,
@@ -35,23 +48,41 @@ class CetakController extends Controller
         ];
 
         return view('admin.cetak.index', array_merge(
-            compact('activeSemester', 'presets'),
+            compact('activeSemester', 'versions', 'selectedVersion', 'presets'),
             $this->cetakPresetService->viewData()
         ));
     }
 
     /**
-     * Print the master schedule (Jadwal Pelajaran).
+     * @return array{0: \App\Models\Semester, 1: JadwalVersion}|null
      */
-    public function jadwalPelajaran()
+    private function resolveActiveVersion(Request $request): ?array
     {
         $activeSemester = $this->semesterService->getActiveSemester();
-
         if (!$activeSemester) {
-            return redirect()->back()->with('error', 'Tidak ada semester aktif.');
+            return null;
         }
 
+        $version = $this->versionService->resolveForSemester(
+            $activeSemester->id,
+            $request->integer('version_id') ?: null
+        );
+
+        return [$activeSemester, $version];
+    }
+
+    /**
+     * Print the master schedule (Jadwal Pelajaran).
+     */
+    public function jadwalPelajaran(Request $request)
+    {
+        $resolved = $this->resolveActiveVersion($request);
+        if (!$resolved) {
+            return redirect()->back()->with('error', 'Tidak ada semester aktif.');
+        }
+        [$activeSemester, $selectedVersion] = $resolved;
         $semesterId = $activeSemester->id;
+        $versionId = $selectedVersion->id;
 
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
@@ -63,6 +94,7 @@ class CetakController extends Controller
             ->get();
 
         $jadwals = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->with(['bebanMengajar.guru', 'bebanMengajar.mapel'])
             ->get();
 
@@ -80,20 +112,23 @@ class CetakController extends Controller
 
         $gurus = Guru::orderedByDuk()->get();
 
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
-              ->where('semester_id', $semesterId);
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
-        $wakaKurikulum = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $wakaKurikulum = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::WAKA_ID)
               ->where('detail', 'LIKE', '%Kurikulum%')
-              ->where('semester_id', $semesterId);
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
         return view('admin.cetak.jadwal-pelajaran', array_merge(
             compact(
                 'activeSemester',
+                'selectedVersion',
                 'kelasList',
                 'allKelas',
                 'grid',
@@ -106,15 +141,15 @@ class CetakController extends Controller
         ));
     }
 
-    public function jadwalBesar()
+    public function jadwalBesar(Request $request)
     {
-        $activeSemester = $this->semesterService->getActiveSemester();
-
-        if (!$activeSemester) {
+        $resolved = $this->resolveActiveVersion($request);
+        if (!$resolved) {
             return redirect()->back()->with('error', 'Tidak ada semester aktif.');
         }
-
+        [$activeSemester, $selectedVersion] = $resolved;
         $semesterId = $activeSemester->id;
+        $versionId = $selectedVersion->id;
 
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
@@ -126,6 +161,7 @@ class CetakController extends Controller
             ->get();
 
         $jadwals = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->with(['bebanMengajar.guru', 'bebanMengajar.mapel'])
             ->get();
 
@@ -143,20 +179,23 @@ class CetakController extends Controller
 
         $gurus = Guru::orderedByDuk()->get();
 
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
-              ->where('semester_id', $semesterId);
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
-        $wakaKurikulum = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $wakaKurikulum = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::WAKA_ID)
               ->where('detail', 'LIKE', '%Kurikulum%')
-              ->where('semester_id', $semesterId);
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
         return view('admin.cetak.jadwal-besar', array_merge(
             compact(
                 'activeSemester',
+                'selectedVersion',
                 'kelasList',
                 'allKelas',
                 'grid',
@@ -172,19 +211,20 @@ class CetakController extends Controller
     /**
      * Print the Teacher Picket Schedule (Jadwal Piket Guru).
      */
-    public function jadwalPiket()
+    public function jadwalPiket(Request $request)
     {
-        $activeSemester = $this->semesterService->getActiveSemester();
-
-        if (!$activeSemester) {
+        $resolved = $this->resolveActiveVersion($request);
+        if (!$resolved) {
             return redirect()->back()->with('error', 'Tidak ada semester aktif.');
         }
-
+        [$activeSemester, $selectedVersion] = $resolved;
         $semesterId = $activeSemester->id;
+        $versionId = $selectedVersion->id;
 
-        $piketData = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $piketData = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::GURU_PIKET_ID)
-              ->where('semester_id', $semesterId);
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->get();
 
         $days = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
@@ -193,7 +233,7 @@ class CetakController extends Controller
         foreach ($piketData as $guru) {
             $tugas = $guru->tugasTambahans()
                 ->where('tugas_tambahan_id', TugasTambahan::GURU_PIKET_ID)
-                ->wherePivot('semester_id', $semesterId)
+                ->wherePivot('semester_id', $semesterId)->wherePivot('version_id', $versionId)
                 ->first();
 
             if (!$tugas || !$tugas->pivot->hari) {
@@ -212,13 +252,14 @@ class CetakController extends Controller
             }
         }
 
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
-              ->where('semester_id', $semesterId);
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
         return view('admin.cetak.jadwal-piket', array_merge(
-            compact('activeSemester', 'schedule', 'days', 'kepalaMadrasah'),
+            compact('activeSemester', 'selectedVersion', 'schedule', 'days', 'kepalaMadrasah'),
             $this->cetakPresetService->viewData()
         ));
     }
@@ -226,26 +267,27 @@ class CetakController extends Controller
     /**
      * Print homeroom teacher list (Daftar Wali Kelas).
      */
-    public function daftarWaliKelas()
+    public function daftarWaliKelas(Request $request)
     {
-        $activeSemester = $this->semesterService->getActiveSemester();
-
-        if (!$activeSemester) {
+        $resolved = $this->resolveActiveVersion($request);
+        if (!$resolved) {
             return redirect()->back()->with('error', 'Tidak ada semester aktif.');
         }
-
+        [$activeSemester, $selectedVersion] = $resolved;
         $semesterId = $activeSemester->id;
+        $versionId = $selectedVersion->id;
 
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
             ->get();
 
-        $waliGurus = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $waliGurus = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::WALI_KELAS_ID)
-              ->where('semester_id', $semesterId);
-        })->with(['tugasTambahans' => function ($q) use ($semesterId) {
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
+        })->with(['tugasTambahans' => function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::WALI_KELAS_ID)
-              ->wherePivot('semester_id', $semesterId);
+              ->wherePivot('semester_id', $semesterId)->wherePivot('version_id', $versionId);
         }])->get();
 
         $waliByKelas = [];
@@ -264,26 +306,27 @@ class CetakController extends Controller
             ];
         });
 
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
-              ->where('semester_id', $semesterId);
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
         return view('admin.cetak.daftar-wali-kelas', array_merge(
-            compact('activeSemester', 'rows', 'kepalaMadrasah'),
+            compact('activeSemester', 'selectedVersion', 'rows', 'kepalaMadrasah'),
             $this->cetakPresetService->viewData()
         ));
     }
 
-    public function lampiranSk()
+    public function lampiranSk(Request $request)
     {
-        $activeSemester = $this->semesterService->getActiveSemester();
-
-        if (!$activeSemester) {
+        $resolved = $this->resolveActiveVersion($request);
+        if (!$resolved) {
             return redirect()->back()->with('error', 'Tidak ada semester aktif.');
         }
-
+        [$activeSemester, $selectedVersion] = $resolved;
         $semesterId = $activeSemester->id;
+        $versionId = $selectedVersion->id;
 
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
@@ -295,11 +338,12 @@ class CetakController extends Controller
             ->get();
 
         $gurus = Guru::with([
-            'bebanMengajars' => function ($q) use ($semesterId) {
-                $q->where('semester_id', $semesterId)->with(['mapel.rumpuns', 'kelas']);
+            'bebanMengajars' => function ($q) use ($semesterId, $versionId) {
+                $q->where('semester_id', $semesterId)->where('version_id', $versionId)->with(['mapel.rumpuns', 'kelas']);
             },
-            'tugasTambahans' => function ($q) use ($semesterId) {
+            'tugasTambahans' => function ($q) use ($semesterId, $versionId) {
                 $q->where('semester_id', $semesterId)
+                  ->where('version_id', $versionId)
                   ->orderByPivot('is_ekuivalen', 'desc');
             },
             'mapelSertifikasi',
@@ -307,13 +351,14 @@ class CetakController extends Controller
         ->orderedByDuk()
         ->get();
 
-        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
-              ->where('semester_id', $semesterId);
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
         })->first();
 
         return view('admin.cetak.lampiran-sk', array_merge(
-            compact('activeSemester', 'kelasList', 'allKelas', 'gurus', 'kepalaMadrasah'),
+            compact('activeSemester', 'selectedVersion', 'kelasList', 'allKelas', 'gurus', 'kepalaMadrasah'),
             $this->cetakPresetService->viewData()
         ));
     }

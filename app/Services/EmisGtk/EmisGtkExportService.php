@@ -21,7 +21,7 @@ class EmisGtkExportService
      * @param  list<int>  $kelasIds
      * @return array{path: string, filename: string, report: array}
      */
-    public function export(int $semesterId, array $kelasIds): array
+    public function export(int $semesterId, int $versionId, array $kelasIds): array
     {
         $templatePath = $this->referenceService->referencesPath('template_jadwal.xlsx');
         $spreadsheet = IOFactory::load($templatePath);
@@ -72,6 +72,7 @@ class EmisGtkExportService
                 $this->clearTeachableCells($sheet, $index, $tingkat, $rombel);
 
                 $jadwals = Jadwal::where('semester_id', $semesterId)
+                    ->where('version_id', $versionId)
                     ->where('hari', $day)
                     ->whereHas('bebanMengajar', fn ($q) => $q->where('kelas_id', $kelas->id))
                     ->with(['bebanMengajar.guru', 'bebanMengajar.mapel'])

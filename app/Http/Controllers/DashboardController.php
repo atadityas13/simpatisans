@@ -9,6 +9,7 @@ use App\Models\BebanMengajar;
 use App\Models\TugasTambahan;
 use App\Services\GuruService;
 use App\Services\JadwalService;
+use App\Services\JadwalVersionService;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
@@ -16,12 +17,18 @@ class DashboardController extends Controller
     protected $guruService;
     protected $jadwalService;
     protected $semesterService;
+    protected $versionService;
 
-    public function __construct(GuruService $guruService, JadwalService $jadwalService, \App\Services\SemesterService $semesterService)
-    {
+    public function __construct(
+        GuruService $guruService,
+        JadwalService $jadwalService,
+        \App\Services\SemesterService $semesterService,
+        JadwalVersionService $versionService,
+    ) {
         $this->guruService = $guruService;
         $this->jadwalService = $jadwalService;
         $this->semesterService = $semesterService;
+        $this->versionService = $versionService;
     }
 
     public function index()
@@ -42,6 +49,7 @@ class DashboardController extends Controller
         }
 
         $semesterId = $activeSemester->id;
+        $versionId = $this->versionService->resolveForSemester($semesterId)->id;
 
         $stats = [
             'total_guru'  => Guru::count(),
@@ -51,19 +59,20 @@ class DashboardController extends Controller
 
         // 1. Progress Alokasi JTM (Estimasi) - Hanya untuk semester aktif
         $totalKebutuhanJtm = Kelas::count() * Mapel::sum('jtm_default');
-        $totalAlokasiJtm   = BebanMengajar::where('semester_id', $semesterId)->sum('jtm');
+        $totalAlokasiJtm   = BebanMengajar::where('semester_id', $semesterId)->where('version_id', $versionId)->sum('jtm');
         $stats['progres_jtm'] = $totalKebutuhanJtm > 0 ? round(($totalAlokasiJtm / $totalKebutuhanJtm) * 100) : 0;
         $stats['jtm_terisi'] = $totalAlokasiJtm;
         $stats['jtm_total']  = $totalKebutuhanJtm;
 
         // 2. Analisa Jadwal (Integrity Score) - Hanya untuk semester aktif
-        $analisa = $this->jadwalService->analisaPenuh($semesterId);
+        $analisa = $this->jadwalService->analisaPenuh($semesterId, $versionId);
         $stats['health_score'] = $analisa['summary']['health_score'];
         $stats['total_problems'] = $analisa['summary']['total_warnings'];
 
         // 3. Rekomendasi: Rombel Tanpa Wali Kelas
         $waliKelasTerisi = DB::table('guru_tugas_tambahans')
             ->where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->where('tugas_tambahan_id', TugasTambahan::WALI_KELAS_ID)
             ->pluck('detail')
             ->filter()
@@ -76,9 +85,9 @@ class DashboardController extends Controller
 
         // 4. Rekomendasi: Defisit JTM Linear (Guru Sertifikasi) - Berdasarkan semester aktif
         $guruSertifikasi = Guru::with([
-            'bebanMengajars' => fn($q) => $q->where('semester_id', $semesterId),
+            'bebanMengajars' => fn($q) => $q->where('semester_id', $semesterId)->where('version_id', $versionId),
             'bebanMengajars.mapel',
-            'tugasTambahans' => fn($q) => $q->wherePivot('semester_id', $semesterId),
+            'tugasTambahans' => fn($q) => $q->wherePivot('semester_id', $semesterId)->wherePivot('version_id', $versionId),
             'mapelSertifikasi'
         ])
         ->where('status_sertifikasi', true)
@@ -86,7 +95,7 @@ class DashboardController extends Controller
 
         $defisitTpg = [];
         foreach ($guruSertifikasi as $guru) {
-            $metrik = $this->guruService->hitungMetrik($guru, $semesterId);
+            $metrik = $this->guruService->hitungMetrik($guru, $semesterId, $versionId);
             if (!$metrik['layak']) {
                 $defisitTpg[] = [
                     'id'     => $guru->id,

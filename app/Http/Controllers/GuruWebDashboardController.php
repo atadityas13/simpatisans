@@ -7,6 +7,7 @@ use App\Models\Guru;
 use App\Models\Jadwal;
 use App\Services\GuruService;
 use App\Services\JamPelajaranService;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -17,6 +18,7 @@ class GuruWebDashboardController extends Controller
         private SemesterService $semesterService,
         private JamPelajaranService $jamPelajaranService,
         private GuruService $guruService,
+        private JadwalVersionService $versionService,
     ) {
     }
 
@@ -30,9 +32,11 @@ class GuruWebDashboardController extends Controller
         $hariIni = $this->hariIndonesia();
         $jadwalHariIni = collect();
         $tpgStatus = null;
+        $versionId = $semester ? $this->versionService->resolveForSemester($semester->id)->id : null;
 
-        if ($guru && $semester) {
+        if ($guru && $semester && $versionId) {
             $jadwalHariIni = Jadwal::where('semester_id', $semester->id)
+                ->where('version_id', $versionId)
                 ->whereRaw('LOWER(hari) = ?', [strtolower($hariIni)])
                 ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $guru->id))
                 ->with(['bebanMengajar.mapel:id,nama_mapel', 'bebanMengajar.kelas:id,nama_kelas'])
@@ -45,7 +49,7 @@ class GuruWebDashboardController extends Controller
                     'kelas' => $j->bebanMengajar?->kelas?->nama_kelas,
                 ]);
 
-            $tpgStatus = $this->buildTpgStatus($guru, $semester->id);
+            $tpgStatus = $this->buildTpgStatus($guru, $semester->id, $versionId);
         }
 
         $playStoreUrl = 'https://play.google.com/store/apps/details?id=com.atadevlabs.talim';
@@ -63,17 +67,19 @@ class GuruWebDashboardController extends Controller
         ]);
     }
 
-    private function buildTpgStatus(Guru $guru, int $semesterId): array
+    private function buildTpgStatus(Guru $guru, int $semesterId, ?int $versionId = null): array
     {
         $guru->loadMissing([
-            'bebanMengajars' => fn ($q) => $q->where('semester_id', $semesterId),
+            'bebanMengajars' => fn ($q) => $q->where('semester_id', $semesterId)
+                ->when($versionId, fn ($q2) => $q2->where('version_id', $versionId)),
             'bebanMengajars.mapel.rumpuns',
-            'tugasTambahans' => fn ($q) => $q->wherePivot('semester_id', $semesterId),
+            'tugasTambahans' => fn ($q) => $q->wherePivot('semester_id', $semesterId)
+                ->when($versionId, fn ($q2) => $q2->wherePivot('version_id', $versionId)),
             'mapelSertifikasi.rumpuns',
             'mapelIjazah.rumpuns',
         ]);
 
-        $metrik = $this->guruService->hitungMetrik($guru, $semesterId);
+        $metrik = $this->guruService->hitungMetrik($guru, $semesterId, $versionId);
         $target = (int) ($metrik['TARGET'] ?? 24);
         $totalLinear = (int) ($metrik['totalLinear'] ?? 0);
         $deficit = max(0, $target - $totalLinear);

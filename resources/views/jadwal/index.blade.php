@@ -30,14 +30,25 @@
             </div>
             
             <div class="flex items-center gap-3">
-                <form action="{{ route('jadwal.index') }}" method="GET" class="flex items-center">
+                <form action="{{ route('jadwal.index') }}" method="GET" class="flex items-center gap-2">
                     <select name="semester_id" onchange="this.form.submit()" class="bg-gray-50 border border-gray-200 text-gray-900 text-xs rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5 font-bold shadow-sm">
                         @foreach($allSemesters as $sem)
                             <option value="{{ $sem->id }}" {{ $selectedSemester->id == $sem->id ? 'selected' : '' }}>
-                                {{ $sem->nama_tahun }} - {{ $sem->tipe }} {{ $sem->is_active ? '(Aktif)' : '' }}
+                                {{ $sem->nama_tahun }} - {{ $sem->tipe }}{{ $sem->is_active ? ' (Aktif)' : '' }}{{ $sem->is_locked ? ' 🔒' : '' }}
                             </option>
                         @endforeach
                     </select>
+                    @if(isset($versions) && $versions->count() > 1)
+                        <select name="version_id" onchange="this.form.submit()" class="bg-indigo-50 border border-indigo-200 text-indigo-900 text-xs rounded-lg focus:ring-indigo-500 block w-full p-2.5 font-bold shadow-sm">
+                            @foreach($versions as $ver)
+                                <option value="{{ $ver->id }}" {{ ($selectedVersion->id ?? null) == $ver->id ? 'selected' : '' }}>
+                                    {{ $ver->name }}{{ $ver->is_default ? ' ★' : '' }}
+                                </option>
+                            @endforeach
+                        </select>
+                    @elseif(isset($selectedVersion))
+                        <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
+                    @endif
                 </form>
 
                 <div class="h-8 w-px bg-gray-200 mx-1"></div>
@@ -62,7 +73,7 @@
                     </button>
                 @endif
 
-                @if($selectedSemester->is_active)
+                @if($selectedSemester->isEditable())
                     <button @click="showConstraintModal = true"
                         class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 bg-orange-500 hover:bg-orange-600 text-white">
                         <span>PRESET JADWAL</span>
@@ -71,6 +82,7 @@
                     <form action="{{ route('jadwal.generate') }}" method="POST" @submit="startLoading()" class="flex">
                         @csrf
                         <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+                        <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
                         <button type="submit"
                             class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 bg-indigo-600 hover:bg-indigo-700 text-white">
                             <span>GENERATE (AI)</span>
@@ -80,14 +92,13 @@
             </div>
         </div>
 
-        @if(!$selectedSemester->is_active)
-            <div class="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3">
-                <div class="bg-amber-100 p-2 rounded-lg text-amber-600">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m0 0v3m0-3h3m-3 0H9m12-3a9 9 0 11-18 0 9 9 0 0118 0zM15 7h.01M9 7h.01M15 11h.01M9 11h.01"/></svg>
+        @if($selectedSemester->is_locked)
+            <div class="mb-6 bg-red-50 border border-red-200 p-4 rounded-xl flex items-center gap-3">
+                <div class="bg-red-100 p-2 rounded-lg text-red-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 </div>
                 <div>
-                    <p class="text-amber-900 font-bold text-sm uppercase tracking-tight">ARSIP</p>
-                    <p class="text-amber-700 text-xs mt-0.5">Anda memilih filter semester lain. Perubahan jadwal tidak diizinkan.</p>
+                    <p class="text-red-900 font-bold text-sm uppercase tracking-tight">Terkunci</p>
                 </div>
             </div>
         @endif
@@ -565,13 +576,14 @@
 
         @include('jadwal.partials.manual-editor')
 
-        @if($selectedSemester->is_active)
+        @if($selectedSemester->isEditable())
             <div class="flex justify-start mb-1.5 px-0.5">
                 <form action="{{ route('jadwal.clear') }}" method="POST" 
                     data-confirm="Hapus SEMUA jadwal yang sudah terinput ke matriks untuk semester ini?">
                     @csrf
                     @method('DELETE')
                     <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
+                    <input type="hidden" name="version_id" value="{{ $selectedVersion->id }}">
                     <button type="submit" class="flex items-center gap-1 text-red-500 hover:text-red-700 font-bold text-[9px] uppercase tracking-tighter transition-colors opacity-80 hover:opacity-100 italic">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-9 9-7-7 9-9zM7 13l4 4" />
@@ -766,8 +778,8 @@
                                                 $bg = 'cell-jumat-5';
                                             }
                                         @endphp
-                                        <td class="border border-gray-800 p-0 text-center font-bold {{ $bg }} {{ $issueCritical ? 'shadow-[inset_0_0_4px_rgba(239,68,68,0.5)]' : ($issueInfo ? 'shadow-[inset_0_0_3px_rgba(234,179,8,0.5)]' : '') }} {{ $selectedSemester->is_active ? 'hover:bg-indigo-200 cursor-pointer' : 'cursor-default opacity-80' }} transition-colors leading-tight relative"
-                                            @if($selectedSemester->is_active)
+                                        <td class="border border-gray-800 p-0 text-center font-bold {{ $bg }} {{ $issueCritical ? 'shadow-[inset_0_0_4px_rgba(239,68,68,0.5)]' : ($issueInfo ? 'shadow-[inset_0_0_3px_rgba(234,179,8,0.5)]' : '') }} {{ $selectedSemester->isEditable() ? 'hover:bg-indigo-200 cursor-pointer' : 'cursor-default opacity-80' }} transition-colors leading-tight relative"
+                                            @if($selectedSemester->isEditable())
                                                 @dblclick="editCell('{{ $hari }}', {{ $jam }}, {{ $kItem->id }}, '{{ $kg }}', $event)"
                                             @endif
                                             @if($issueTooltip) title="{{ e($issueTooltip) }}" @elseif($slot) title="[{{ $kg }}] {{ e($tName) }} - {{ e($mName) }}" @else title="Kosong" @endif>
@@ -833,7 +845,10 @@
                         loadingCounter: 0,
                         loadingInterval: null,
                         semester_id: '{{ $selectedSemester->id }}',
-                        is_active: {{ $selectedSemester->is_active ? 'true' : 'false' }},
+                        version_id: '{{ $selectedVersion->id }}',
+                        is_active: {{ $selectedSemester->isEditable() ? 'true' : 'false' }},
+                        can_edit: {{ $selectedSemester->isEditable() ? 'true' : 'false' }},
+                        semester_locked: {{ $selectedSemester->is_locked ? 'true' : 'false' }},
 
                         startLoading() {
                             this.showLoading = true;
@@ -1291,6 +1306,7 @@
                                     hari, jam_ke: jam, kelas_id: kelasId,
                                     beban_mengajar_id: null,
                                     semester_id: this.semester_id,
+                                    version_id: this.version_id,
                                     _token: '{{ csrf_token() }}',
                                 }),
                             }).then(() => location.reload());
@@ -1316,6 +1332,7 @@
                                     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                                     body: JSON.stringify({
                                         semester_id: this.semester_id,
+                                    version_id: this.version_id,
                                         slots,
                                         force: force ? 1 : 0,
                                         _token: '{{ csrf_token() }}',
@@ -1580,6 +1597,7 @@
                                 jam_ke: jam,
                                 type: this.selectionType,
                                 semester_id: this.semester_id,
+                                    version_id: this.version_id,
                                 _token: '{{ csrf_token() }}'
                             };
 

@@ -8,6 +8,7 @@ use App\Models\Mapel;
 use App\Models\Semester;
 use App\Services\EmisGtk\EmisGtkExportService;
 use App\Services\EmisGtk\EmisGtkReferenceService;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -18,6 +19,7 @@ class EmisGtkController extends Controller
         private readonly EmisGtkExportService $exportService,
         private readonly EmisGtkReferenceService $referenceService,
         private readonly SemesterService $semesterService,
+        private readonly JadwalVersionService $versionService,
     ) {}
 
     public function index(Request $request)
@@ -26,6 +28,16 @@ class EmisGtkController extends Controller
         $activeSemester = $this->semesterService->getActiveSemester();
         $semesterId = $request->get('semester_id', $activeSemester?->id);
         $selectedSemester = $semesterId ? Semester::find($semesterId) : $activeSemester;
+
+        $versions = collect();
+        $selectedVersion = null;
+        if ($semesterId) {
+            $versions = $this->versionService->listForSemester((int) $semesterId);
+            $selectedVersion = $this->versionService->resolveForSemester(
+                (int) $semesterId,
+                $request->integer('version_id') ?: null
+            );
+        }
 
         $kelasList = Kelas::orderByRaw("FIELD(tingkat, 'VII', 'VIII', 'IX')")
             ->orderBy('nama_kelas')
@@ -47,6 +59,8 @@ class EmisGtkController extends Controller
         return view('emis-gtk.index', compact(
             'allSemesters',
             'selectedSemester',
+            'versions',
+            'selectedVersion',
             'kelasList',
             'stats',
         ));
@@ -56,12 +70,19 @@ class EmisGtkController extends Controller
     {
         $validated = $request->validate([
             'semester_id' => 'required|exists:semesters,id',
+            'version_id' => 'required|exists:jadwal_versions,id',
             'kelas_ids' => 'required|array|min:1',
             'kelas_ids.*' => 'integer|exists:kelas,id',
         ]);
 
+        $version = $this->versionService->resolveForSemester(
+            (int) $validated['semester_id'],
+            (int) $validated['version_id']
+        );
+
         $result = $this->exportService->export(
             (int) $validated['semester_id'],
+            (int) $version->id,
             array_map('intval', $validated['kelas_ids']),
         );
 
@@ -94,7 +115,10 @@ class EmisGtkController extends Controller
         $summary = $this->referenceService->importAll($basePath);
 
         return redirect()
-            ->route('emis-gtk.index', ['semester_id' => $request->get('semester_id')])
+            ->route('emis-gtk.index', [
+                'semester_id' => $request->get('semester_id'),
+                'version_id' => $request->get('version_id'),
+            ])
             ->with('emis_import_summary', $summary)
             ->with('success', 'Referensi EMIS-GTK berhasil diimpor ke database.');
     }

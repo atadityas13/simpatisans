@@ -15,12 +15,13 @@ class JadwalSAOService
 {
     private const TIME_BUDGET = 120;
 
-    public function generate(int $semesterId): array
+    public function generate(int $semesterId, int $versionId): array
     {
         @ini_set('memory_limit', '512M');
         @set_time_limit(self::TIME_BUDGET + 30);
 
         $beban = BebanMengajar::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->where('is_satminkal', 1)
             ->count();
 
@@ -32,12 +33,12 @@ class JadwalSAOService
             throw new \Exception('Data Kelas kosong.');
         }
 
-        $solver = JadwalCspSolver::fromSemester($semesterId);
+        $solver = JadwalCspSolver::fromSemester($semesterId, $versionId);
         $target = $solver->getTargetCapacity();
 
         $ok = false;
         for ($attempt = 0; $attempt < 3; $attempt++) {
-            $solver = JadwalCspSolver::fromSemester($semesterId);
+            $solver = JadwalCspSolver::fromSemester($semesterId, $versionId);
             if ($solver->solve((int) max(45, self::TIME_BUDGET / 3), $attempt * 23 + 1)) {
                 $ok = true;
                 break;
@@ -49,7 +50,7 @@ class JadwalSAOService
         }
 
         if (!$ok) {
-            $solver = JadwalCspSolver::fromSemester($semesterId);
+            $solver = JadwalCspSolver::fromSemester($semesterId, $versionId);
             $solver->solve(self::TIME_BUDGET, 99);
         }
 
@@ -60,13 +61,13 @@ class JadwalSAOService
             throw new \Exception('Gagal membuat jadwal. Periksa beban mengajar.');
         }
 
-        return $this->simpan($semesterId, $solver->getAssignments(), $terisi, $target, $kosong);
+        return $this->simpan($semesterId, $versionId, $solver->getAssignments(), $terisi, $target, $kosong);
     }
 
     /** @param list<array{beban_id:int,hari:string,jam:int}> $assignments */
-    private function simpan(int $semesterId, array $assignments, int $terisi, int $target, int $kosong): array
+    private function simpan(int $semesterId, int $versionId, array $assignments, int $terisi, int $target, int $kosong): array
     {
-        DB::table('jadwals')->where('semester_id', $semesterId)->delete();
+        DB::table('jadwals')->where('semester_id', $semesterId)->where('version_id', $versionId)->delete();
         DB::beginTransaction();
         try {
             $rows = [];
@@ -74,6 +75,7 @@ class JadwalSAOService
             foreach ($assignments as $a) {
                 $rows[] = [
                     'semester_id' => $semesterId,
+                    'version_id' => $versionId,
                     'beban_mengajar_id' => $a['beban_id'],
                     'hari' => ucfirst(strtolower(trim($a['hari']))),
                     'jam_ke' => $a['jam'],

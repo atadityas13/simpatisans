@@ -14,11 +14,21 @@ class Semester extends Model
         'nama_tahun',
         'tipe',
         'is_active',
+        'is_locked',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'is_locked' => 'boolean',
     ];
+
+    /**
+     * Apakah pembagian tugas & jadwal boleh diedit.
+     */
+    public function isEditable(): bool
+    {
+        return ! $this->is_locked;
+    }
 
     /**
      * Get the display name for the semester.
@@ -26,6 +36,16 @@ class Semester extends Model
     public function getFullLabelAttribute(): string
     {
         return "{$this->nama_tahun} - {$this->tipe}";
+    }
+
+    public function versions(): HasMany
+    {
+        return $this->hasMany(JadwalVersion::class);
+    }
+
+    public function defaultVersion(): HasMany
+    {
+        return $this->hasMany(JadwalVersion::class)->where('is_default', true);
     }
 
     public function bebanMengajars(): HasMany

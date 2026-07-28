@@ -9,7 +9,7 @@ class GuruService
     /**
      * Hitung metrik beban kerja dan kelayakan sertifikasi guru.
      */
-    public function hitungMetrik(Guru $guru, int $semesterId): array
+    public function hitungMetrik(Guru $guru, int $semesterId, ?int $versionId = null): array
     {
         $sertRumpun  = $guru->mapelSertifikasi?->rumpuns; // Updated to rumpuns, though still unused
         $sertMapelId = $guru->mapel_sertifikasi_id;
@@ -20,6 +20,9 @@ class GuruService
         $jtmLinearKbm = 0;
         // Filter beban mengajar berdasarkan semester
         $bebanMengajars = $guru->bebanMengajars->where('semester_id', $semesterId);
+        if ($versionId !== null) {
+            $bebanMengajars = $bebanMengajars->where('version_id', $versionId);
+        }
         
         foreach ($bebanMengajars as $bm) {
             $jtmKbm += $bm->jtm;
@@ -32,8 +35,14 @@ class GuruService
         $jtmTugas = 0;
         $jtmLinearTugas = 0;
         // Filter tugas tambahan berdasarkan semester
-        $tugasTambahans = $guru->tugasTambahans->filter(function($t) use ($semesterId) {
-            return $t->pivot->semester_id == $semesterId;
+        $tugasTambahans = $guru->tugasTambahans->filter(function($t) use ($semesterId, $versionId) {
+            if ($t->pivot->semester_id != $semesterId) {
+                return false;
+            }
+            if ($versionId !== null && (int) ($t->pivot->version_id ?? 0) !== (int) $versionId) {
+                return false;
+            }
+            return true;
         });
 
         foreach ($tugasTambahans as $t) {

@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active_role' => \App\Http\Middleware\ActiveRoleMiddleware::class,
             'first_login' => \App\Http\Middleware\EnforceFirstLogin::class,
+            'semester_unlocked' => \App\Http\Middleware\ProtectActiveSemester::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

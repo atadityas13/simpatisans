@@ -13,9 +13,10 @@ class JadwalService
     /**
      * Jalankan analisa penuh terhadap seluruh data jadwal.
      */
-    public function analisaPenuh(int $semesterId): array
+    public function analisaPenuh(int $semesterId, int $versionId): array
     {
         $jadwals = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->with(['bebanMengajar.guru', 'bebanMengajar.mapel', 'bebanMengajar.kelas'])
             ->get();
         $gurus   = Guru::all();
@@ -205,7 +206,8 @@ class JadwalService
         }
 
         // 6c. Mapel belum terisi penuh (JTM vs slot jadwal)
-        $allBeban = BebanMengajar::where('semester_id', $semesterId)->where('is_satminkal', 1)
+        $allBeban = BebanMengajar::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)->where('is_satminkal', 1)
             ->with(['guru', 'mapel', 'kelas'])->get();
         foreach ($allBeban as $beban) {
             $placed = $bebanUsage->get($beban->id)?->count() ?? 0;
@@ -242,7 +244,7 @@ class JadwalService
      * @param  array<int, array{hari: string, jam_ke: int, kelas_id: int, beban_mengajar_id: int}>  $placements
      * @return array{warnings: array<int, array{level: string, code: string, message: string}>, has_critical: bool}
      */
-    public function validatePlacements(int $semesterId, array $placements): array
+    public function validatePlacements(int $semesterId, int $versionId, array $placements): array
     {
         $warnings = [];
         $seen = [];
@@ -266,6 +268,7 @@ class JadwalService
         }
 
         $existingBebanJadwals = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->where('beban_mengajar_id', $beban->id)
             ->with('bebanMengajar')
             ->get();
@@ -305,6 +308,7 @@ class JadwalService
             }
 
             $bentrok = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
                 ->where('hari', $hari)
                 ->where('jam_ke', $jam)
                 ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $beban->guru_id))
@@ -381,6 +385,7 @@ class JadwalService
         $affectedDays = collect($placements)->map(fn ($p) => $this->normalizeHari($p['hari']))->unique();
         foreach ($affectedDays as $hari) {
             $jams = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
                 ->where('hari', $hari)
                 ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $beban->guru_id))
                 ->with('bebanMengajar')
@@ -417,9 +422,9 @@ class JadwalService
      *
      * @param  array<int, array{hari: string, jam_ke: int, kelas_id: int, beban_mengajar_id: int}>  $placements
      */
-    public function applyPlacements(int $semesterId, array $placements): void
+    public function applyPlacements(int $semesterId, int $versionId, array $placements): void
     {
-        \DB::transaction(function () use ($semesterId, $placements) {
+        \DB::transaction(function () use ($semesterId, $versionId, $placements) {
             foreach ($placements as $p) {
                 $hari = $this->normalizeHari($p['hari']);
                 $jam = (int) $p['jam_ke'];
@@ -427,6 +432,7 @@ class JadwalService
                 $bebanId = (int) $p['beban_mengajar_id'];
 
                 $jadwal = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
                     ->where('hari', $hari)
                     ->where('jam_ke', $jam)
                     ->whereHas('bebanMengajar', fn ($q) => $q->where('kelas_id', $kelasId))
@@ -437,6 +443,7 @@ class JadwalService
                 } else {
                     Jadwal::create([
                         'semester_id' => $semesterId,
+                        'version_id' => $versionId,
                         'hari' => $hari,
                         'jam_ke' => $jam,
                         'beban_mengajar_id' => $bebanId,
@@ -472,11 +479,12 @@ class JadwalService
      *
      * @return array<string, array<int, array{level: string, code: string, message: string}>>
      */
-    public function buildSlotIssueMap(int $semesterId, ?array $analisa = null): array
+    public function buildSlotIssueMap(int $semesterId, int $versionId, ?array $analisa = null): array
     {
-        $analisa ??= $this->analisaPenuh($semesterId);
+        $analisa ??= $this->analisaPenuh($semesterId, $versionId);
 
         $jadwals = Jadwal::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->with(['bebanMengajar.guru', 'bebanMengajar.mapel', 'bebanMengajar.kelas'])
             ->get();
 

@@ -52,11 +52,13 @@ Route::group(['middleware' => 'auth'], function () {
             Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
             Route::get('jadwal', [JadwalController::class, 'index'])->name('jadwal.index');
-            Route::post('jadwal/generate', [JadwalController::class, 'generate'])->name('jadwal.generate');
-            Route::post('jadwal/update-slot', [JadwalController::class, 'updateSlot'])->name('jadwal.update-slot');
-            Route::post('jadwal/update-slots-batch', [JadwalController::class, 'updateSlotsBatch'])->name('jadwal.update-slots-batch');
-            Route::delete('jadwal/clear', [JadwalController::class, 'clear'])->name('jadwal.clear');
-            Route::post('jadwal/toggle-constraint', [JadwalController::class, 'toggleConstraint'])->name('jadwal.toggle-constraint');
+            Route::middleware('semester_unlocked')->group(function () {
+                Route::post('jadwal/generate', [JadwalController::class, 'generate'])->name('jadwal.generate');
+                Route::post('jadwal/update-slot', [JadwalController::class, 'updateSlot'])->name('jadwal.update-slot');
+                Route::post('jadwal/update-slots-batch', [JadwalController::class, 'updateSlotsBatch'])->name('jadwal.update-slots-batch');
+                Route::delete('jadwal/clear', [JadwalController::class, 'clear'])->name('jadwal.clear');
+                Route::post('jadwal/toggle-constraint', [JadwalController::class, 'toggleConstraint'])->name('jadwal.toggle-constraint');
+            });
             Route::get('emis-gtk', [EmisGtkController::class, 'index'])->name('emis-gtk.index');
             Route::post('emis-gtk/export', [EmisGtkController::class, 'export'])->name('emis-gtk.export');
             Route::post('emis-gtk/import-references', [EmisGtkController::class, 'importReferences'])->name('emis-gtk.import-references');
@@ -71,14 +73,16 @@ Route::group(['middleware' => 'auth'], function () {
 
             Route::get('pembagian-tugas', [PembagianTugasController::class, 'index'])->name('pembagian.index');
             Route::get('pembagian-tugas/guru/{guru}', [PembagianTugasController::class, 'show'])->name('pembagian.show');
-            Route::post('pembagian-tugas/guru/{guru}/kbm', [PembagianTugasController::class, 'storeKbm'])->name('pembagian.kbm.store');
-            Route::delete('pembagian-tugas/kbm/{beban}', [PembagianTugasController::class, 'destroyKbm'])->name('pembagian.kbm.destroy');
-            Route::delete('pembagian-tugas/guru/{guru}/kbm-clear', [PembagianTugasController::class, 'clearKbm'])->name('pembagian.kbm.clear');
+            Route::middleware('semester_unlocked')->group(function () {
+                Route::post('pembagian-tugas/guru/{guru}/kbm', [PembagianTugasController::class, 'storeKbm'])->name('pembagian.kbm.store');
+                Route::delete('pembagian-tugas/kbm/{beban}', [PembagianTugasController::class, 'destroyKbm'])->name('pembagian.kbm.destroy');
+                Route::delete('pembagian-tugas/guru/{guru}/kbm-clear', [PembagianTugasController::class, 'clearKbm'])->name('pembagian.kbm.clear');
 
-            Route::post('pembagian-tugas/guru/{guru}/non-satminkal', [PembagianTugasController::class, 'storeNonSatminkal'])->name('pembagian.non-satminkal.store');
-            Route::delete('pembagian-tugas/non-satminkal/{beban}', [PembagianTugasController::class, 'destroyNonSatminkal'])->name('pembagian.non-satminkal.destroy');
-            Route::post('pembagian-tugas/guru/{guru}/tugas', [PembagianTugasController::class, 'storeTugas'])->name('pembagian.tugas.store');
-            Route::delete('pembagian-tugas/guru/{guru}/tugas/{tugas}', [PembagianTugasController::class, 'destroyTugas'])->name('pembagian.tugas.destroy');
+                Route::post('pembagian-tugas/guru/{guru}/non-satminkal', [PembagianTugasController::class, 'storeNonSatminkal'])->name('pembagian.non-satminkal.store');
+                Route::delete('pembagian-tugas/non-satminkal/{beban}', [PembagianTugasController::class, 'destroyNonSatminkal'])->name('pembagian.non-satminkal.destroy');
+                Route::post('pembagian-tugas/guru/{guru}/tugas', [PembagianTugasController::class, 'storeTugas'])->name('pembagian.tugas.store');
+                Route::delete('pembagian-tugas/guru/{guru}/tugas/{tugas}', [PembagianTugasController::class, 'destroyTugas'])->name('pembagian.tugas.destroy');
+            });
 
             Route::resource('master/guru', GuruController::class);
             Route::resource('master/mapel', MapelController::class);
@@ -87,6 +91,9 @@ Route::group(['middleware' => 'auth'], function () {
 
             Route::resource('pengaturan/semester', SemesterController::class);
             Route::post('pengaturan/semester/{semester}/activate', [SemesterController::class, 'activate'])->name('semester.activate');
+            Route::post('pengaturan/semester/{semester}/toggle-lock', [SemesterController::class, 'toggleLock'])->name('semester.toggle-lock');
+            Route::post('pengaturan/semester/{semester}/versions', [SemesterController::class, 'storeVersion'])->name('semester.versions.store');
+            Route::delete('pengaturan/semester/{semester}/versions/{version}', [SemesterController::class, 'destroyVersion'])->name('semester.versions.destroy');
 
             Route::get('pengaturan/pengumuman', [App\Http\Controllers\PengumumanController::class, 'index'])->name('pengumuman.index');
             Route::post('pengaturan/pengumuman', [App\Http\Controllers\PengumumanController::class, 'store'])->name('pengumuman.store');

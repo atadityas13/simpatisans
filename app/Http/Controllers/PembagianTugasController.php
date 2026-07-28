@@ -9,6 +9,7 @@ use App\Models\TugasTambahan;
 use App\Models\BebanMengajar;
 use App\Models\Semester;
 use App\Services\GuruService;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Illuminate\Http\Request;
 
@@ -16,11 +17,13 @@ class PembagianTugasController extends Controller
 {
     protected $guruService;
     protected $semesterService;
+    protected $versionService;
 
-    public function __construct(GuruService $guruService, SemesterService $semesterService)
+    public function __construct(GuruService $guruService, SemesterService $semesterService, JadwalVersionService $versionService)
     {
         $this->guruService = $guruService;
         $this->semesterService = $semesterService;
+        $this->versionService = $versionService;
     }
 
     public function index(Request $request)
@@ -32,18 +35,23 @@ class PembagianTugasController extends Controller
 
         if (!$semesterId) {
             $selectedSemester = null;
+            $versions = collect([]);
+            $selectedVersion = null;
             $gurus = collect([]);
             $rows = [];
             $guruSearchBlobs = [];
-            return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester', 'guruSearchBlobs'));
+            return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion', 'guruSearchBlobs'));
         }
 
         $selectedSemester = Semester::findOrFail($semesterId);
+        $versions = $this->versionService->listForSemester($semesterId);
+        $selectedVersion = $this->versionService->resolveForSemester($semesterId, $request->integer('version_id') ?: null);
+        $versionId = $selectedVersion->id;
 
         $gurus = Guru::with([
-            'bebanMengajars' => fn($q) => $q->where('semester_id', $semesterId),
+            'bebanMengajars' => fn($q) => $q->where('semester_id', $semesterId)->where('version_id', $versionId),
             'bebanMengajars.mapel',
-            'tugasTambahans' => fn($q) => $q->wherePivot('semester_id', $semesterId),
+            'tugasTambahans' => fn($q) => $q->wherePivot('semester_id', $semesterId)->wherePivot('version_id', $versionId),
             'mapelSertifikasi'
         ])
         ->orderByRaw('duk IS NULL ASC, duk ASC')
@@ -52,12 +60,12 @@ class PembagianTugasController extends Controller
         $rows = [];
         foreach ($gurus as $guru) {
             /** @var \App\Models\Guru $guru */
-            $rows[] = $this->guruService->hitungMetrik($guru, $semesterId);
+            $rows[] = $this->guruService->hitungMetrik($guru, $semesterId, $versionId);
         }
 
         $guruSearchBlobs = $this->buildGuruSearchBlobs($gurus);
 
-        return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester', 'guruSearchBlobs'));
+        return view('pembagian.index', compact('gurus', 'rows', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion', 'guruSearchBlobs'));
     }
 
     /**
@@ -78,21 +86,26 @@ class PembagianTugasController extends Controller
 
         if (!$semesterId) {
             $selectedSemester = null;
+            $versions = collect([]);
+            $selectedVersion = null;
             $guru = Guru::findOrFail($id);
             $bebanMengajars = collect([]);
             $tugasTambahans = collect([]);
             $nonSatminkal = collect([]);
             $metrik = ['layak' => false, 'TARGET' => 24, 'totalLinear' => 0, 'totalTugas' => 0, 'SisaKekuranganTarget' => 24, 'totalSatminkal' => 0, 'totalNonSatminkal' => 0];
-            return view('pembagian.show', compact('guru', 'bebanMengajars', 'tugasTambahans', 'nonSatminkal', 'metrik', 'allSemesters', 'selectedSemester'));
+            return view('pembagian.show', compact('guru', 'bebanMengajars', 'tugasTambahans', 'nonSatminkal', 'metrik', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion'));
         }
 
         $selectedSemester = Semester::findOrFail($semesterId);
+        $versions = $this->versionService->listForSemester($semesterId);
+        $selectedVersion = $this->versionService->resolveForSemester($semesterId, $request->integer('version_id') ?: null);
+        $versionId = $selectedVersion->id;
 
         $guru = Guru::with([
-            'bebanMengajars' => fn($q) => $q->where('semester_id', $semesterId),
+            'bebanMengajars' => fn($q) => $q->where('semester_id', $semesterId)->where('version_id', $versionId),
             'bebanMengajars.mapel',
             'bebanMengajars.kelas',
-            'tugasTambahans' => fn($q) => $q->wherePivot('semester_id', $semesterId),
+            'tugasTambahans' => fn($q) => $q->wherePivot('semester_id', $semesterId)->wherePivot('version_id', $versionId),
             'mapelSertifikasi',
             'mapelDiampu',
         ])->findOrFail($id);
@@ -103,14 +116,14 @@ class PembagianTugasController extends Controller
         $mapels  = $guru->mapelDiampu;
 
         // Peta keterisian: [mapel_id][kelas_id] => Nama Guru
-        $allBeban = BebanMengajar::where('semester_id', $semesterId)->with('guru')->get();
+        $allBeban = BebanMengajar::where('semester_id', $semesterId)->where('version_id', $versionId)->with('guru')->get();
         $occupiedMap = [];
         foreach ($allBeban as $b) {
             $occupiedMap[$b->mapel_id][$b->kelas_id] = $b->guru->nama_lengkap;
         }
 
         $tugases = TugasTambahan::orderBy('id', 'asc')->get();
-        $metrik  = $this->guruService->hitungMetrik($guru, $semesterId);
+        $metrik  = $this->guruService->hitungMetrik($guru, $semesterId, $versionId);
 
         // Cari tugas ekuivalen yang sudah ada di semester terpilih (exclude Guru Piket karena ia bersifat aditif/bisa double)
         $existingEkuivalen = $guru->tugasTambahans
@@ -121,7 +134,7 @@ class PembagianTugasController extends Controller
 
         $occupiedMap = (object)$occupiedMap;
 
-        return view('pembagian.show', compact('guru', 'kelas', 'mapels', 'occupiedMap', 'tugases', 'metrik', 'existingEkuivalen', 'allSemesters', 'selectedSemester'));
+        return view('pembagian.show', compact('guru', 'kelas', 'mapels', 'occupiedMap', 'tugases', 'metrik', 'existingEkuivalen', 'allSemesters', 'selectedSemester', 'versions', 'selectedVersion'));
     }
 
 
@@ -134,6 +147,7 @@ class PembagianTugasController extends Controller
             'kelas_ids'   => 'required|array|min:1',
             'kelas_ids.*' => 'exists:kelas,id',
             'semester_id' => 'required|exists:semesters,id',
+            'version_id' => 'required|exists:jadwal_versions,id',
         ]);
 
         $mapel = Mapel::findOrFail($request->mapel_id);
@@ -142,17 +156,19 @@ class PembagianTugasController extends Controller
                 ->where('mapel_id', $request->mapel_id)
                 ->where('kelas_id', $kelasId)
                 ->where('semester_id', $request->semester_id)
+                ->where('version_id', $request->version_id)
                 ->exists()) {
                 BebanMengajar::create([
                     'guru_id' => $id, 
                     'mapel_id' => $request->mapel_id, 
                     'kelas_id' => $kelasId, 
                     'semester_id' => $request->semester_id,
+                    'version_id' => $request->version_id,
                     'jtm' => $mapel->jtm_default
                 ]);
             }
         }
-        return redirect()->route('pembagian.show', ['guru' => $id, 'semester_id' => $request->semester_id])
+        return redirect()->route('pembagian.show', ['guru' => $id, 'semester_id' => $request->semester_id, 'version_id' => $request->version_id])
             ->with('success', 'Penugasan mengajar berhasil ditambahkan!');
     }
 
@@ -161,8 +177,9 @@ class PembagianTugasController extends Controller
         $kbm = BebanMengajar::findOrFail($id);
         $guru_id = $kbm->guru_id;
         $semester_id = $kbm->semester_id;
+        $version_id = $kbm->version_id;
         $kbm->delete();
-        return redirect()->route('pembagian.show', ['guru' => $guru_id, 'semester_id' => $semester_id])
+        return redirect()->route('pembagian.show', ['guru' => $guru_id, 'semester_id' => $semester_id, 'version_id' => $version_id])
             ->with('success', 'Penugasan dihapus.');
     }
 
@@ -174,6 +191,7 @@ class PembagianTugasController extends Controller
             'jumlah_kelas'  => 'required|integer|min:1',
             'hari'          => 'required|array|min:1',
             'semester_id'   => 'required|exists:semesters,id',
+            'version_id'   => 'required|exists:jadwal_versions,id',
         ]);
 
         $mapel = Mapel::findOrFail($request->mapel_id);
@@ -182,6 +200,7 @@ class PembagianTugasController extends Controller
             'guru_id'      => $id,
             'mapel_id'     => $request->mapel_id,
             'semester_id'  => $request->semester_id,
+            'version_id'   => $request->version_id,
             'jtm'          => $mapel->jtm_default * $request->jumlah_kelas,
             'is_satminkal' => false,
             'jumlah_kelas' => $request->jumlah_kelas,
@@ -198,7 +217,7 @@ class PembagianTugasController extends Controller
             }
         }
 
-        return redirect()->route('pembagian.show', ['guru' => $id, 'semester_id' => $request->semester_id])
+        return redirect()->route('pembagian.show', ['guru' => $id, 'semester_id' => $request->semester_id, 'version_id' => $request->version_id])
             ->with('success', 'Data Mengajar Non-satminkal berhasil disimpan & hari diblokir di penjadwalan!');
     }
 
@@ -208,6 +227,7 @@ class PembagianTugasController extends Controller
         $guruId = $beban->guru_id;
         $hariArr = $beban->hari;
         $semesterId = $beban->semester_id;
+        $versionId = $beban->version_id;
 
         $beban->delete();
 
@@ -228,7 +248,7 @@ class PembagianTugasController extends Controller
             }
         }
 
-        return redirect()->route('pembagian.show', ['guru' => $guruId, 'semester_id' => $semesterId])
+        return redirect()->route('pembagian.show', ['guru' => $guruId, 'semester_id' => $semesterId, 'version_id' => $versionId])
             ->with('success', 'Data Non-satminkal dihapus.');
     }
 
@@ -238,6 +258,7 @@ class PembagianTugasController extends Controller
         $request->validate([
             'tugas_id'    => 'required|exists:tugas_tambahans,id',
             'semester_id' => 'required|exists:semesters,id',
+            'version_id' => 'required|exists:jadwal_versions,id',
             'detail'      => 'nullable|string',
             'is_ekuivalen' => 'nullable|boolean',
             'hari'        => 'nullable|array',
@@ -255,6 +276,7 @@ class PembagianTugasController extends Controller
                 \Illuminate\Support\Facades\DB::table('guru_tugas_tambahans')
                     ->where('guru_id', $guru->id)
                     ->where('semester_id', $request->semester_id)
+                    ->where('version_id', $request->version_id)
                     ->where('tugas_tambahan_id', '!=', TugasTambahan::GURU_PIKET_ID)
                     ->update(['is_ekuivalen' => 0]);
             }
@@ -264,6 +286,7 @@ class PembagianTugasController extends Controller
             ->where('guru_id', $guru->id)
             ->where('tugas_tambahan_id', $request->tugas_id)
             ->where('semester_id', $request->semester_id)
+            ->where('version_id', $request->version_id)
             ->exists();
 
         $hariData = ($tugas->id == TugasTambahan::GURU_PIKET_ID && $request->hari) ? json_encode($request->hari) : null;
@@ -273,6 +296,7 @@ class PembagianTugasController extends Controller
                 ->where('guru_id', $guru->id)
                 ->where('tugas_tambahan_id', $request->tugas_id)
                 ->where('semester_id', $request->semester_id)
+                ->where('version_id', $request->version_id)
                 ->update([
                     'is_ekuivalen' => $isEkuivalen,
                     'detail'       => $request->detail,
@@ -289,17 +313,19 @@ class PembagianTugasController extends Controller
             $msg = 'Tugas tambahan berhasil ditambahkan!';
         }
 
-        return redirect()->route('pembagian.show', ['guru' => $id, 'semester_id' => $request->semester_id])
+        return redirect()->route('pembagian.show', ['guru' => $id, 'semester_id' => $request->semester_id, 'version_id' => $request->version_id])
             ->with('success', $msg);
     }
 
     public function destroyTugas(Request $request, $guruId, $tugasId)
     {
         $semester_id = $request->query('semester_id');
+        $version_id = $request->query('version_id');
         $guru = Guru::findOrFail($guruId);
         
         $guru->tugasTambahans()
             ->wherePivot('semester_id', $semester_id)
+            ->wherePivot('version_id', $version_id)
             ->wherePivot('tugas_tambahan_id', $tugasId)
             ->detach($tugasId);
 
@@ -307,6 +333,7 @@ class PembagianTugasController extends Controller
         $hasMainEkuivalen = \Illuminate\Support\Facades\DB::table('guru_tugas_tambahans')
             ->where('guru_id', $guruId)
             ->where('semester_id', $semester_id)
+            ->where('version_id', $version_id)
             ->where('is_ekuivalen', 1)
             ->where('tugas_tambahan_id', '!=', TugasTambahan::GURU_PIKET_ID)
             ->exists();
@@ -316,6 +343,7 @@ class PembagianTugasController extends Controller
                 ->join('tugas_tambahans', 'guru_tugas_tambahans.tugas_tambahan_id', '=', 'tugas_tambahans.id')
                 ->where('guru_tugas_tambahans.guru_id', $guruId)
                 ->where('guru_tugas_tambahans.semester_id', $semester_id)
+                ->where('guru_tugas_tambahans.version_id', $version_id)
                 ->where('tugas_tambahans.tipe', 'system')
                 ->where('tugas_tambahans.id', '!=', TugasTambahan::GURU_PIKET_ID)
                 ->select('guru_tugas_tambahans.tugas_tambahan_id as pivot_id')
@@ -325,20 +353,23 @@ class PembagianTugasController extends Controller
                 \Illuminate\Support\Facades\DB::table('guru_tugas_tambahans')
                     ->where('guru_id', $guruId)
                     ->where('semester_id', $semester_id)
+                    ->where('version_id', $version_id)
                     ->where('tugas_tambahan_id', $sysTugasToPromote->pivot_id)
                     ->update(['is_ekuivalen' => 1]);
             }
         }
 
-        return redirect()->route('pembagian.show', ['guru' => $guruId, 'semester_id' => $semester_id])
+        return redirect()->route('pembagian.show', ['guru' => $guruId, 'semester_id' => $semester_id, 'version_id' => $version_id])
             ->with('success', 'Tugas tambahan dihapus.');
     }
 
     public function clearKbm(Request $request, $id)
     {
         $semesterId = $request->query('semester_id');
+        $versionId = $request->query('version_id');
         $bebanMengajars = BebanMengajar::where('guru_id', $id)
             ->where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
             ->get();
 
         foreach ($bebanMengajars as $bm) {
@@ -367,7 +398,7 @@ class PembagianTugasController extends Controller
             $bm->delete();
         }
 
-        return redirect()->route('pembagian.show', ['guru' => $id, 'semester_id' => $semesterId])
+        return redirect()->route('pembagian.show', ['guru' => $id, 'semester_id' => $semesterId, 'version_id' => $versionId])
             ->with('success', 'Semua penugasan KBM berhasil dibersihkan.');
     }
 }

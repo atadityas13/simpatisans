@@ -11,6 +11,7 @@ use App\Models\Kelas;
 use App\Models\TugasTambahan;
 use App\Services\CetakPresetService;
 use App\Services\JamPelajaranService;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,7 @@ class GuruJurnalController extends Controller
 {
     public function __construct(
         private SemesterService $semesterService,
+        private JadwalVersionService $versionService,
         private CetakPresetService $cetakPresetService,
         private JamPelajaranService $jamPelajaranService,
     ) {
@@ -37,6 +39,7 @@ class GuruJurnalController extends Controller
 
         $beban = BebanMengajar::where('guru_id', $guru->id)
             ->where('semester_id', $semester->id)
+            ->where('version_id', $this->operationalVersionId($semester->id))
             ->whereNotNull('kelas_id')
             ->with(['kelas:id,nama_kelas,tingkat', 'mapel:id,nama_mapel'])
             ->get();
@@ -261,6 +264,7 @@ class GuruJurnalController extends Controller
         $hari = $this->hariIndonesiaFromDate($tanggal);
 
         $slots = Jadwal::where('semester_id', $semester->id)
+            ->where('version_id', $this->operationalVersionId($semester->id))
             ->where('hari', $hari)
             ->whereHas('bebanMengajar', function ($q) use ($guru, $kelas, $mapelId) {
                 $q->where('guru_id', $guru->id)
@@ -303,6 +307,7 @@ class GuruJurnalController extends Controller
         $hari = $this->hariIndonesiaFromDate($today);
 
         $slots = Jadwal::where('semester_id', $semester->id)
+            ->where('version_id', $this->operationalVersionId($semester->id))
             ->whereRaw('LOWER(TRIM(hari)) = ?', [strtolower($hari)])
             ->whereHas('bebanMengajar', fn ($q) => $q->where('guru_id', $guru->id))
             ->with([
@@ -678,6 +683,7 @@ class GuruJurnalController extends Controller
     {
         return BebanMengajar::where('guru_id', $guruId)
             ->where('semester_id', $semesterId)
+            ->where('version_id', $this->operationalVersionId($semesterId))
             ->where('kelas_id', $kelasId)
             ->exists();
     }
@@ -686,6 +692,7 @@ class GuruJurnalController extends Controller
     {
         return BebanMengajar::where('guru_id', $guruId)
             ->where('semester_id', $semesterId)
+            ->where('version_id', $this->operationalVersionId($semesterId))
             ->where('kelas_id', $kelasId)
             ->where('mapel_id', $mapelId)
             ->exists();
@@ -868,5 +875,10 @@ class GuruJurnalController extends Controller
         $days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
         return $days[(int) $date->dayOfWeek];
+    }
+
+    private function operationalVersionId(int $semesterId): int
+    {
+        return $this->versionService->resolveForSemester($semesterId)->id;
     }
 }

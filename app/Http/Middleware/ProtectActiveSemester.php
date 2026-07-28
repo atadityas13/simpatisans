@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\BebanMengajar;
+use App\Models\Semester;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -9,25 +11,48 @@ use Symfony\Component\HttpFoundation\Response;
 class ProtectActiveSemester
 {
     /**
-     * Handle an incoming request.
+     * Blokir mutasi pembagian tugas / jadwal jika semester terkunci.
      *
      * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Allowed only for GET/HEAD or if it's the active semester
         if ($request->isMethod('GET') || $request->isMethod('HEAD')) {
             return $next($request);
         }
 
-        $semesterService = app(\App\Services\SemesterService::class);
-        $activeSemester = $semesterService->getActiveSemester();
+        $semesterId = $this->resolveSemesterId($request);
+        if ($semesterId === null) {
+            return $next($request);
+        }
 
-        // If a semester_id is present in the request, it must match the active one
-        if ($request->has('semester_id') && (int)$request->semester_id !== $activeSemester->id) {
-            abort(403, 'Aksi dilarang pada semester tidak aktif.');
+        $semester = Semester::find($semesterId);
+        if ($semester && $semester->is_locked) {
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['message' => 'Semester terkunci. Buka kunci di Pengaturan Semester untuk mengedit.'], 403);
+            }
+
+            return redirect()->back()->with('error', 'Semester terkunci. Buka kunci di Pengaturan Semester untuk mengedit.');
         }
 
         return $next($request);
+    }
+
+    private function resolveSemesterId(Request $request): ?int
+    {
+        if ($request->filled('semester_id')) {
+            return (int) $request->input('semester_id');
+        }
+
+        $beban = $request->route('beban') ?? $request->route('kbm');
+        if ($beban instanceof BebanMengajar) {
+            return (int) $beban->semester_id;
+        }
+
+        if (is_numeric($beban)) {
+            return (int) (BebanMengajar::find($beban)?->semester_id);
+        }
+
+        return null;
     }
 }

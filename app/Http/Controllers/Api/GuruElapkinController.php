@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Guru;
 use App\Models\TugasTambahan;
 use App\Models\User;
+use App\Services\JadwalVersionService;
 use App\Services\SemesterService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,8 +15,10 @@ use Illuminate\Support\Facades\Log;
 
 class GuruElapkinController extends Controller
 {
-    public function __construct(private SemesterService $semesterService)
-    {
+    public function __construct(
+        private SemesterService $semesterService,
+        private JadwalVersionService $versionService,
+    ) {
     }
 
     /**
@@ -331,8 +334,10 @@ class GuruElapkinController extends Controller
         }
 
         return Guru::whereHas('tugasTambahans', function ($q) use ($semesterId) {
+            $versionId = $this->versionService->resolveForSemester($semesterId)->id;
             $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
-                ->where('guru_tugas_tambahans.semester_id', $semesterId);
+                ->where('guru_tugas_tambahans.semester_id', $semesterId)
+                ->where('guru_tugas_tambahans.version_id', $versionId);
         })->first();
     }
 }
