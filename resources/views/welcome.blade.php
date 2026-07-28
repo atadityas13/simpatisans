@@ -110,7 +110,7 @@
                 </div>
                 <div class="w-full bg-gray-100 rounded-full h-1.5">
                     <div class="bg-indigo-600 h-1.5 rounded-full transition-all duration-500"
-                        style="width: {{ $stats['progres_jtm'] }}%"></div>
+                        style="width: {{ min(100, $stats['progres_jtm']) }}%"></div>
                 </div>
             </div>
 

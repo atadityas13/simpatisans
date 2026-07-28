@@ -57,10 +57,18 @@ class DashboardController extends Controller
             'total_mapel' => Mapel::count(),
         ];
 
-        // 1. Progress Alokasi JTM (Estimasi) - Hanya untuk semester aktif
-        $totalKebutuhanJtm = Kelas::count() * Mapel::sum('jtm_default');
-        $totalAlokasiJtm   = BebanMengajar::where('semester_id', $semesterId)->where('version_id', $versionId)->sum('jtm');
-        $stats['progres_jtm'] = $totalKebutuhanJtm > 0 ? round(($totalAlokasiJtm / $totalKebutuhanJtm) * 100) : 0;
+        // 1. Beban Kurikulum — dinamis dari jumlah rombel aktif
+        // Kebutuhan = Σ (JP default semua mapel) × jumlah rombel
+        // Terisi    = Σ JTM beban satminkal (terikat kelas), bukan non-satminkal
+        $jumlahRombel = Kelas::count();
+        $jtmPerRombel = (int) Mapel::sum('jtm_default');
+        $totalKebutuhanJtm = $jumlahRombel * $jtmPerRombel;
+        $totalAlokasiJtm = (int) BebanMengajar::where('semester_id', $semesterId)
+            ->where('version_id', $versionId)
+            ->where('is_satminkal', true)
+            ->whereNotNull('kelas_id')
+            ->sum('jtm');
+        $stats['progres_jtm'] = $totalKebutuhanJtm > 0 ? (int) round(($totalAlokasiJtm / $totalKebutuhanJtm) * 100) : 0;
         $stats['jtm_terisi'] = $totalAlokasiJtm;
         $stats['jtm_total']  = $totalKebutuhanJtm;
 
