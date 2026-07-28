@@ -131,6 +131,21 @@
             </a>
         </div>
 
+        {{-- 7. Daftar Tugas Tambahan --}}
+        <div class="group bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all duration-300 flex flex-col justify-between">
+            <div>
+                <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">Daftar Tugas Tambahan</h3>
+                <p class="text-sm text-gray-500 mb-6 italic">Mencetak tugas tambahan guru (kecuali wali kelas) beserta status ekuivalen JTM.</p>
+            </div>
+            <a href="{{ route('cetak.daftar-tugas-tambahan', ['version_id' => $selectedVersion->id ?? null]) }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
+                <span>Cetak Tugas Tambahan</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+            </a>
+        </div>
+
     </div>
 
     <!-- PRESET MODAL -->

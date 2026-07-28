@@ -318,6 +318,78 @@ class CetakController extends Controller
         ));
     }
 
+    /**
+     * Print additional duties list (Daftar Tugas Tambahan), excluding Wali Kelas.
+     */
+    public function daftarTugasTambahan(Request $request)
+    {
+        $resolved = $this->resolveActiveVersion($request);
+        if (!$resolved) {
+            return redirect()->back()->with('error', 'Tidak ada semester aktif.');
+        }
+        [$activeSemester, $selectedVersion] = $resolved;
+        $semesterId = $activeSemester->id;
+        $versionId = $selectedVersion->id;
+
+        $assignments = \Illuminate\Support\Facades\DB::table('guru_tugas_tambahans as gtt')
+            ->join('tugas_tambahans as tt', 'tt.id', '=', 'gtt.tugas_tambahan_id')
+            ->join('gurus as g', 'g.id', '=', 'gtt.guru_id')
+            ->where('gtt.semester_id', $semesterId)
+            ->where('gtt.version_id', $versionId)
+            ->where('gtt.tugas_tambahan_id', '!=', TugasTambahan::WALI_KELAS_ID)
+            ->orderBy('tt.id')
+            ->orderBy('g.nama_guru')
+            ->select([
+                'g.nama_guru',
+                'g.gelar_depan',
+                'g.gelar_belakang',
+                'tt.nama_tugas',
+                'tt.jtm_ekuivalen',
+                'gtt.is_ekuivalen',
+                'gtt.detail',
+                'gtt.hari',
+            ])
+            ->get();
+
+        $rows = $assignments->values()->map(function ($row, $index) {
+            $prefix = ($row->gelar_depan && $row->gelar_depan !== '-') ? $row->gelar_depan.' ' : '';
+            $suffix = ($row->gelar_belakang && $row->gelar_belakang !== '-') ? ', '.$row->gelar_belakang : '';
+            $namaGuru = $prefix.$row->nama_guru.$suffix;
+
+            $tugasLabel = $row->nama_tugas;
+            if (! empty($row->detail)) {
+                $tugasLabel .= ' — '.$row->detail;
+            } elseif (! empty($row->hari)) {
+                $hariArr = is_string($row->hari) ? json_decode($row->hari, true) : $row->hari;
+                if (is_array($hariArr) && count($hariArr) > 0) {
+                    $tugasLabel .= ' ('.implode(', ', $hariArr).')';
+                }
+            }
+
+            $ekuivalen = ((int) $row->is_ekuivalen === 1)
+                ? ((int) $row->jtm_ekuivalen).' JTM'
+                : 'Non-ekuivalen';
+
+            return [
+                'no' => $index + 1,
+                'nama_guru' => $namaGuru,
+                'tugas' => $tugasLabel,
+                'ekuivalen' => $ekuivalen,
+            ];
+        });
+
+        $kepalaMadrasah = Guru::whereHas('tugasTambahans', function ($q) use ($semesterId, $versionId) {
+            $q->where('tugas_tambahan_id', TugasTambahan::KEPALA_MADRASAH_ID)
+              ->where('semester_id', $semesterId)
+              ->where('version_id', $versionId);
+        })->first();
+
+        return view('admin.cetak.daftar-tugas-tambahan', array_merge(
+            compact('activeSemester', 'selectedVersion', 'rows', 'kepalaMadrasah'),
+            $this->cetakPresetService->viewData()
+        ));
+    }
+
     public function lampiranSk(Request $request)
     {
         $resolved = $this->resolveActiveVersion($request);
