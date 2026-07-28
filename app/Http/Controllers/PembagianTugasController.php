@@ -311,6 +311,7 @@ class PembagianTugasController extends Controller
                 'detail'       => $request->detail,
                 'hari'         => $hariData,
                 'semester_id'  => $request->semester_id,
+                'version_id'   => $request->version_id,
             ]);
             $msg = 'Tugas tambahan berhasil ditambahkan!';
         }
