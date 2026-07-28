@@ -42,19 +42,25 @@
 
                 <div class="h-8 w-px bg-gray-200 mx-1"></div>
 
-                <button @click="showAnalysis = true"
-                    class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 {{ ($hasCriticalWarnings ?? false) ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse' : (($hasWarnings ?? false) ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white') }}">
-                    @if($hasCriticalWarnings ?? false)
+                @if($hasCriticalWarnings ?? false)
+                    <button @click="showAnalysis = true"
+                        class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 bg-red-600 hover:bg-red-700 text-white animate-pulse">
                         <span>⚠</span>
                         <span>PERLU PERHATIAN ({{ $criticalWarnings ?? 0 }})</span>
-                    @elseif($hasWarnings ?? false)
+                    </button>
+                @elseif($hasWarnings ?? false)
+                    <button @click="showAnalysis = true"
+                        class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 bg-amber-500 hover:bg-amber-600 text-white">
                         <span>ℹ</span>
                         <span>PENANDA KUALITAS ({{ $analisa['summary']['info_warnings'] ?? 0 }})</span>
-                    @else
+                    </button>
+                @else
+                    <button @click="showAnalysis = true"
+                        class="whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold text-xs transition-all shadow-md active:scale-95 bg-emerald-600 hover:bg-emerald-700 text-white">
                         <span>✓</span>
                         <span>ANALISA (OK)</span>
-                    @endif
-                </button>
+                    </button>
+                @endif
 
                 @if($selectedSemester->is_active)
                     <button @click="showConstraintModal = true"

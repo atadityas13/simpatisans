@@ -13,7 +13,7 @@
                 Pastikan nama rombel di EMIS-GTK sudah memakai format ini agar import tidak error.
             </p>
         </div>
-        <div class="absolute top-0 right-0 -translate-y-12 translate-x-12 w-64 h-64 bg-teal-50 rounded-full blur-3xl opacity-50"></div>
+        <div class="absolute top-0 right-0 -translate-y-12 translate-x-12 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-50"></div>
     </div>
 
     @if(session('success'))
@@ -24,14 +24,14 @@
 
     @if(session('emis_export_report'))
         @php $emisReport = session('emis_export_report'); @endphp
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm space-y-2">
-            <p class="font-black text-slate-800 uppercase text-xs tracking-widest">Laporan Export Terakhir</p>
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm space-y-2">
+            <p class="font-black text-gray-800 uppercase text-xs tracking-widest">Laporan Export Terakhir</p>
             <p class="text-emerald-700 font-bold">Slot terisi: {{ $emisReport['filled'] ?? 0 }}</p>
             @if(!empty($emisReport['skipped_tingkat_belum_di_template']))
                 <p class="text-amber-700"><strong>Belum ada di template EMIS:</strong> {{ implode(', ', $emisReport['skipped_tingkat_belum_di_template']) }}</p>
             @endif
             @if(($emisReport['skipped_template'] ?? 0) > 0)
-                <p class="text-slate-600">Slot template dilewati: {{ $emisReport['skipped_template'] }}</p>
+                <p class="text-gray-600">Slot template dilewati: {{ $emisReport['skipped_template'] }}</p>
             @endif
             @if(!empty($emisReport['skipped_no_gtk']))
                 <p class="text-amber-700"><strong>Tanpa ID GTK:</strong> {{ count($emisReport['skipped_no_gtk']) }} entri</p>
@@ -57,16 +57,16 @@
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">ID GTK Guru</p>
-            <p class="text-2xl font-black text-teal-700 mt-1">{{ $stats['guru_with_gtk'] }} <span class="text-sm text-slate-400 font-bold">/ {{ $stats['guru_total'] }}</span></p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">ID GTK Guru</p>
+            <p class="text-2xl font-black text-indigo-700 mt-1">{{ $stats['guru_with_gtk'] }} <span class="text-sm text-gray-400 font-bold">/ {{ $stats['guru_total'] }}</span></p>
         </div>
         <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Mapel EMIS</p>
-            <p class="text-2xl font-black text-teal-700 mt-1">{{ $stats['mapel_ready'] }} <span class="text-sm text-slate-400 font-bold">/ {{ $stats['mapel_total'] }}</span></p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Mapel EMIS</p>
+            <p class="text-2xl font-black text-indigo-700 mt-1">{{ $stats['mapel_ready'] }} <span class="text-sm text-gray-400 font-bold">/ {{ $stats['mapel_total'] }}</span></p>
         </div>
         <div class="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Kode Kelas EMIS</p>
-            <p class="text-2xl font-black text-teal-700 mt-1">{{ $stats['kelas_ready'] }} <span class="text-sm text-slate-400 font-bold">/ {{ $stats['kelas_total'] }}</span></p>
+            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400">Kode Kelas EMIS</p>
+            <p class="text-2xl font-black text-indigo-700 mt-1">{{ $stats['kelas_ready'] }} <span class="text-sm text-gray-400 font-bold">/ {{ $stats['kelas_total'] }}</span></p>
         </div>
     </div>
 
@@ -79,9 +79,9 @@
     @else
         <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
             <form action="{{ route('emis-gtk.index') }}" method="GET" class="flex flex-col sm:flex-row sm:items-center gap-3">
-                <label class="text-[10px] font-black uppercase tracking-widest text-slate-400">Semester sumber jadwal</label>
+                <label class="text-[10px] font-black uppercase tracking-widest text-gray-400">Semester sumber jadwal</label>
                 <select name="semester_id" onchange="this.form.submit()"
-                    class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 p-2.5 font-bold">
+                    class="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 font-bold">
                     @foreach($allSemesters as $sem)
                         <option value="{{ $sem->id }}" {{ $selectedSemester->id == $sem->id ? 'selected' : '' }}>
                             {{ $sem->nama_tahun }} - {{ $sem->tipe }} {{ $sem->is_active ? '(Aktif)' : '' }}
@@ -95,28 +95,28 @@
                 <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
 
                 <div class="flex items-center justify-between">
-                    <h3 class="text-sm font-black uppercase tracking-widest text-slate-700">Pilih Kelas</h3>
+                    <h3 class="text-sm font-black uppercase tracking-widest text-gray-700">Pilih Kelas</h3>
                     <button type="button" onclick="document.querySelectorAll('.emis-kelas').forEach(c => c.checked = true)"
-                        class="text-[10px] font-bold text-teal-600 hover:text-teal-800 uppercase tracking-widest">Pilih semua</button>
+                        class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">Pilih semua</button>
                 </div>
 
                 @foreach($kelasList as $tingkat => $kelases)
                     <div>
                         <div class="flex items-center justify-between mb-2">
-                            <h4 class="text-xs font-black uppercase tracking-widest text-slate-400">Tingkat {{ $tingkat }}</h4>
+                            <h4 class="text-xs font-black uppercase tracking-widest text-gray-400">Tingkat {{ $tingkat }}</h4>
                             <button type="button"
-                                class="text-[10px] font-bold text-teal-600 hover:text-teal-800"
+                                class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800"
                                 onclick="document.querySelectorAll('.emis-kelas-{{ $tingkat }}').forEach(c => c.checked = true)">Pilih {{ $tingkat }}</button>
                         </div>
                         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                             @foreach($kelases as $kelas)
-                                <label class="flex items-center gap-2 p-3 rounded-xl border border-slate-200 hover:bg-teal-50 cursor-pointer text-xs font-bold text-slate-700">
+                                <label class="flex items-center gap-2 p-3 rounded-xl border border-gray-200 hover:bg-indigo-50 cursor-pointer text-xs font-bold text-gray-700">
                                     <input type="checkbox" name="kelas_ids[]" value="{{ $kelas->id }}"
-                                        class="emis-kelas emis-kelas-{{ $tingkat }} rounded border-teal-300 text-teal-600 focus:ring-teal-500"
+                                        class="emis-kelas emis-kelas-{{ $tingkat }} rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
                                         {{ in_array($kelas->tingkat_emis, ['8', '9'], true) ? 'checked' : '' }}>
                                     <span>{{ str_replace('Kelas ', '', $kelas->nama_kelas) }}</span>
                                     @if($kelas->tingkat_emis && $kelas->rombel_emis)
-                                        <span class="text-[9px] text-slate-400 font-mono">{{ $kelas->tingkat_emis }}/{{ $kelas->rombel_emis }}</span>
+                                        <span class="text-[9px] text-gray-400 font-mono">{{ $kelas->tingkat_emis }}/{{ $kelas->rombel_emis }}</span>
                                     @endif
                                 </label>
                             @endforeach
@@ -125,29 +125,29 @@
                 @endforeach
 
                 <button type="submit"
-                    class="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-md">
+                    class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-md">
                     Download Excel EMIS-GTK
                 </button>
             </form>
         </div>
 
         <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
-            <h3 class="text-sm font-black uppercase tracking-widest text-slate-700">Update Referensi EMIS</h3>
-            <p class="text-xs text-slate-500">Upload ulang file referensi dari EMIS-GTK bila ada perubahan, lalu sinkronkan ke database.</p>
+            <h3 class="text-sm font-black uppercase tracking-widest text-gray-700">Update Referensi EMIS</h3>
+            <p class="text-xs text-gray-500">Upload ulang file referensi dari EMIS-GTK bila ada perubahan, lalu sinkronkan ke database.</p>
             <form method="POST" action="{{ route('emis-gtk.import-references') }}" enctype="multipart/form-data" class="space-y-4">
                 @csrf
                 <input type="hidden" name="semester_id" value="{{ $selectedSemester->id }}">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <label class="block text-xs font-bold text-slate-600">Referensi PTK
+                    <label class="block text-xs font-bold text-gray-600">Referensi PTK
                         <input type="file" name="referensi_ptk" accept=".xlsx" class="mt-1 block w-full text-xs"></label>
-                    <label class="block text-xs font-bold text-slate-600">Referensi Mapel
+                    <label class="block text-xs font-bold text-gray-600">Referensi Mapel
                         <input type="file" name="referensi_pelajaran" accept=".xlsx" class="mt-1 block w-full text-xs"></label>
-                    <label class="block text-xs font-bold text-slate-600">Template Jadwal
+                    <label class="block text-xs font-bold text-gray-600">Template Jadwal
                         <input type="file" name="template_jadwal" accept=".xlsx" class="mt-1 block w-full text-xs"></label>
-                    <label class="block text-xs font-bold text-slate-600">Referensi Rombel (opsional)
+                    <label class="block text-xs font-bold text-gray-600">Referensi Rombel (opsional)
                         <input type="file" name="referensi_rombel" accept=".xlsx" class="mt-1 block w-full text-xs"></label>
                 </div>
-                <button type="submit" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest">
+                <button type="submit" class="bg-indigo-700 hover:bg-indigo-800 text-white px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest">
                     Upload & Sinkronkan
                 </button>
             </form>
