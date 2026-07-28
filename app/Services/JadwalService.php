@@ -40,9 +40,9 @@ class JadwalService
             ]
         ];
 
-        // 0. Pre-load constraints
+        // 0. Pre-load constraints (versi aktif saja)
         $blockedLookup = [];
-        $allBlocked = GuruConstraint::where('type', 0)->get();
+        $allBlocked = GuruConstraint::forVersion($semesterId, $versionId)->where('type', 0)->get();
         foreach ($allBlocked as $c) {
             $h = ucfirst(strtolower(trim($c->hari)));
             $blockedLookup["{$c->guru_id}-{$h}-{$c->jam_ke}"] = true;
@@ -122,7 +122,10 @@ class JadwalService
         // 5. Deteksi Over-Blocked
         $totalGuruCount = count($gurus);
         if ($totalGuruCount > 0) {
-            $blockedGroups = GuruConstraint::where('type', 0)->get()->groupBy(fn($c) => "{$c->hari}-{$c->jam_ke}");
+            $blockedGroups = GuruConstraint::forVersion($semesterId, $versionId)
+                ->where('type', 0)
+                ->get()
+                ->groupBy(fn($c) => "{$c->hari}-{$c->jam_ke}");
             foreach ($blockedGroups as $key => $group) {
                 $count = count($group);
                 $ratio = ($count / $totalGuruCount) * 100;
@@ -287,7 +290,7 @@ class JadwalService
         }
 
         $blockedLookup = [];
-        foreach (GuruConstraint::where('guru_id', $beban->guru_id)->where('type', 0)->get() as $c) {
+        foreach (GuruConstraint::forVersion($semesterId, $versionId)->where('guru_id', $beban->guru_id)->where('type', 0)->get() as $c) {
             $blockedLookup[$this->normalizeHari($c->hari) . "-{$c->jam_ke}"] = true;
         }
 

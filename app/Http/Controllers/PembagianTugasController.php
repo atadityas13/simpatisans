@@ -209,11 +209,17 @@ class PembagianTugasController extends Controller
             'hari'         => $request->hari,
         ]);
 
-        // Integrasi dengan GuruConstraint (Blackout)
+        // Integrasi dengan GuruConstraint (Blackout) — hanya versi ini
         foreach ($request->hari as $hariName) {
             for ($jam = 1; $jam <= 10; $jam++) {
                 \App\Models\GuruConstraint::updateOrCreate(
-                    ['guru_id' => $id, 'hari' => $hariName, 'jam_ke' => $jam],
+                    [
+                        'guru_id' => $id,
+                        'semester_id' => $request->semester_id,
+                        'version_id' => $request->version_id,
+                        'hari' => $hariName,
+                        'jam_ke' => $jam,
+                    ],
                     ['type' => 0] // Block
                 );
             }
@@ -233,16 +239,19 @@ class PembagianTugasController extends Controller
 
         $beban->delete();
 
-        // Bersihkan GuruConstraint jika tidak ada beban non-satminkal lain di hari tersebut
+        // Bersihkan GuruConstraint versi ini jika tidak ada beban non-satminkal lain di hari tersebut
         if (is_array($hariArr)) {
             foreach ($hariArr as $hariName) {
                 $stillBusy = BebanMengajar::where('guru_id', $guruId)
+                    ->where('semester_id', $semesterId)
+                    ->where('version_id', $versionId)
                     ->where('is_satminkal', false)
                     ->whereJsonContains('hari', $hariName)
                     ->exists();
                 
                 if (!$stillBusy) {
-                    \App\Models\GuruConstraint::where('guru_id', $guruId)
+                    \App\Models\GuruConstraint::forVersion((int) $semesterId, (int) $versionId)
+                        ->where('guru_id', $guruId)
                         ->where('hari', $hariName)
                         ->where('type', 0)
                         ->delete();
@@ -324,13 +333,14 @@ class PembagianTugasController extends Controller
     {
         $semester_id = $request->query('semester_id');
         $version_id = $request->query('version_id');
-        $guru = Guru::findOrFail($guruId);
-        
-        $guru->tugasTambahans()
-            ->wherePivot('semester_id', $semester_id)
-            ->wherePivot('version_id', $version_id)
-            ->wherePivot('tugas_tambahan_id', $tugasId)
-            ->detach($tugasId);
+        Guru::findOrFail($guruId);
+
+        \Illuminate\Support\Facades\DB::table('guru_tugas_tambahans')
+            ->where('guru_id', $guruId)
+            ->where('tugas_tambahan_id', $tugasId)
+            ->where('semester_id', $semester_id)
+            ->where('version_id', $version_id)
+            ->delete();
 
         // Auto-promote another system task to ekuivalen if there is no main ekuivalen left
         $hasMainEkuivalen = \Illuminate\Support\Facades\DB::table('guru_tugas_tambahans')
@@ -384,13 +394,16 @@ class PembagianTugasController extends Controller
                     foreach ($hariArr as $hariName) {
                         // Check if this teacher still has other non-satminkal tasks on this day (excluding current one)
                         $stillBusy = BebanMengajar::where('guru_id', $id)
+                            ->where('semester_id', $semesterId)
+                            ->where('version_id', $versionId)
                             ->where('is_satminkal', false)
                             ->where('id', '!=', $bm->id)
                             ->whereJsonContains('hari', $hariName)
                             ->exists();
                         
                         if (!$stillBusy) {
-                            \App\Models\GuruConstraint::where('guru_id', $id)
+                            \App\Models\GuruConstraint::forVersion((int) $semesterId, (int) $versionId)
+                                ->where('guru_id', $id)
                                 ->where('hari', $hariName)
                                 ->where('type', 0) // Blocking type
                                 ->delete();

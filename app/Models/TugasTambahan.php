@@ -17,5 +17,5 @@ class TugasTambahan extends Model
 
     public function isSystem(): bool { return $this->tipe === 'system'; }
 
-    public function gurus() { return $this->belongsToMany(Guru::class, 'guru_tugas_tambahans', 'tugas_tambahan_id', 'guru_id')->withPivot('is_ekuivalen', 'detail', 'hari'); }
+    public function gurus() { return $this->belongsToMany(Guru::class, 'guru_tugas_tambahans', 'tugas_tambahan_id', 'guru_id')->withPivot('is_ekuivalen', 'detail', 'hari', 'semester_id', 'version_id'); }
 }

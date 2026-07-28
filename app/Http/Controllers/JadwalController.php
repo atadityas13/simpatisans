@@ -147,7 +147,10 @@ class JadwalController extends Controller
 
         // DATA GURU & CONSTRAINTS
         $gurus = Guru::orderBy('nama_guru')->get();
-        $constraints = GuruConstraint::get()->groupBy('guru_id');
+        $constraints = GuruConstraint::with('guru')
+            ->forVersion($semesterId, $versionId)
+            ->get()
+            ->groupBy('guru_id');
 
         $guruList = $gurus->map(fn ($g) => [
             'id' => $g->id,
@@ -173,10 +176,16 @@ class JadwalController extends Controller
             'hari' => 'required',
             'jam_ke' => 'required|integer',
             'type' => 'required|in:0,1,2', // 0: block, 1: preserve, 2: reset
+            'semester_id' => 'required|exists:semesters,id',
+            'version_id' => 'required|exists:jadwal_versions,id',
         ]);
 
+        $semesterId = (int) $request->semester_id;
+        $versionId = (int) $request->version_id;
+
         if ($request->type == 2) {
-            GuruConstraint::where('guru_id', $request->guru_id)
+            GuruConstraint::forVersion($semesterId, $versionId)
+                ->where('guru_id', $request->guru_id)
                 ->where('hari', $request->hari)
                 ->where('jam_ke', $request->jam_ke)
                 ->delete();
@@ -184,7 +193,13 @@ class JadwalController extends Controller
         }
 
         GuruConstraint::updateOrCreate(
-            ['guru_id' => $request->guru_id, 'hari' => $request->hari, 'jam_ke' => $request->jam_ke],
+            [
+                'guru_id' => $request->guru_id,
+                'semester_id' => $semesterId,
+                'version_id' => $versionId,
+                'hari' => $request->hari,
+                'jam_ke' => $request->jam_ke,
+            ],
             ['type' => $request->type]
         );
 

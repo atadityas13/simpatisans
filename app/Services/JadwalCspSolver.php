@@ -67,13 +67,16 @@ final class JadwalCspSolver
             $m->nama_mapel,
         ])->values()->toArray();
 
-        $constraintRows = GuruConstraint::where('type', 0)->get()->map(fn($c) => [
-            $c->id,
-            $c->guru_id,
-            $c->hari,
-            $c->jam_ke,
-            $c->type,
-        ])->toArray();
+        $constraintRows = GuruConstraint::forVersion($semesterId, $versionId)
+            ->where('type', 0)
+            ->get()
+            ->map(fn($c) => [
+                $c->id,
+                $c->guru_id,
+                $c->hari,
+                $c->jam_ke,
+                $c->type,
+            ])->toArray();
 
         return new self($semesterId, $bebanRows, $mapelRows, $kelasRows, $constraintRows);
     }

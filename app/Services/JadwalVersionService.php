@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BebanMengajar;
 use App\Models\Guru;
+use App\Models\GuruConstraint;
 use App\Models\Jadwal;
 use App\Models\JadwalVersion;
 use App\Models\Semester;
@@ -124,7 +125,7 @@ class JadwalVersionService
     }
 
     /**
-     * Salin pembagian tugas, tugas tambahan, dan jadwal antar versi (bisa beda semester).
+     * Salin pembagian tugas, tugas tambahan, jadwal, dan constraint antar versi.
      */
     public function cloneVersionData(JadwalVersion $source, JadwalVersion $target): void
     {
@@ -192,6 +193,20 @@ class JadwalVersionService
                 'hari' => $oldJ->hari,
                 'jam_ke' => $oldJ->jam_ke,
             ]);
+        }
+
+        $oldConstraints = GuruConstraint::where('version_id', $source->id)->get();
+        foreach ($oldConstraints as $oldC) {
+            GuruConstraint::updateOrCreate(
+                [
+                    'guru_id' => $oldC->guru_id,
+                    'semester_id' => $target->semester_id,
+                    'version_id' => $target->id,
+                    'hari' => $oldC->hari,
+                    'jam_ke' => $oldC->jam_ke,
+                ],
+                ['type' => $oldC->type]
+            );
         }
     }
 }
