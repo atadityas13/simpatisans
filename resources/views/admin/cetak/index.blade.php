@@ -146,6 +146,21 @@
             </a>
         </div>
 
+        {{-- 8. Surat Pernyataan Zakat --}}
+        <div class="group bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all duration-300 flex flex-col justify-between">
+            <div>
+                <div class="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 mb-2">Surat Pernyataan Zakat</h3>
+                <p class="text-sm text-gray-500 mb-6 italic">Cetak surat pernyataan zakat profesi 2,5% untuk semua guru (satu surat per halaman).</p>
+            </div>
+            <a href="{{ route('cetak.surat-pernyataan-zakat') }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
+                <span>Cetak Surat Zakat</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+            </a>
+        </div>
+
     </div>
 
     <!-- PRESET MODAL -->
