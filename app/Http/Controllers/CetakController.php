@@ -390,25 +390,6 @@ class CetakController extends Controller
         ));
     }
 
-    /**
-     * Print Surat Pernyataan zakat profesi for all teachers (one letter per A4 page).
-     */
-    public function suratPernyataanZakat()
-    {
-        $gurus = Guru::orderedByDuk()->get();
-
-        $bulanId = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
-
-        $now = now('Asia/Jakarta');
-        $tanggalSurat = $now->day.' '.($bulanId[(int) $now->month] ?? $now->format('F')).' '.$now->year;
-
-        return view('admin.cetak.surat-pernyataan-zakat', compact('gurus', 'tanggalSurat'));
-    }
-
     public function lampiranSk(Request $request)
     {
         $resolved = $this->resolveActiveVersion($request);
