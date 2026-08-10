@@ -95,7 +95,6 @@
         }
 
         .identitas .value {
-            border-bottom: 1px dotted #000;
             min-height: 1.2em;
             padding-left: 4px;
         }
@@ -113,8 +112,8 @@
         }
 
         .signature-box {
-            width: 260px;
-            text-align: center;
+            width: 280px;
+            text-align: left;
         }
 
         .signature-box p {
@@ -136,6 +135,10 @@
             font-weight: bold;
             text-decoration: underline;
             margin-top: 4px;
+        }
+
+        .sign-nip {
+            margin-top: 2px;
         }
 
         @media screen {
@@ -192,10 +195,10 @@
 
     @forelse($gurus as $guru)
         @php
-            $nama = $guru->nama_lengkap ?: '…………………………………………………………';
-            $nip = filled($guru->username) ? $guru->username : '…………………………………………………………';
-            $golongan = filled($guru->golongan) ? $guru->golongan : '…………………………………………………………';
-            $jabatan = filled($guru->jabatan) ? $guru->jabatan : '…………………………………………………………';
+            $nama = $guru->nama_lengkap ?: '';
+            $nip = filled($guru->username) ? $guru->username : '';
+            $golongan = filled($guru->golongan) ? $guru->golongan : '';
+            $jabatan = filled($guru->jabatan) ? $guru->jabatan : '';
             $unitKerja = 'MTsN 11 Majalengka';
         @endphp
 
@@ -252,6 +255,9 @@
                     <p class="meterai">Meterai Rp. 10.000</p>
                     <div class="sign-space"></div>
                     <p class="sign-name">{{ $nama }}</p>
+                    @if($nip !== '')
+                        <p class="sign-nip">NIP. {{ $nip }}</p>
+                    @endif
                 </div>
             </div>
         </div>
