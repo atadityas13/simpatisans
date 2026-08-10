@@ -122,14 +122,17 @@
         }
 
         .meterai {
-            margin: 10px 0 4px;
+            margin: 0;
             font-size: 10pt;
             font-style: italic;
-            text-align: center;
+            text-align: left;
         }
 
         .sign-space {
-            height: 72px;
+            height: 90px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
         }
 
         .sign-name {
@@ -253,8 +256,9 @@
                 <div class="signature-box">
                     <p>Majalengka, {{ $tanggalSurat }}</p>
                     <p>Yang membuat pernyataan,</p>
-                    <p class="meterai">Meterai Rp. 10.000</p>
-                    <div class="sign-space"></div>
+                    <div class="sign-space">
+                        <p class="meterai">Meterai Rp. 10.000</p>
+                    </div>
                     <p class="sign-name">{{ $nama }}</p>
                     @if($nip !== '')
                         <p class="sign-nip">NIP. {{ $nip }}</p>
