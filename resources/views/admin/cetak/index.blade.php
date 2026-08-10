@@ -155,10 +155,15 @@
                 <h3 class="text-lg font-bold text-gray-900 mb-2">Surat Pernyataan Zakat</h3>
                 <p class="text-sm text-gray-500 mb-6 italic">Cetak surat pernyataan zakat profesi 2,5% untuk semua guru (satu surat per halaman).</p>
             </div>
-            <a href="{{ route('cetak.surat-pernyataan-zakat') }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
-                <span>Cetak Surat Zakat</span>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-            </a>
+            <div class="space-y-2">
+                <a href="{{ route('cetak.surat-pernyataan-zakat') }}" target="_blank" class="w-full py-3 bg-gray-50 text-indigo-600 font-black text-[11px] uppercase tracking-widest rounded-xl hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-50 flex items-center justify-center gap-2">
+                    <span>Cetak Semua Guru</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                </a>
+                <a href="{{ route('public.surat-pernyataan-zakat.form') }}" target="_blank" class="w-full py-2.5 bg-white text-teal-700 font-bold text-[10px] uppercase tracking-widest rounded-xl hover:bg-teal-50 transition-colors border border-teal-100 flex items-center justify-center gap-2">
+                    <span>Form Publik (tanpa login)</span>
+                </a>
+            </div>
         </div>
 
     </div>

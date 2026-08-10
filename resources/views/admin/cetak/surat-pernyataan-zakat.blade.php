@@ -203,7 +203,7 @@
             $nip = filled($guru->username) ? $guru->username : '';
             $golongan = filled($guru->golongan) ? $guru->golongan : '';
             $jabatan = filled($guru->jabatan) ? $guru->jabatan : '';
-            $unitKerja = 'MTsN 11 Majalengka';
+            $unitKerja = filled($guru->unit_kerja ?? null) ? $guru->unit_kerja : 'MTsN 11 Majalengka';
         @endphp
 
         <div class="surat-page">

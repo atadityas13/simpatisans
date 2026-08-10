@@ -18,6 +18,12 @@ use App\Http\Controllers\AuthController;
 Route::view('privacy-policy', 'privacy-policy')->name('privacy-policy');
 Route::redirect('kebijakan-privasi', 'privacy-policy');
 
+// Public: Surat Pernyataan Zakat (tanpa login)
+Route::get('surat-pernyataan-zakat', [App\Http\Controllers\PublicSuratPernyataanController::class, 'form'])
+    ->name('public.surat-pernyataan-zakat.form');
+Route::get('surat-pernyataan-zakat/cetak', [App\Http\Controllers\PublicSuratPernyataanController::class, 'cetak'])
+    ->name('public.surat-pernyataan-zakat.cetak');
+
 // Auth Routes (Guest)
 Route::group(['middleware' => 'guest'], function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
