@@ -125,6 +125,7 @@
             margin: 10px 0 4px;
             font-size: 10pt;
             font-style: italic;
+            text-align: center;
         }
 
         .sign-space {
