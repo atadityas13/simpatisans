@@ -43,4 +43,9 @@ return [
         'talim_package' => env('ELAPKIN_TALIM_PACKAGE', 'com.atadevlabs.talim'),
     ],
 
+    'madani' => [
+        'url' => env('MADANI_API_URL', 'https://madani.mtsn11majalengka.sch.id/api'),
+        'introspect_secret' => env('MADANI_INTROSPECT_SECRET'),
+    ],
+
 ];
