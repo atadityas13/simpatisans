@@ -10,7 +10,7 @@ class MadaniTokenIntrospector
 {
     /**
      * @return array{active: bool, username?: string, nip?: string, name?: string}|null
-     *                                                                                  null = Madani unreachable / misconfigured
+     *         null = Madani unreachable / misconfigured
      */
     public function inspect(string $plainTextToken): ?array
     {

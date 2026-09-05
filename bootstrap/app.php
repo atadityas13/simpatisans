@@ -1,9 +1,5 @@
 <?php
 
-use App\Http\Middleware\ActiveRoleMiddleware;
-use App\Http\Middleware\AuthenticateTalimApi;
-use App\Http\Middleware\EnforceFirstLogin;
-use App\Http\Middleware\ProtectActiveSemester;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -18,15 +14,16 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'active_role' => ActiveRoleMiddleware::class,
-            'first_login' => EnforceFirstLogin::class,
-            'semester_unlocked' => ProtectActiveSemester::class,
-            'auth.talim' => AuthenticateTalimApi::class,
+            'active_role' => \App\Http\Middleware\ActiveRoleMiddleware::class,
+            'first_login' => \App\Http\Middleware\EnforceFirstLogin::class,
+            'semester_unlocked' => \App\Http\Middleware\ProtectActiveSemester::class,
+            'auth.talim' => \App\Http\Middleware\AuthenticateTalimApi::class,
+            'auth.madani.siswa' => \App\Http\Middleware\AuthenticateMadaniSiswa::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API mobile Ta'lim: selalu JSON, hindari error view yang butuh facade View
-        $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
+        $exceptions->shouldRenderJsonWhen(function (Request $request, \Throwable $e) {
             return $request->is('api/*') || $request->expectsJson();
         });
     })->create();

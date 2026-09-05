@@ -1,14 +1,15 @@
 <?php
 
-use App\Http\Controllers\Api\AppUpdateController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\GuruCalendarEventController;
 use App\Http\Controllers\Api\GuruCetakController;
+use App\Http\Controllers\Api\GuruCalendarEventController;
 use App\Http\Controllers\Api\GuruDashboardController;
 use App\Http\Controllers\Api\GuruElapkinController;
 use App\Http\Controllers\Api\GuruJurnalController;
 use App\Http\Controllers\Api\GuruPengumumanController;
 use App\Http\Controllers\Api\GuruProfileController;
+use App\Http\Controllers\Api\AppUpdateController;
+use App\Http\Controllers\Api\KelasJadwalController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -20,6 +21,10 @@ Route::get('/health', function () {
 });
 
 Route::get('/app-update/{platform}', [AppUpdateController::class, 'show']);
+
+Route::middleware(['auth.madani.siswa', 'throttle:60,1'])->prefix('siswa')->group(function () {
+    Route::get('/jadwal', [KelasJadwalController::class, 'show']);
+});
 
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
