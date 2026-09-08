@@ -87,6 +87,11 @@ class MadaniRombelController extends Controller
             'semester' => [
                 'id' => $semester->id,
                 'nama' => $semester->full_label,
+                'tahun' => (string) $semester->nama_tahun,
+                'tipe' => (string) $semester->tipe,
+            ],
+            'tahun_ajaran' => [
+                'nama' => (string) $semester->nama_tahun,
             ],
             'version' => [
                 'id' => $version->id,
