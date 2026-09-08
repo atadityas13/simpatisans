@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'semester_unlocked' => \App\Http\Middleware\ProtectActiveSemester::class,
             'auth.talim' => \App\Http\Middleware\AuthenticateTalimApi::class,
             'auth.madani.siswa' => \App\Http\Middleware\AuthenticateMadaniSiswa::class,
+            'auth.madani.export' => \App\Http\Middleware\AuthenticateMadaniExport::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

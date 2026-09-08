@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\GuruPengumumanController;
 use App\Http\Controllers\Api\GuruProfileController;
 use App\Http\Controllers\Api\AppUpdateController;
 use App\Http\Controllers\Api\KelasJadwalController;
+use App\Http\Controllers\Api\MadaniRombelController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
@@ -24,6 +25,10 @@ Route::get('/app-update/{platform}', [AppUpdateController::class, 'show']);
 
 Route::middleware(['auth.madani.siswa', 'throttle:60,1'])->prefix('siswa')->group(function () {
     Route::get('/jadwal', [KelasJadwalController::class, 'show']);
+});
+
+Route::middleware(['auth.madani.export', 'throttle:60,1'])->prefix('madani')->group(function () {
+    Route::get('/rombels', [MadaniRombelController::class, 'index']);
 });
 
 Route::prefix('auth')->group(function () {
