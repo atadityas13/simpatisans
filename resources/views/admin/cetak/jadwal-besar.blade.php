@@ -98,17 +98,15 @@
         background: white;
     }
 
-        /* The Original Layout (Optimized for 12 Pages 3x4) */
+        /* The Original Layout (12 Pages 3x4). Skala dihitung ulang via JS agar pas 600mm x 1148mm. */
         .original-layout {
             position: absolute;
-            width: 260mm; /* Fixed width for consistent horizontal slicing */
+            width: max-content;
+            min-width: 260mm;
             height: auto;
             transform-origin: top left;
-            /* Recalculated for perfect 12-page fit */
-            /* Scale X 2.3 -> 260 * 2.3 = 598mm (Fits in 3x200mm) */
-            /* Corrective Scaling: Decreased Y to 2.85 to ensure all content fits in 12 pages */
-            transform: scale(2.32, 2.88); 
-            padding: 0.4cm 0.5cm 2.5cm 0.5cm; /* Added 2.5cm bottom padding as safety buffer */
+            transform: scale(2.32, 2.88);
+            padding: 0.4cm 0.5cm 0.4cm 0.5cm;
             box-sizing: border-box;
             font-family: 'Arial Narrow', 'Arial', sans-serif;
             background: white;
@@ -433,5 +431,35 @@
         @endfor
     </div>
     @include('admin.cetak._adjustable_assets', ['templateKey' => 'cetak_besar'])
+    <script>
+        (function () {
+            var COLS = 3, ROWS = 4, PAGE_W_MM = 200, PAGE_H_MM = 287, SAFETY = 0.995;
+            var PX_PER_MM = 96 / 25.4;
+
+            function fitPoster() {
+                var layouts = document.querySelectorAll('.original-layout');
+                if (!layouts.length) return;
+
+                var first = layouts[0];
+                var prev = first.style.transform;
+                first.style.transform = 'none';
+                var w = Math.max(first.scrollWidth, first.offsetWidth);
+                var h = Math.max(first.scrollHeight, first.offsetHeight);
+                first.style.transform = prev;
+                if (!w || !h) return;
+
+                var sx = (COLS * PAGE_W_MM * PX_PER_MM * SAFETY) / w;
+                var sy = (ROWS * PAGE_H_MM * PX_PER_MM * SAFETY) / h;
+                layouts.forEach(function (el) {
+                    el.style.transform = 'scale(' + sx + ', ' + sy + ')';
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', fitPoster);
+            window.addEventListener('load', fitPoster);
+            window.addEventListener('beforeprint', fitPoster);
+            if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitPoster);
+        })();
+    </script>
 </body>
 </html>
