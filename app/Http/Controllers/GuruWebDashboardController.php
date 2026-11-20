@@ -2,15 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppUpdate;
 use App\Models\Guru;
 use App\Models\Jadwal;
 use App\Services\GuruService;
-use App\Services\JamPelajaranService;
 use App\Services\JadwalVersionService;
+use App\Services\JamPelajaranService;
 use App\Services\SemesterService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 class GuruWebDashboardController extends Controller
 {
@@ -19,8 +17,7 @@ class GuruWebDashboardController extends Controller
         private JamPelajaranService $jamPelajaranService,
         private GuruService $guruService,
         private JadwalVersionService $versionService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -53,9 +50,6 @@ class GuruWebDashboardController extends Controller
         }
 
         $playStoreUrl = 'https://play.google.com/store/apps/details?id=com.atadevlabs.talim';
-        if (Schema::hasTable('app_updates')) {
-            $playStoreUrl = AppUpdate::activePlatform('android')->first()?->play_store_url ?: $playStoreUrl;
-        }
 
         return view('guru.dashboard', [
             'guru' => $guru,

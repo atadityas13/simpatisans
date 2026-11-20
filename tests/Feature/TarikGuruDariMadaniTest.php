@@ -169,17 +169,6 @@ class TarikGuruDariMadaniTest extends TestCase
             ->assertJsonPath('rumpuns.0', 'IPA');
     }
 
-    public function test_hapus_akun_guru_menyisakan_admin(): void
-    {
-        $this->withoutMiddleware()
-            ->post(route('pengguna.hapus-akun-guru'))
-            ->assertRedirect();
-
-        $this->assertDatabaseMissing('users', ['role' => 'guru']);
-        $this->assertDatabaseHas('users', ['role' => 'super_admin']);
-        $this->assertDatabaseHas('users', ['role' => 'admin_kurikulum']);
-    }
-
     public function test_halaman_membandingkan_lewat_api_madani(): void
     {
         config([

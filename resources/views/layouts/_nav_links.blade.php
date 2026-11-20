@@ -165,42 +165,6 @@
                     </svg>
                     <span x-show="sidebarOpen">Semester</span>
                 </a>
-                <a href="/pengaturan/pengumuman"
-                    class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('pengaturan/pengumuman*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
-                    <svg class="w-4 h-4 mr-3 {{ request()->is('pengaturan/pengumuman*') ? 'text-indigo-400' : 'text-slate-500 group-hover:text-indigo-400' }}"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                    <span x-show="sidebarOpen">Pengumuman</span>
-                </a>
-                <a href="/pengaturan/kalender"
-                    class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('pengaturan/kalender*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
-                    <svg class="w-4 h-4 mr-3 {{ request()->is('pengaturan/kalender*') ? 'text-indigo-400' : 'text-slate-500 group-hover:text-indigo-400' }}"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span x-show="sidebarOpen">Kalender</span>
-                </a>
-                <a href="/pengaturan/update-app"
-                    class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('pengaturan/update-app*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
-                    <svg class="w-4 h-4 mr-3 {{ request()->is('pengaturan/update-app*') ? 'text-indigo-400' : 'text-slate-500 group-hover:text-indigo-400' }}"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span x-show="sidebarOpen">Update App</span>
-                </a>
-                <a href="/config/pengguna"
-                    class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('config/pengguna*') ? 'bg-indigo-600/10 text-indigo-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">
-                    <svg class="w-4 h-4 mr-3 {{ request()->is('config/pengguna*') ? 'text-indigo-400' : 'text-slate-500 group-hover:text-indigo-400' }}"
-                        fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                    <span x-show="sidebarOpen">Pengguna</span>
-                </a>
                 @if(auth()->user()?->isSuperAdmin())
                     <a href="/pengaturan/admin"
                         class="group flex items-center px-4 py-2 text-sm font-semibold rounded-xl transition-all nav-anchor-v06 {{ request()->is('pengaturan/admin*') ? 'bg-purple-600/10 text-purple-400' : 'text-slate-400 hover:bg-white/5 hover:text-white' }}">

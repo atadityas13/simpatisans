@@ -1,9 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\AppUpdateController;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\CalendarEventController;
 use App\Http\Controllers\CetakController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DatabaseController;
@@ -15,8 +13,6 @@ use App\Http\Controllers\KelasController;
 use App\Http\Controllers\MadaniGuruSyncController;
 use App\Http\Controllers\MapelController;
 use App\Http\Controllers\PembagianTugasController;
-use App\Http\Controllers\PenggunaController;
-use App\Http\Controllers\PengumumanController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\TugasTambahanController;
@@ -108,33 +104,12 @@ Route::group(['middleware' => 'auth'], function () {
             Route::delete('pengaturan/semester/{semester}/versions/{version}', [SemesterController::class, 'destroyVersion'])->name('semester.versions.destroy');
             Route::resource('pengaturan/semester', SemesterController::class)->except(['create', 'show', 'edit']);
 
-            Route::get('pengaturan/pengumuman', [PengumumanController::class, 'index'])->name('pengumuman.index');
-            Route::post('pengaturan/pengumuman', [PengumumanController::class, 'store'])->name('pengumuman.store');
-            Route::put('pengaturan/pengumuman/{pengumuman}', [PengumumanController::class, 'update'])->name('pengumuman.update');
-            Route::delete('pengaturan/pengumuman/{pengumuman}', [PengumumanController::class, 'destroy'])->name('pengumuman.destroy');
-
-            Route::get('pengaturan/kalender', [CalendarEventController::class, 'index'])->name('calendar-events.index');
-            Route::post('pengaturan/kalender', [CalendarEventController::class, 'store'])->name('calendar-events.store');
-            Route::put('pengaturan/kalender/{calendarEvent}', [CalendarEventController::class, 'update'])->name('calendar-events.update');
-            Route::delete('pengaturan/kalender/{calendarEvent}', [CalendarEventController::class, 'destroy'])->name('calendar-events.destroy');
-
-            Route::get('pengaturan/update-app', [AppUpdateController::class, 'index'])->name('app-updates.index');
-            Route::post('pengaturan/update-app', [AppUpdateController::class, 'store'])->name('app-updates.store');
-
             // Admin roles and account management
             Route::resource('pengaturan/admin', AdminController::class)->except(['create', 'show', 'edit']);
 
             // Database Management
             Route::get('pengaturan/database', [DatabaseController::class, 'index'])->name('database.index');
             Route::post('pengaturan/database/truncate', [DatabaseController::class, 'truncate'])->name('database.truncate');
-
-            // Teacher account management (Pengguna)
-            Route::get('config/pengguna', [PenggunaController::class, 'index'])->name('pengguna.index');
-            Route::post('config/pengguna/hapus-akun-guru', [PenggunaController::class, 'hapusAkunGuru'])->name('pengguna.hapus-akun-guru');
-            Route::post('config/pengguna/generate/{guru}', [PenggunaController::class, 'generate'])->name('pengguna.generate');
-            Route::patch('config/pengguna/{user}/toggle', [PenggunaController::class, 'toggleStatus'])->name('pengguna.toggle');
-            Route::post('config/pengguna/{user}/reset', [PenggunaController::class, 'resetPassword'])->name('pengguna.reset');
-            Route::post('config/pengguna/{user}/photo', [PenggunaController::class, 'updatePhoto'])->name('pengguna.photo');
         });
 
         // GURU CONTEXT ROUTES

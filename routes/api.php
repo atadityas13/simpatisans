@@ -1,13 +1,10 @@
 <?php
 
-use App\Http\Controllers\Api\AppUpdateController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\GuruCalendarEventController;
 use App\Http\Controllers\Api\GuruCetakController;
 use App\Http\Controllers\Api\GuruDashboardController;
 use App\Http\Controllers\Api\GuruElapkinController;
 use App\Http\Controllers\Api\GuruJurnalController;
-use App\Http\Controllers\Api\GuruPengumumanController;
 use App\Http\Controllers\Api\GuruProfileController;
 use App\Http\Controllers\Api\KelasJadwalController;
 use App\Http\Controllers\Api\MadaniReferensiController;
@@ -21,8 +18,6 @@ Route::get('/health', function () {
         'time' => now()->toIso8601String(),
     ]);
 });
-
-Route::get('/app-update/{platform}', [AppUpdateController::class, 'show']);
 
 Route::middleware(['auth.madani.siswa', 'throttle:60,1'])->prefix('siswa')->group(function () {
     Route::get('/jadwal', [KelasJadwalController::class, 'show']);
@@ -45,8 +40,6 @@ Route::prefix('auth')->group(function () {
 Route::middleware('auth.talim')->prefix('guru')->group(function () {
     Route::get('/dashboard', [GuruDashboardController::class, 'index']);
     Route::get('/jadwal', [GuruDashboardController::class, 'jadwal']);
-    Route::get('/pengumuman', [GuruPengumumanController::class, 'index']);
-    Route::get('/calendar-events', [GuruCalendarEventController::class, 'index']);
     Route::get('/cetak/jadwal-pelajaran', [GuruCetakController::class, 'jadwalPelajaran']);
     Route::get('/cetak/lampiran-sk', [GuruCetakController::class, 'lampiranSk']);
 
