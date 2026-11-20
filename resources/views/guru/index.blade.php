@@ -78,11 +78,8 @@
             }
         }
     }">
-        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-900">Daftar Guru</h2>
-                <p class="text-gray-600 mt-1 text-sm">Identitas, KG, DUK, ijazah, dan biodata mengikuti Madani. Mapel diampu diatur di sini.</p>
-            </div>
+        <div class="mb-6 flex items-center justify-between gap-4">
+            <h2 class="text-2xl font-bold text-gray-900">Daftar Guru</h2>
             <button type="button" @click="bukaTarik()"
                 class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition whitespace-nowrap">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
