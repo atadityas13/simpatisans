@@ -92,10 +92,11 @@ Route::group(['middleware' => 'auth'], function () {
                 Route::delete('pembagian-tugas/guru/{guru}/tugas/{tugas}', [PembagianTugasController::class, 'destroyTugas'])->name('pembagian.tugas.destroy');
             });
 
+            Route::post('master/guru/tarik/cari', [MadaniGuruSyncController::class, 'cari'])->name('guru.tarik.cari');
             Route::post('master/guru/tarik', [MadaniGuruSyncController::class, 'tarik'])->name('guru.tarik');
             Route::post('master/guru/{guru}/sync', [MadaniGuruSyncController::class, 'sync'])->name('guru.sync');
             Route::get('master/guru/madani', fn () => redirect()->route('guru.index'));
-            Route::resource('master/guru', GuruController::class);
+            Route::resource('master/guru', GuruController::class)->except(['destroy']);
             Route::resource('master/mapel', MapelController::class);
             Route::resource('master/kelas', KelasController::class);
             Route::resource('master/tugas-tambahan', TugasTambahanController::class);

@@ -242,6 +242,70 @@ class TarikGuruDariMadaniTest extends TestCase
         $this->assertDatabaseMissing('gurus', ['username' => '198811112015011005']);
     }
 
+    public function test_cari_nip_menampilkan_data_tanpa_menyimpan(): void
+    {
+        config([
+            'services.madani.url' => 'https://madani.test/api',
+            'services.madani.introspect_secret' => 'rahasia',
+        ]);
+
+        Http::fake([
+            'https://madani.test/api/v1/simpatisans/gtks' => Http::response([
+                'data' => [
+                    $this->baris([
+                        'nip' => '199003032015011003',
+                        'nama' => 'Andi Nugroho',
+                        'kode_internal' => 'ZZ',
+                        'nomor_hp' => '081234567890',
+                    ]),
+                ],
+            ]),
+        ]);
+
+        $this->withoutMiddleware()
+            ->postJson(route('guru.tarik.cari'), ['nip' => '199003032015011003'])
+            ->assertOk()
+            ->assertJsonPath('status', 'siap')
+            ->assertJsonPath('baris.0.label', 'Nama')
+            ->assertJsonPath('baris.0.nilai', 'Andi Nugroho')
+            ->assertJsonFragment(['label' => 'Nomor HP', 'nilai' => '081234567890']);
+
+        $this->assertSame(0, Guru::query()->count());
+    }
+
+    public function test_cari_nip_yang_tidak_ada(): void
+    {
+        config([
+            'services.madani.url' => 'https://madani.test/api',
+            'services.madani.introspect_secret' => 'rahasia',
+        ]);
+
+        Http::fake([
+            'https://madani.test/api/v1/simpatisans/gtks' => Http::response(['data' => []]),
+        ]);
+
+        $this->withoutMiddleware()
+            ->postJson(route('guru.tarik.cari'), ['nip' => '199003032015011003'])
+            ->assertOk()
+            ->assertJsonPath('status', 'tidak_ada');
+    }
+
+    public function test_hapus_guru_tidak_lagi_tersedia(): void
+    {
+        $guru = Guru::query()->create([
+            'username' => '198001012005011001',
+            'kode_guru' => 'BD',
+            'nama_guru' => 'Budi Santoso',
+            'status_pegawai' => 'PNS',
+        ]);
+
+        $this->withoutMiddleware()
+            ->delete('/master/guru/'.$guru->id)
+            ->assertStatus(405);
+
+        $this->assertDatabaseHas('gurus', ['id' => $guru->id]);
+    }
+
     public function test_tarik_nip_yang_sudah_ada_ditolak(): void
     {
         config([

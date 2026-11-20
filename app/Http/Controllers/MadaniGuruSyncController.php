@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Guru;
 use App\Services\Madani\TarikGuruService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -11,6 +12,35 @@ use Throwable;
 
 class MadaniGuruSyncController extends Controller
 {
+    public function cari(Request $request, TarikGuruService $layanan): JsonResponse
+    {
+        $data = $request->validate([
+            'nip' => ['required', 'string', 'max:30'],
+        ], [
+            'nip.required' => 'Isi NIP guru yang akan dicari.',
+        ]);
+
+        try {
+            return response()->json($layanan->pratinjauNip($data['nip']));
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'status' => 'gagal',
+                'pesan' => $e->getMessage(),
+                'baris' => [],
+                'peringatan' => [],
+            ], 422);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'status' => 'gagal',
+                'pesan' => 'Pencarian ke Madani gagal.',
+                'baris' => [],
+                'peringatan' => [],
+            ], 500);
+        }
+    }
+
     public function tarik(Request $request, TarikGuruService $layanan): RedirectResponse
     {
         $data = $request->validate([

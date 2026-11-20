@@ -60,28 +60,69 @@ class TarikGuruService
      */
     public function tarikNip(string $nip): array
     {
+        $siap = $this->siapkanNip($nip);
+        if ($siap['status'] !== 'siap') {
+            throw new RuntimeException($siap['pesan']);
+        }
+
+        DB::transaction(function () use ($siap): void {
+            Guru::query()->create($siap['item']['payload']);
+        });
+
+        return [
+            'nama' => (string) $siap['item']['nama'],
+            'kode' => (string) $siap['item']['kode'],
+            'peringatan' => $siap['peringatan'],
+        ];
+    }
+
+    /**
+     * @return array{status: string, pesan: string, baris: list<array{label: string, nilai: string}>, peringatan: list<string>}
+     */
+    public function pratinjauNip(string $nip): array
+    {
+        $siap = $this->siapkanNip($nip);
+
+        return [
+            'status' => $siap['status'],
+            'pesan' => $siap['pesan'],
+            'baris' => $siap['status'] === 'siap' ? $this->ringkas($siap['row'], $siap['item']) : [],
+            'peringatan' => $siap['peringatan'],
+        ];
+    }
+
+    /**
+     * @return array{status: string, pesan: string, peringatan: list<string>, item?: array<string, mixed>, row?: array<string, mixed>}
+     */
+    private function siapkanNip(string $nip): array
+    {
         $kunci = $this->kunci($nip);
         if ($kunci === '') {
-            throw new RuntimeException('NIP tidak dikenali. Isi minimal 8 digit.');
+            return [
+                'status' => 'tidak_dikenali',
+                'pesan' => 'NIP tidak dikenali. Isi minimal 8 digit.',
+                'peringatan' => [],
+            ];
         }
 
         $paket = $this->fetchRows();
         $cocok = $this->barisNip($paket['rows'], $kunci);
         if ($cocok === []) {
-            throw new RuntimeException('NIP ini tidak ditemukan sebagai guru aktif di Madani.');
+            return [
+                'status' => 'tidak_ada',
+                'pesan' => 'NIP ini tidak ditemukan di Madani.',
+                'peringatan' => [],
+            ];
         }
 
         $hasil = $this->bandingkan($cocok);
-
-        foreach ($hasil['tarik'] as $item) {
-            DB::transaction(function () use ($item): void {
-                Guru::query()->create($item['payload']);
-            });
-
+        if ($hasil['tarik'] !== []) {
             return [
-                'nama' => (string) $item['nama'],
-                'kode' => (string) $item['kode'],
+                'status' => 'siap',
+                'pesan' => $hasil['tarik'][0]['nama'].' ditemukan di Madani dan belum ada di Simpatisans.',
                 'peringatan' => $hasil['peringatan'],
+                'item' => $hasil['tarik'][0],
+                'row' => $cocok[0],
             ];
         }
 
@@ -89,16 +130,82 @@ class TarikGuruService
             fn (Guru $guru): bool => $this->kunci((string) $guru->username) === $kunci
         );
         if ($sudahAda) {
-            throw new RuntimeException('Guru dengan NIP ini sudah ada. Gunakan Sync pada baris guru tersebut.');
+            return [
+                'status' => 'sudah_ada',
+                'pesan' => 'Guru dengan NIP ini sudah ada. Gunakan Sync pada baris guru tersebut.',
+                'peringatan' => $hasil['peringatan'],
+            ];
         }
 
         foreach ($hasil['lewati'] as $pesan) {
             if (str_contains($pesan, $kunci)) {
-                throw new RuntimeException($pesan);
+                return [
+                    'status' => 'tidak_ada',
+                    'pesan' => $pesan,
+                    'peringatan' => $hasil['peringatan'],
+                ];
             }
         }
 
-        throw new RuntimeException('NIP ini tidak ditemukan sebagai guru aktif di Madani.');
+        return [
+            'status' => 'tidak_ada',
+            'pesan' => 'NIP ini tidak ditemukan sebagai guru aktif di Madani.',
+            'peringatan' => $hasil['peringatan'],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  array<string, mixed>  $item
+     * @return list<array{label: string, nilai: string}>
+     */
+    private function ringkas(array $row, array $item): array
+    {
+        $jenisKelamin = match ($row['jenis_kelamin'] ?? null) {
+            'L' => 'Laki-laki',
+            'P' => 'Perempuan',
+            default => '—',
+        };
+        $ijazah = $this->berisi($row['mapel_ijazah'] ?? null)
+            ? (string) $row['mapel_ijazah']
+            : ($this->berisi($row['rumpun_ijazah'] ?? null) ? (string) $row['rumpun_ijazah'] : '—');
+        $tersertifikasi = (bool) ($row['status_sertifikasi'] ?? false);
+
+        $pasangan = [
+            'Nama' => (string) $item['nama'],
+            'NIP' => (string) $item['nip'],
+            'Gelar depan' => $this->tampil($row['gelar_depan'] ?? null),
+            'Gelar belakang' => $this->tampil($row['gelar_belakang'] ?? null),
+            'Kode guru' => (string) $item['kode'],
+            'DUK' => $item['duk'] === null ? '—' : (string) $item['duk'],
+            'Status pegawai' => (string) $item['status_pegawai'],
+            'Jenis kelamin' => $jenisKelamin,
+            'Tempat lahir' => $this->tampil($row['tempat_lahir'] ?? null),
+            'Tanggal lahir' => $this->tampil($row['tanggal_lahir'] ?? null),
+            'Agama' => $this->tampil($row['agama'] ?? null),
+            'Nomor HP' => $this->tampil($row['nomor_hp'] ?? null),
+            'Email' => $this->tampil($row['email'] ?? null),
+            'Alamat' => $this->tampil($row['alamat'] ?? null),
+            'NUPTK' => $this->tampil($row['nuptk'] ?? null),
+            'Jabatan' => $this->tampil($row['jabatan'] ?? null),
+            'Golongan' => $this->tampil($row['golongan'] ?? null),
+            'Ijazah' => $ijazah,
+            'Sertifikasi' => $tersertifikasi ? 'Ya' : 'Tidak',
+            'Mapel sertifikasi' => $tersertifikasi ? $this->tampil($row['mapel_sertifikasi'] ?? null) : '—',
+            'Guru BK' => (bool) ($row['is_bk'] ?? false) ? 'Ya' : 'Tidak',
+        ];
+
+        $baris = [];
+        foreach ($pasangan as $label => $nilai) {
+            $baris[] = ['label' => $label, 'nilai' => $nilai];
+        }
+
+        return $baris;
+    }
+
+    private function tampil(mixed $nilai): string
+    {
+        return $this->berisi($nilai) ? (string) $nilai : '—';
     }
 
     /**

@@ -37,6 +37,45 @@
             this.namaGuru = nama;
             this.mapelDipilih = (mapelIds || []).map(id => String(id));
             this.modalOpen = true;
+        },
+        tarikOpen: false,
+        tarikNip: '',
+        tarikMencari: false,
+        tarikHasil: null,
+        tarikError: '',
+        csrf: '{{ csrf_token() }}',
+        cariUrl: '{{ route('guru.tarik.cari') }}',
+        bukaTarik() {
+            this.tarikOpen = true;
+            this.tarikNip = '';
+            this.tarikHasil = null;
+            this.tarikError = '';
+            this.tarikMencari = false;
+        },
+        async cariTarik() {
+            this.tarikMencari = true;
+            this.tarikError = '';
+            this.tarikHasil = null;
+            try {
+                const body = new FormData();
+                body.append('_token', this.csrf);
+                body.append('nip', this.tarikNip);
+                const res = await fetch(this.cariUrl, {
+                    method: 'POST',
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    this.tarikError = json.pesan || json.errors?.nip?.[0] || json.message || 'Pencarian gagal.';
+                    return;
+                }
+                this.tarikHasil = json;
+            } catch (e) {
+                this.tarikError = 'Tidak dapat menghubungi server.';
+            } finally {
+                this.tarikMencari = false;
+            }
         }
     }">
         <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -44,14 +83,10 @@
                 <h2 class="text-2xl font-bold text-gray-900">Daftar Guru</h2>
                 <p class="text-gray-600 mt-1 text-sm">Identitas, KG, DUK, ijazah, dan biodata mengikuti Madani. Mapel diampu diatur di sini.</p>
             </div>
-            <form method="POST" action="{{ route('guru.tarik') }}" class="flex items-center gap-2">
-                @csrf
-                <input type="text" name="nip" value="{{ old('nip') }}" required maxlength="30" inputmode="numeric" placeholder="NIP"
-                    class="w-48 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono text-gray-800 focus:border-indigo-500 focus:ring-indigo-500">
-                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition whitespace-nowrap">
-                    Tarik dari Madani
-                </button>
-            </form>
+            <button type="button" @click="bukaTarik()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition whitespace-nowrap">
+                Tarik dari Madani
+            </button>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -137,11 +172,6 @@
                                             class="w-full px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition">
                                             Atur mapel diampu
                                         </button>
-                                        <form action="{{ route('guru.destroy', $guru->id) }}" method="POST" data-confirm="Hapus data guru ini? Jadwal yang terkait ikut terhapus.">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="w-full px-3 py-1.5 text-xs font-semibold text-red-600 bg-white border border-red-100 rounded-lg hover:bg-red-50 transition">Hapus</button>
-                                        </form>
                                     </div>
                                 </td>
                             </tr>
@@ -201,6 +231,66 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <div x-show="tarikOpen" x-cloak class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div @click.away="tarikOpen = false" class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+                <div class="flex items-center justify-between p-6 border-b border-gray-100">
+                    <div>
+                        <h3 class="font-bold text-gray-900 text-xl">Tarik dari Madani</h3>
+                        <p class="text-xs text-gray-500 mt-1">Cari NIP dulu. Data baru disimpan setelah dikonfirmasi.</p>
+                    </div>
+                    <button type="button" @click="tarikOpen = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto">
+                    <label for="tarik-nip" class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Masukkan NIP</label>
+                    <div class="flex gap-2">
+                        <input id="tarik-nip" type="text" x-model="tarikNip" maxlength="30" inputmode="numeric" placeholder="NIP"
+                            @keydown.enter.prevent="cariTarik()"
+                            class="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono text-gray-800 focus:border-indigo-500 focus:ring-indigo-500">
+                        <button type="button" @click="cariTarik()" :disabled="tarikMencari"
+                            class="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
+                            <span x-text="tarikMencari ? 'Mencari...' : 'Cari'"></span>
+                        </button>
+                    </div>
+                    <p x-show="tarikError" x-cloak class="mt-3 text-sm text-red-700" x-text="tarikError"></p>
+                    <div x-show="tarikHasil" x-cloak class="mt-4">
+                        <p class="text-sm font-semibold"
+                            :class="tarikHasil && tarikHasil.status === 'siap' ? 'text-emerald-700' : 'text-red-700'"
+                            x-text="tarikHasil ? tarikHasil.pesan : ''"></p>
+                        <dl x-show="tarikHasil && tarikHasil.status === 'siap'" class="mt-3 divide-y divide-gray-100 border border-gray-100 rounded-xl px-3">
+                            <template x-for="baris in (tarikHasil ? tarikHasil.baris : [])" :key="baris.label">
+                                <div class="flex justify-between gap-4 py-2 text-sm">
+                                    <dt class="text-gray-500 shrink-0" x-text="baris.label"></dt>
+                                    <dd class="text-gray-900 text-right" x-text="baris.nilai"></dd>
+                                </div>
+                            </template>
+                        </dl>
+                        <ul class="mt-3 space-y-1" x-show="tarikHasil && tarikHasil.peringatan && tarikHasil.peringatan.length">
+                            <template x-for="(pesan, indeks) in (tarikHasil ? tarikHasil.peringatan : [])" :key="indeks">
+                                <li class="text-xs text-amber-700" x-text="pesan"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
+                <div class="px-6 py-4 flex justify-end gap-2 border-t border-gray-100">
+                    <button type="button" @click="tarikOpen = false"
+                        class="px-5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">
+                        Batal
+                    </button>
+                    <form method="POST" action="{{ route('guru.tarik') }}" x-show="tarikHasil && tarikHasil.status === 'siap'">
+                        @csrf
+                        <input type="hidden" name="nip" :value="tarikNip">
+                        <button type="submit" class="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">
+                            Simpan
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>

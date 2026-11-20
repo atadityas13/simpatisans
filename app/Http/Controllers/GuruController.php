@@ -55,12 +55,4 @@ class GuruController extends Controller
             ->route('guru.index')
             ->with('success', 'Mapel diampu '.$guru->nama_lengkap.' diperbarui.');
     }
-
-    public function destroy(Guru $guru): RedirectResponse
-    {
-        $guru->mapelDiampu()->detach();
-        $guru->delete();
-
-        return redirect()->route('guru.index')->with('success', 'Data Guru dihapus!');
-    }
 }
