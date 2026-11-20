@@ -43,7 +43,7 @@
             <form method="POST" action="{{ route('guru.madani.sync') }}">
                 @csrf
                 <button type="submit" class="bg-white hover:bg-gray-50 text-indigo-700 font-medium py-2.5 px-5 rounded-xl border border-indigo-200">
-                    Sync {{ count($sinkron) }} guru@if (count($hanya_lokal) > 0) dan hapus {{ count($hanya_lokal) }}@endif
+                    Sync {{ count($sinkron) }} guru{{ count($hanya_lokal) > 0 ? ' dan hapus '.count($hanya_lokal) : '' }}
                 </button>
             </form>
         @endif
