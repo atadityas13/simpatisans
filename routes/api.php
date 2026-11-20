@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\GuruPengumumanController;
 use App\Http\Controllers\Api\GuruProfileController;
 use App\Http\Controllers\Api\AppUpdateController;
 use App\Http\Controllers\Api\KelasJadwalController;
+use App\Http\Controllers\Api\MadaniGuruController;
 use App\Http\Controllers\Api\MadaniRombelController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,6 +30,7 @@ Route::middleware(['auth.madani.siswa', 'throttle:60,1'])->prefix('siswa')->grou
 
 Route::middleware(['auth.madani.export', 'throttle:60,1'])->prefix('madani')->group(function () {
     Route::get('/rombels', [MadaniRombelController::class, 'index']);
+    Route::get('/gurus', [MadaniGuruController::class, 'index']);
 });
 
 Route::prefix('auth')->group(function () {
