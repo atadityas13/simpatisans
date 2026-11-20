@@ -4,12 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Guru;
 use App\Models\Mapel;
-use App\Models\Rumpun;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\View\View;
 
 class GuruController extends Controller
 {
-    public function index()
+    public function index(): View
     {
         $gurus = Guru::with(['mapelIjazah', 'rumpunIjazah', 'mapelSertifikasi', 'mapelDiampu'])
             ->orderedByDuk()
@@ -18,87 +19,44 @@ class GuruController extends Controller
         $guruSearchBlobs = $gurus->map(fn (Guru $g) => $g->searchBlob())->values()->all();
 
         $mapels = Mapel::orderBy('id')->get();
-        $rumpuns = Rumpun::orderBy('nama_rumpun')->get();
 
-        return view('guru.index', compact('gurus', 'mapels', 'rumpuns', 'guruSearchBlobs'));
+        return view('guru.index', compact('gurus', 'mapels', 'guruSearchBlobs'));
     }
 
-    public function create()
+    public function create(): RedirectResponse
     {
         return redirect()
             ->route('guru.index')
             ->with('error', 'Guru baru hanya bisa ditarik dari Madani.');
     }
 
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
         return redirect()
             ->route('guru.index')
             ->with('error', 'Guru baru hanya bisa ditarik dari Madani.');
     }
 
-    public function edit(Guru $guru)
+    public function edit(Guru $guru): RedirectResponse
     {
-        $mapels = Mapel::orderBy('id')->get();
-        $mapelDiampuIds = $guru->mapelDiampu->pluck('id')->toArray();
-
-        return view('guru.edit', compact('guru', 'mapels', 'mapelDiampuIds'));
+        return redirect()->route('guru.index');
     }
 
-    public function update(Request $request, Guru $guru)
+    public function update(Request $request, Guru $guru): RedirectResponse
     {
         $validated = $request->validate([
-            'username' => 'required|string|max:30|unique:gurus,username,'.$guru->id,
-            'kode_guru' => 'required|string|size:2|unique:gurus,kode_guru,'.$guru->id,
-            'duk' => 'nullable|integer|min:1|unique:gurus,duk,'.$guru->id,
-            'status_pegawai' => 'required|in:PNS,PPPK,NON_ASN',
-            'nama_guru' => 'required|string|max:255',
-            'gelar_depan' => 'nullable|string|max:100',
-            'gelar_belakang' => 'nullable|string|max:100',
-            'jenis_kelamin' => 'nullable|in:L,P',
-            'tempat_lahir' => 'nullable|string|max:100',
-            'tanggal_lahir' => 'nullable|date',
-            'agama' => 'nullable|string|max:50',
-            'nomor_hp' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
-            'alamat' => 'nullable|string|max:500',
-            'nuptk' => 'nullable|string|max:20',
-            'jabatan' => 'nullable|string|max:255',
-            'golongan' => 'nullable|string|max:20',
-            'ijazah_selection' => 'nullable|string',
-            'mapel_sertifikasi_id' => 'nullable|exists:mapels,id',
-            'is_bk' => 'nullable|boolean',
-            'mapel_diampu' => 'nullable|array',
-            'mapel_diampu.*' => 'exists:mapels,id',
+            'mapel_diampu' => ['nullable', 'array'],
+            'mapel_diampu.*' => ['integer', 'exists:mapels,id'],
         ]);
 
-        $validated['status_sertifikasi'] = $request->boolean('status_sertifikasi');
-        $validated['is_bk'] = $request->boolean('is_bk');
+        $guru->mapelDiampu()->sync($validated['mapel_diampu'] ?? []);
 
-        // Handle Combined Ijazah Selection
-        $validated['mapel_ijazah_id'] = null;
-        $validated['rumpun_ijazah_id'] = null;
-        if ($request->filled('ijazah_selection')) {
-            [$type, $id] = explode('_', $request->ijazah_selection);
-            if ($type === 'mapel') {
-                $validated['mapel_ijazah_id'] = $id;
-            }
-            if ($type === 'rumpun') {
-                $validated['rumpun_ijazah_id'] = $id;
-            }
-        }
-
-        if (! $validated['status_sertifikasi']) {
-            $validated['mapel_sertifikasi_id'] = null;
-        }
-
-        $guru->update($validated);
-        $guru->mapelDiampu()->sync($request->mapel_diampu ?? []);
-
-        return redirect()->route('guru.index')->with('success', 'Data Guru berhasil diperbarui!');
+        return redirect()
+            ->route('guru.index')
+            ->with('success', 'Mapel diampu '.$guru->nama_lengkap.' diperbarui.');
     }
 
-    public function destroy(Guru $guru)
+    public function destroy(Guru $guru): RedirectResponse
     {
         $guru->mapelDiampu()->detach();
         $guru->delete();

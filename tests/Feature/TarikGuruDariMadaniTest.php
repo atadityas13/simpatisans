@@ -205,6 +205,155 @@ class TarikGuruDariMadaniTest extends TestCase
         });
     }
 
+    public function test_tarik_nip_hanya_menambah_guru_yang_diminta(): void
+    {
+        config([
+            'services.madani.url' => 'https://madani.test/api',
+            'services.madani.introspect_secret' => 'rahasia',
+        ]);
+
+        Http::fake([
+            'https://madani.test/api/v1/simpatisans/gtks' => Http::response([
+                'data' => [
+                    $this->baris([
+                        'nip' => '199003032015011003',
+                        'nama' => 'Andi Nugroho',
+                        'kode_internal' => 'ZZ',
+                    ]),
+                    $this->baris([
+                        'nip' => '198811112015011005',
+                        'nama' => 'Orang Lain',
+                        'kode_internal' => 'AA',
+                    ]),
+                ],
+            ]),
+        ]);
+
+        $this->withoutMiddleware()
+            ->post(route('guru.tarik'), ['nip' => '1990 0303 201501 1 003'])
+            ->assertRedirect(route('guru.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('gurus', [
+            'username' => '199003032015011003',
+            'nama_guru' => 'Andi Nugroho',
+            'kode_guru' => 'ZZ',
+        ]);
+        $this->assertDatabaseMissing('gurus', ['username' => '198811112015011005']);
+    }
+
+    public function test_tarik_nip_yang_sudah_ada_ditolak(): void
+    {
+        config([
+            'services.madani.url' => 'https://madani.test/api',
+            'services.madani.introspect_secret' => 'rahasia',
+        ]);
+        Guru::query()->create([
+            'username' => '199003032015011003',
+            'kode_guru' => 'AA',
+            'nama_guru' => 'Andi Nugroho',
+            'status_pegawai' => 'PNS',
+        ]);
+
+        Http::fake([
+            'https://madani.test/api/v1/simpatisans/gtks' => Http::response([
+                'data' => [
+                    $this->baris(['nip' => '199003032015011003', 'nama' => 'Andi Nugroho']),
+                ],
+            ]),
+        ]);
+
+        $this->withoutMiddleware()
+            ->post(route('guru.tarik'), ['nip' => '199003032015011003'])
+            ->assertRedirect(route('guru.index'))
+            ->assertSessionHas('error');
+
+        $this->assertSame(1, Guru::query()->count());
+    }
+
+    public function test_sync_satu_tidak_mengubah_guru_lain(): void
+    {
+        config([
+            'services.madani.url' => 'https://madani.test/api',
+            'services.madani.introspect_secret' => 'rahasia',
+        ]);
+
+        $target = Guru::query()->create([
+            'username' => '198001012005011001',
+            'kode_guru' => 'BD',
+            'nama_guru' => 'Budi Santoso',
+            'email' => 'budi@example.com',
+            'status_pegawai' => 'PNS',
+        ]);
+        $lain = Guru::query()->create([
+            'username' => '197001012000011009',
+            'kode_guru' => 'LL',
+            'nama_guru' => 'Hanya di Simpatisans',
+            'status_pegawai' => 'NON_ASN',
+        ]);
+
+        Http::fake([
+            'https://madani.test/api/v1/simpatisans/gtks' => Http::response([
+                'data' => [
+                    $this->baris([
+                        'nip' => '198001012005011001',
+                        'nama' => 'Budi Diperbarui',
+                        'email' => null,
+                        'nomor_hp' => '081234567890',
+                    ]),
+                    $this->baris([
+                        'nip' => '197001012000011009',
+                        'nama' => 'Seharusnya Tidak Berubah',
+                    ]),
+                ],
+            ]),
+        ]);
+
+        $this->withoutMiddleware()
+            ->post(route('guru.sync', $target))
+            ->assertRedirect(route('guru.index'))
+            ->assertSessionHas('success');
+
+        $target->refresh();
+        $lain->refresh();
+        $this->assertSame('Budi Diperbarui', $target->nama_guru);
+        $this->assertSame('budi@example.com', $target->email);
+        $this->assertSame('081234567890', $target->nomor_hp);
+        $this->assertSame('Hanya di Simpatisans', $lain->nama_guru);
+    }
+
+    public function test_update_hanya_menyimpan_mapel_diampu(): void
+    {
+        $mapel = Mapel::query()->create(['nama_mapel' => 'Matematika']);
+        $guru = Guru::query()->create([
+            'username' => '198001012005011001',
+            'kode_guru' => 'BD',
+            'nama_guru' => 'Budi Santoso',
+            'email' => 'budi@example.com',
+            'status_pegawai' => 'PNS',
+        ]);
+
+        $this->withoutMiddleware()
+            ->get(route('guru.edit', $guru))
+            ->assertRedirect(route('guru.index'));
+
+        $this->withoutMiddleware()
+            ->put(route('guru.update', $guru), [
+                'mapel_diampu' => [$mapel->id],
+                'nama_guru' => 'Nama Disusupkan',
+                'email' => 'hack@example.com',
+                'nomor_hp' => '0800000000',
+            ])
+            ->assertRedirect(route('guru.index'))
+            ->assertSessionHas('success');
+
+        $guru->refresh();
+        $this->assertSame('Budi Santoso', $guru->nama_guru);
+        $this->assertSame('budi@example.com', $guru->email);
+        $this->assertNull($guru->nomor_hp);
+        $this->assertSame([$mapel->id], $guru->mapelDiampu()->pluck('mapels.id')->all());
+    }
+
     /**
      * @param  array<string, mixed>  $override
      * @return array<string, mixed>
@@ -310,6 +459,13 @@ class TarikGuruDariMadaniTest extends TestCase
             $table->unsignedBigInteger('mapel_ijazah_id')->nullable();
             $table->unsignedBigInteger('rumpun_ijazah_id')->nullable();
             $table->unsignedBigInteger('mapel_sertifikasi_id')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('guru_mapels', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('guru_id');
+            $table->unsignedBigInteger('mapel_id');
             $table->timestamps();
         });
     }

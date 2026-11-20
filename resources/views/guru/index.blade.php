@@ -5,40 +5,18 @@
     @if(session('error'))
         <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ session('error') }}</div>
     @endif
+    @if($errors->any())
+        <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ $errors->first() }}</div>
+    @endif
     @if(session('success'))
         <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('success') }}</div>
     @endif
 
-    <div x-data="{ 
-        modalOpen: false, 
-        isEdit: false, 
-        activeTab: 'identitas',
-        formAction: '{{ route('guru.store') }}',
-        formData: {
-            id: '',
-            username: '',
-            kode_guru: '',
-            duk: '',
-            status_pegawai: 'PNS',
-            nama_guru: '',
-            gelar_depan: '',
-            gelar_belakang: '',
-            jenis_kelamin: '',
-            tempat_lahir: '',
-            tanggal_lahir: '',
-            agama: '',
-            nomor_hp: '',
-            email: '',
-            alamat: '',
-            nuptk: '',
-            jabatan: '',
-            golongan: '',
-            ijazah_selection: '',
-            status_sertifikasi: 0,
-            is_bk: 0,
-            mapel_sertifikasi_id: '',
-            mapel_diampu: []
-        },
+    <div x-data="{
+        modalOpen: false,
+        formAction: '',
+        namaGuru: '',
+        mapelDipilih: [],
         guruSearch: '',
         guruSearchBlobs: @js($guruSearchBlobs ?? []),
         rowMatches(blob) {
@@ -54,78 +32,26 @@
             const q = this.guruSearch.trim().toLowerCase();
             return q && this.guruMatchCount() === 0;
         },
-        openAdd() {
-            this.isEdit = false;
-            this.activeTab = 'identitas';
-            this.formAction = '{{ route('guru.store') }}';
-            this.formData = {
-                id: '',
-                username: '',
-                kode_guru: '',
-                duk: '',
-                status_pegawai: 'PNS',
-                nama_guru: '',
-                gelar_depan: '',
-                gelar_belakang: '',
-                jenis_kelamin: '',
-                tempat_lahir: '',
-                tanggal_lahir: '',
-                agama: '',
-                nomor_hp: '',
-                email: '',
-                alamat: '',
-                nuptk: '',
-                jabatan: '',
-                golongan: '',
-                ijazah_selection: '',
-                status_sertifikasi: 0,
-                is_bk: 0,
-                mapel_sertifikasi_id: '',
-                mapel_diampu: []
-            };
-            this.modalOpen = true;
-        },
-        openEdit(guru, mapelIds) {
-            this.isEdit = true;
-            this.activeTab = 'identitas';
-            this.formAction = '/master/guru/' + guru.id;
-            this.formData = {
-                id: guru.id,
-                username: guru.username || '',
-                kode_guru: guru.kode_guru || '',
-                duk: guru.duk || '',
-                status_pegawai: guru.status_pegawai || 'NON_ASN',
-                nama_guru: guru.nama_guru || '',
-                gelar_depan: guru.gelar_depan || '',
-                gelar_belakang: guru.gelar_belakang || '',
-                jenis_kelamin: guru.jenis_kelamin || '',
-                tempat_lahir: guru.tempat_lahir || '',
-                tanggal_lahir: guru.tanggal_lahir ? guru.tanggal_lahir.substring(0, 10) : '',
-                agama: guru.agama || '',
-                nomor_hp: guru.nomor_hp || '',
-                email: guru.email || '',
-                alamat: guru.alamat || '',
-                nuptk: guru.nuptk || '',
-                jabatan: guru.jabatan || '',
-                golongan: guru.golongan || '',
-                ijazah_selection: guru.mapel_ijazah_id ? `mapel_${guru.mapel_ijazah_id}` : (guru.rumpun_ijazah_id ? `rumpun_${guru.rumpun_ijazah_id}` : ''),
-                status_sertifikasi: guru.status_sertifikasi ? 1 : 0,
-                is_bk: guru.is_bk ? 1 : 0,
-                mapel_sertifikasi_id: guru.mapel_sertifikasi_id || '',
-                mapel_diampu: mapelIds || []
-            };
+        bukaMapel(action, nama, mapelIds) {
+            this.formAction = action;
+            this.namaGuru = nama;
+            this.mapelDipilih = (mapelIds || []).map(id => String(id));
             this.modalOpen = true;
         }
     }">
-        <div class="mb-6 flex justify-between items-center">
+        <div class="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
                 <h2 class="text-2xl font-bold text-gray-900">Daftar Guru</h2>
-                <p class="text-gray-600 mt-1 text-sm">Manajemen data rinci tenaga pendidik. Status, jabatan dan mapel.</p>
+                <p class="text-gray-600 mt-1 text-sm">Identitas, KG, DUK, ijazah, dan biodata mengikuti Madani. Mapel diampu diatur di sini.</p>
             </div>
-            <a href="{{ route('guru.madani') }}"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition inline-flex items-center">
-                Tarik & Sync Madani
-            </a>
+            <form method="POST" action="{{ route('guru.tarik') }}" class="flex items-center gap-2">
+                @csrf
+                <input type="text" name="nip" value="{{ old('nip') }}" required maxlength="30" inputmode="numeric" placeholder="NIP"
+                    class="w-48 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-mono text-gray-800 focus:border-indigo-500 focus:ring-indigo-500">
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition whitespace-nowrap">
+                    Tarik dari Madani
+                </button>
+            </form>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -141,29 +67,14 @@
                             <th class="px-5 py-4 text-center">Mapel Ijazah</th>
                             <th class="px-5 py-4 text-center">Sertifikasi</th>
                             <th class="px-5 py-4 text-center">Mapel Diampu</th>
+                            <th class="px-5 py-4 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         @forelse($gurus as $i => $guru)
                             <tr class="hover:bg-gray-50 transition-colors" data-search="{{ e($guruSearchBlobs[$i] ?? '') }}" x-show="rowMatches($el.dataset.search)">
                                 <td class="px-4 py-4 text-center">
-                                    <div class="font-black text-indigo-700 mb-2 truncate">{{ strtoupper($guru->kode_guru) }}</div>
-                                    <div class="flex items-center justify-center space-x-1">
-                                        <button @click="openEdit({{ $guru->toJson() }}, {{ $guru->mapelDiampu->pluck('id')->toJson() }})"
-                                            class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-100" title="Edit Profil Guru">
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                        </button>
-                                        <form action="{{ route('guru.destroy', $guru->id) }}" method="POST" class="inline-block" data-confirm="Hapus data guru ini?">
-                                            @csrf @method('DELETE')
-                                            <button type="submit" class="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-red-100" title="Hapus">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v2m3 4h.01" />
-                                                </svg>
-                                            </button>
-                                        </form>
-                                    </div>
+                                    <div class="font-black text-indigo-700 truncate">{{ strtoupper($guru->kode_guru) }}</div>
                                 </td>
                                 <td class="px-5 py-4">
                                     <p class="font-bold text-gray-900 leading-tight">{{ $guru->nama_lengkap }}</p>
@@ -199,7 +110,7 @@
                                 <td class="px-5 py-4">
                                     <div class="flex flex-wrap gap-1 max-w-[180px]">
                                         @forelse($guru->mapelDiampu as $mp)
-                                            @php 
+                                            @php
                                                 $linTypes = $guru->getLinearityTypes($mp);
                                                 $is_linear = count($linTypes) > 0;
                                                 $linTitle = count($linTypes) === 2 ? 'Linear' : ($is_linear ? 'Linear ' . implode('', $linTypes) : 'Tidak Linear / Belum Sertifikasi');
@@ -212,14 +123,35 @@
                                         @endforelse
                                     </div>
                                 </td>
+                                <td class="px-5 py-4">
+                                    <div class="flex flex-col items-stretch gap-1.5 min-w-[9.5rem]">
+                                        <form method="POST" action="{{ route('guru.sync', $guru) }}" data-confirm="Perbarui data {{ $guru->nama_lengkap }} dari Madani? Mapel diampu tidak berubah.">
+                                            @csrf
+                                            <button type="submit" class="w-full px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition">Sync</button>
+                                        </form>
+                                        <button type="button"
+                                            data-action="{{ route('guru.update', $guru) }}"
+                                            data-nama="{{ $guru->nama_lengkap }}"
+                                            data-mapel="{{ $guru->mapelDiampu->pluck('id')->toJson() }}"
+                                            @click="bukaMapel($el.dataset.action, $el.dataset.nama, JSON.parse($el.dataset.mapel || '[]'))"
+                                            class="w-full px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition">
+                                            Atur mapel diampu
+                                        </button>
+                                        <form action="{{ route('guru.destroy', $guru->id) }}" method="POST" data-confirm="Hapus data guru ini? Jadwal yang terkait ikut terhapus.">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="w-full px-3 py-1.5 text-xs font-semibold text-red-600 bg-white border border-red-100 rounded-lg hover:bg-red-50 transition">Hapus</button>
+                                        </form>
+                                    </div>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-5 py-10 text-center text-gray-400 italic">Belum ada data guru.</td>
+                                <td colspan="8" class="px-5 py-10 text-center text-gray-400 italic">Belum ada data guru.</td>
                             </tr>
                         @endforelse
                         <tr x-show="guruFilterEmpty()" x-cloak>
-                            <td colspan="7" class="px-5 py-10 text-center text-gray-500 italic">
+                            <td colspan="8" class="px-5 py-10 text-center text-gray-500 italic">
                                 Tidak ada guru yang cocok dengan &ldquo;<span x-text="guruSearch"></span>&rdquo;
                             </td>
                         </tr>
@@ -228,295 +160,49 @@
             </div>
         </div>
 
-        {{-- MODAL DATA GURU --}}
         <div x-show="modalOpen" x-cloak class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
-            
-            <div @click.away="modalOpen = false" 
-                class="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden"
+            <div @click.away="modalOpen = false"
+                class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden"
                 x-transition:enter="transition ease-out duration-300 transform" x-transition:enter-start="scale-95 opacity-0" x-transition:enter-end="scale-100 opacity-100">
-                
-                {{-- Header --}}
                 <div class="flex items-center justify-between p-6 border-b border-gray-100">
                     <div>
-                        <h3 class="font-bold text-gray-900 text-xl" x-text="isEdit ? 'Edit Data Guru' : 'Tambah Guru Baru'"></h3>
-                        <p class="text-xs text-gray-500 mt-1" x-text="isEdit ? 'Identitas, KG, DUK, ijazah, dan biodata mengikuti Madani. Ubah di Madani lalu Sync. Mapel diampu tetap diatur di sini.' : 'Guru baru hanya bisa ditarik dari Madani.'"></p>
+                        <h3 class="font-bold text-gray-900 text-xl">Atur mapel diampu</h3>
+                        <p class="text-xs text-gray-500 mt-1" x-text="namaGuru"></p>
                     </div>
-                    <button @click="modalOpen = false" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <button type="button" @click="modalOpen = false" class="text-gray-400 hover:text-gray-600 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-
-                {{-- Tab Navigation --}}
-                <div class="flex gap-8 border-b border-gray-50 px-8 py-1 bg-gray-50/50">
-                    <button type="button" @click="activeTab = 'identitas'" 
-                        :class="activeTab === 'identitas' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600'"
-                        class="py-3 border-b-2 text-xs font-black uppercase tracking-widest transition-all">
-                        01. Identitas Kepegawaian
-                    </button>
-                    <button type="button" @click="activeTab = 'kompetensi'" 
-                        :class="activeTab === 'kompetensi' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600'"
-                        class="py-3 border-b-2 text-xs font-black uppercase tracking-widest transition-all">
-                        02. Mapel & Sertifikasi
-                    </button>
-                </div>
-
-                {{-- Form Content --}}
-                <form :action="formAction" method="POST" class="flex-1 flex flex-col h-full max-h-full overflow-hidden">
+                <form :action="formAction" method="POST" class="flex flex-col min-h-0">
                     @csrf
-                    <template x-if="isEdit">
-                        @method('PUT')
-                    </template>
-
-                    {{-- Scrollable Body --}}
-                    <div class="flex-1 overflow-y-auto custom-scrollbar">
-                        {{-- TAB 1: Identitas Kepegawaian --}}
-                        <div x-show="activeTab === 'identitas'" class="p-8 space-y-8">
-                            {{-- Baris 1: Status Kepegawaian, Username, NUPTK, DUK --}}
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
-                                {{-- a. Radio ASN --}}
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Status Kepegawaian</label>
-                                    <div class="flex flex-wrap items-center gap-3 bg-gray-50/50 p-2 rounded-xl border border-gray-100">
-                                        <label class="flex items-center cursor-pointer group">
-                                            <input type="radio" name="status_pegawai" value="PNS" 
-                                                x-model="formData.status_pegawai" 
-                                                class="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                            <span class="ml-2 text-[11px] font-bold text-gray-600 group-hover:text-indigo-600 transition-colors uppercase">PNS</span>
-                                        </label>
-                                        <label class="flex items-center cursor-pointer group">
-                                            <input type="radio" name="status_pegawai" value="PPPK" 
-                                                x-model="formData.status_pegawai" 
-                                                class="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                            <span class="ml-2 text-[11px] font-bold text-gray-600 group-hover:text-indigo-600 transition-colors uppercase"> PPPK</span>
-                                        </label>
-                                        <label class="flex items-center cursor-pointer group">
-                                            <input type="radio" name="status_pegawai" value="NON_ASN" 
-                                                x-model="formData.status_pegawai" 
-                                                class="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500">
-                                            <span class="ml-2 text-[11px] font-bold text-gray-600 group-hover:text-indigo-600 transition-colors uppercase tracking-widest">Non ASN</span>
-                                        </label>
-                                    </div>
-                                </div>
-                                {{-- b. Username (NIP/NIK) --}}
-                                <div class="md:col-span-1">
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1" 
-                                        x-text="(formData.status_pegawai === 'PNS' || formData.status_pegawai === 'PPPK') ? 'NIP' : 'NIK'"></label>
-                                    <input type="text" name="username" x-model="formData.username" required
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 font-mono transition-all">
-                                </div>
-                                {{-- c. NUPTK --}}
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">NUPTK/PegID</label>
-                                    <input type="text" name="nuptk" x-model="formData.nuptk"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                                {{-- d. DUK --}}
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">DUK (No. Urut)</label>
-                                    <input type="number" name="duk" x-model="formData.duk"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                            </div>
-
-                            {{-- Baris 2: Nama Lengkap, Gelar Depan, Gelar Belakang --}}
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                {{-- a. Nama Lengkap --}}
-                                <div class="md:col-span-2">
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Nama Lengkap (Tanpa Gelar)</label>
-                                    <input type="text" name="nama_guru" x-model="formData.nama_guru" required
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 font-bold transition-all">
-                                </div>
-                                {{-- b. Gelar Depan --}}
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Gelar Depan</label>
-                                    <input type="text" name="gelar_depan" x-model="formData.gelar_depan" placeholder="Drs."
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                                {{-- c. Gelar Belakang --}}
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Gelar Belakang</label>
-                                    <input type="text" name="gelar_belakang" x-model="formData.gelar_belakang" placeholder="M.Pd."
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                            </div>
-
-                            {{-- Baris 3: Biodata Pribadi --}}
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Jenis Kelamin</label>
-                                    <select name="jenis_kelamin" x-model="formData.jenis_kelamin"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                        <option value="">— Pilih —</option>
-                                        <option value="L">Laki-laki</option>
-                                        <option value="P">Perempuan</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Tempat Lahir</label>
-                                    <input type="text" name="tempat_lahir" x-model="formData.tempat_lahir"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Tanggal Lahir</label>
-                                    <input type="date" name="tanggal_lahir" x-model="formData.tanggal_lahir"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Agama</label>
-                                    <select name="agama" x-model="formData.agama"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                        <option value="">— Pilih —</option>
-                                        @foreach(['Islam', 'Kristen', 'Katolik', 'Hindu', 'Buddha', 'Konghucu'] as $agama)
-                                            <option value="{{ $agama }}">{{ $agama }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-
-                            {{-- Baris 4: Kontak --}}
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Nomor HP</label>
-                                    <input type="text" name="nomor_hp" x-model="formData.nomor_hp" placeholder="08xxxxxxxxxx"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Email</label>
-                                    <input type="email" name="email" x-model="formData.email"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                                <div class="md:col-span-1">
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Alamat</label>
-                                    <input type="text" name="alamat" x-model="formData.alamat"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                            </div>
-
-                            {{-- Baris 5: KG, Jabatan, Golongan --}}
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                {{-- a. KG --}}
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Kode Guru</label>
-                                    <input type="text" name="kode_guru" x-model="formData.kode_guru" required maxlength="2" placeholder="KG"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 font-black text-center transition-all uppercase">
-                                </div>
-                                {{-- b. Jabatan --}}
-                                <div class="md:col-span-2">
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Jabatan</label>
-                                    <input type="text" name="jabatan" x-model="formData.jabatan" placeholder="Guru Ahli Pertama - Guru TIK"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                </div>
-                                {{-- c. Golongan --}}
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Golongan / Grade</label>
-                                    <select name="golongan" x-model="formData.golongan"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                        <option value="">-- Pilih --</option>
-                                        @foreach(['III/a', 'III/b', 'III/c', 'III/d', 'IV/a', 'IV/b', 'IV/c','IX', 'GTT'] as $gol)
-                                            <option value="{{ $gol }}">{{ $gol }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- TAB 2: Kompetensi & Sertifikasi --}}
-                        <div x-show="activeTab === 'kompetensi'" class="p-8 flex flex-col md:flex-row gap-8">
-                            {{-- Kolom 1: Profil Kompetensi --}}
-                            <div class="flex-1 space-y-6">
-                                {{-- a. Mapel Ijazah (Combined) --}}
-                                <div>
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Mapel Ijazah (S1)</label>
-                                    <select name="ijazah_selection" x-model="formData.ijazah_selection"
-                                        class="w-full rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all">
-                                        <option value="">— Pilih Mapel Ijazah —</option>
-                                        @foreach($rumpuns as $rumpun)
-                                            <option value="rumpun_{{ $rumpun->id }}">{{ $rumpun->nama_rumpun }}</option>
-                                        @endforeach
-                                        @foreach($mapels as $mapel)
-                                            <option value="mapel_{{ $mapel->id }}">{{ $mapel->nama_mapel }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                {{-- b. Radio Tersertifikasi --}}
-                                <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Tersertifikasi (TPG)</label>
-                                    <div class="flex items-center gap-6">
-                                        <label class="flex items-center cursor-pointer group">
-                                            <input type="radio" name="status_sertifikasi" value="1" 
-                                                x-model.number="formData.status_sertifikasi" 
-                                                class="w-4 h-4 text-green-600 border-gray-300 focus:ring-green-500">
-                                            <span class="ml-2 text-sm font-bold text-gray-600 group-hover:text-green-600 transition-colors">Ya</span>
-                                        </label>
-                                        <label class="flex items-center cursor-pointer group">
-                                            <input type="radio" name="status_sertifikasi" value="0" 
-                                                x-model.number="formData.status_sertifikasi" 
-                                                @change="formData.mapel_sertifikasi_id = ''"
-                                                class="w-4 h-4 text-gray-400 border-gray-300 focus:ring-gray-500">
-                                            <span class="ml-2 text-sm font-bold text-gray-600 group-hover:text-gray-400 transition-colors">Tidak</span>
-                                        </label>
-                                    </div>
-
-                                    {{-- c. Mapel Sertifikasi --}}
-                                    <div x-show="formData.status_sertifikasi" x-collapse class="mt-4 pt-4 border-t border-gray-200">
-                                        <label class="block text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-2 ml-1">Mapel Sertifikasi</label>
-                                        <select name="mapel_sertifikasi_id" x-model="formData.mapel_sertifikasi_id"
-                                            class="w-full rounded-xl border-indigo-200 bg-white focus:ring-indigo-500 focus:border-indigo-500 text-sm p-3 transition-all shadow-sm">
-                                            <option value="">-- Pilih Mapel Sertifikasi --</option>
-                                            @foreach($mapels as $m)
-                                                <option value="{{ $m->id }}">{{ $m->nama_mapel }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 mt-4">
-                                    <label class="block text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3 ml-1">Tugas Utama BK</label>
-                                    <label class="flex items-center cursor-pointer group">
-                                        <input type="checkbox" name="is_bk" value="1" 
-                                            x-model.number="formData.is_bk" 
-                                            class="w-5 h-5 text-indigo-600 border-gray-300 rounded-lg focus:ring-indigo-500">
-                                        <span class="ml-3 text-sm font-bold text-gray-700 group-hover:text-indigo-600 transition-colors">Guru Bimbingan dan Konseling (BK)</span>
-                                    </label>
-                                    <p class="text-[10px] text-indigo-400 mt-2 ml-8 leading-tight italic">* Jika dicentang, guru secara otomatis dianggap memiliki beban 24 Jam Bimbingan di semua laporan.</p>
-                                </div>
-                            </div>
-
-                            {{-- Kolom 2: Daftar Mapel Diampu (LIMIT 5 ITEMS + INTERNAL SCROLL) --}}
-                            <div class="flex-1 flex flex-col bg-gray-50/50 rounded-2xl border border-gray-100 overflow-hidden h-[280px]">
-                                <div class="p-4 bg-gray-100/50 border-b border-gray-100 shrink-0">
-                                    <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest">Pilih Mapel Diampu</label>
-                                </div>
-                                <div class="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                                    @foreach($mapels as $m)
-                                        <label class="flex items-center p-3 bg-white rounded-xl border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all cursor-pointer group">
-                                            <input type="checkbox" name="mapel_diampu[]" value="{{ $m->id }}"
-                                                x-model="formData.mapel_diampu"
-                                                class="w-5 h-5 text-indigo-600 rounded-lg border-gray-300 focus:ring-indigo-500 transition-all">
-                                            <span class="ml-3 text-sm font-bold text-gray-700 group-hover:text-indigo-700 transition-colors">{{ $m->nama_mapel }}</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
+                    @method('PUT')
+                    <div class="overflow-y-auto p-4 space-y-2 max-h-[55vh]">
+                        @foreach($mapels as $m)
+                            <label class="flex items-center p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-indigo-200 hover:shadow-sm transition-all cursor-pointer group">
+                                <input type="checkbox" name="mapel_diampu[]" value="{{ $m->id }}"
+                                    x-model="mapelDipilih"
+                                    class="w-5 h-5 text-indigo-600 rounded-lg border-gray-300 focus:ring-indigo-500 transition-all">
+                                <span class="ml-3 text-sm font-bold text-gray-700 group-hover:text-indigo-700 transition-colors">{{ $m->nama_mapel }}</span>
+                            </label>
+                        @endforeach
                     </div>
-
-                    {{-- Fixed Footer (Following Tambah Tugas Mengajar Pattern) --}}
-                    <div class="px-5 pb-5 pt-2 flex justify-end gap-2 bg-white shrink-0">
+                    <div class="px-5 py-4 flex justify-end gap-2 border-t border-gray-100">
                         <button type="button" @click="modalOpen = false"
                             class="px-5 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition">
                             Batal
                         </button>
                         <button type="submit"
-                            class="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition"
-                            x-text="isEdit ? 'Simpan Perubahan' : 'Simpan'"></button>
+                            class="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 transition">
+                            Simpan
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
 @endsection

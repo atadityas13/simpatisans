@@ -56,6 +56,116 @@ class TarikGuruService
     }
 
     /**
+     * @return array{nama: string, kode: string, peringatan: list<string>}
+     */
+    public function tarikNip(string $nip): array
+    {
+        $kunci = $this->kunci($nip);
+        if ($kunci === '') {
+            throw new RuntimeException('NIP tidak dikenali. Isi minimal 8 digit.');
+        }
+
+        $paket = $this->fetchRows();
+        $cocok = $this->barisNip($paket['rows'], $kunci);
+        if ($cocok === []) {
+            throw new RuntimeException('NIP ini tidak ditemukan sebagai guru aktif di Madani.');
+        }
+
+        $hasil = $this->bandingkan($cocok);
+
+        foreach ($hasil['tarik'] as $item) {
+            DB::transaction(function () use ($item): void {
+                Guru::query()->create($item['payload']);
+            });
+
+            return [
+                'nama' => (string) $item['nama'],
+                'kode' => (string) $item['kode'],
+                'peringatan' => $hasil['peringatan'],
+            ];
+        }
+
+        $sudahAda = Guru::query()->get()->contains(
+            fn (Guru $guru): bool => $this->kunci((string) $guru->username) === $kunci
+        );
+        if ($sudahAda) {
+            throw new RuntimeException('Guru dengan NIP ini sudah ada. Gunakan Sync pada baris guru tersebut.');
+        }
+
+        foreach ($hasil['lewati'] as $pesan) {
+            if (str_contains($pesan, $kunci)) {
+                throw new RuntimeException($pesan);
+            }
+        }
+
+        throw new RuntimeException('NIP ini tidak ditemukan sebagai guru aktif di Madani.');
+    }
+
+    /**
+     * @return array{diperbarui: bool, perubahan: list<array{label: string, dari: ?string, ke: string}>, peringatan: list<string>}
+     */
+    public function sinkronSatu(Guru $guru): array
+    {
+        $kunci = $this->kunci((string) $guru->username);
+        $paket = $this->fetchRows();
+        $cocok = $kunci === '' ? [] : $this->barisNip($paket['rows'], $kunci);
+        if ($cocok === []) {
+            throw new RuntimeException($guru->nama_lengkap.' tidak ada di Madani, jadi tidak diubah.');
+        }
+
+        $hasil = $this->bandingkan($cocok);
+
+        $item = null;
+        foreach ($hasil['sinkron'] as $calon) {
+            if ($calon['guru']->id === $guru->id) {
+                $item = $calon;
+                break;
+            }
+        }
+
+        $peringatan = $hasil['peringatan'];
+
+        if ($item === null) {
+            return [
+                'diperbarui' => false,
+                'perubahan' => [],
+                'peringatan' => $peringatan,
+            ];
+        }
+
+        $payload = [];
+        foreach ($item['perubahan'] as $ubah) {
+            $payload[$ubah['kolom']] = $ubah['nilai'];
+        }
+
+        DB::transaction(function () use ($guru, $payload): void {
+            $guru->update($payload);
+        });
+
+        return [
+            'diperbarui' => true,
+            'perubahan' => array_map(fn (array $ubah): array => [
+                'label' => $ubah['label'],
+                'dari' => $ubah['dari'],
+                'ke' => $ubah['ke'],
+            ], $item['perubahan']),
+            'peringatan' => $peringatan,
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $rows
+     * @return list<array<string, mixed>>
+     */
+    private function barisNip(array $rows, string $kunci): array
+    {
+        return array_values(array_filter(
+            $rows,
+            fn (array $row): bool => (string) ($row['nip_kunci'] ?? '') === $kunci,
+        ));
+    }
+
+    /**
      * @param  list<array<string, mixed>>  $remoteRows
      * @param  list<string>  $peringatan
      * @return array<string, mixed>

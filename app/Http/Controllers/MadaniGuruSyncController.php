@@ -2,66 +2,78 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Guru;
 use App\Services\Madani\TarikGuruService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Response;
+use Illuminate\Http\Request;
+use RuntimeException;
 use Throwable;
 
 class MadaniGuruSyncController extends Controller
 {
-    public function index(TarikGuruService $tarik): Response|RedirectResponse
+    public function tarik(Request $request, TarikGuruService $layanan): RedirectResponse
     {
-        try {
-            $hasil = $tarik->fetchAndRemember();
+        $data = $request->validate([
+            'nip' => ['required', 'string', 'max:30'],
+        ], [
+            'nip.required' => 'Isi NIP guru yang akan ditarik.',
+        ]);
 
-            return response(view('guru.madani', $hasil)->render());
+        try {
+            $hasil = $layanan->tarikNip($data['nip']);
+        } catch (RuntimeException $e) {
+            return redirect()
+                ->route('guru.index')
+                ->withInput()
+                ->with('error', 'Tarik gagal: '.$e->getMessage());
         } catch (Throwable $e) {
             report($e);
 
             return redirect()
                 ->route('guru.index')
-                ->with('error', 'Tarik dan sync gagal: '.$e->getMessage());
-        }
-    }
-
-    public function tarik(TarikGuruService $layanan): RedirectResponse
-    {
-        try {
-            $hasil = $layanan->tarikDariSesi();
-        } catch (Throwable $e) {
-            report($e);
-
-            return redirect()
-                ->route('guru.madani')
+                ->withInput()
                 ->with('error', 'Tarik gagal: '.$e->getMessage());
         }
 
+        $pesan = $hasil['nama'].' ditarik dari Madani dengan kode '.$hasil['kode'].'.';
+        if ($hasil['peringatan'] !== []) {
+            $pesan .= ' '.implode(' ', $hasil['peringatan']);
+        }
+
         return redirect()
-            ->route('guru.madani')
-            ->with('success', sprintf(
-                'Tarik dari Madani selesai: %d guru ditambahkan. Mapel diampu dan jadwal tidak diubah.',
-                $hasil['ditarik'],
-            ));
+            ->route('guru.index')
+            ->with('success', $pesan);
     }
 
-    public function sync(TarikGuruService $layanan): RedirectResponse
+    public function sync(Guru $guru, TarikGuruService $layanan): RedirectResponse
     {
         try {
-            $hasil = $layanan->syncDariSesi();
+            $hasil = $layanan->sinkronSatu($guru);
+        } catch (RuntimeException $e) {
+            return redirect()
+                ->route('guru.index')
+                ->with('error', 'Sync gagal: '.$e->getMessage());
         } catch (Throwable $e) {
             report($e);
 
             return redirect()
-                ->route('guru.madani')
+                ->route('guru.index')
                 ->with('error', 'Sync gagal: '.$e->getMessage());
         }
 
+        if ($hasil['diperbarui']) {
+            $label = collect($hasil['perubahan'])->pluck('label')->implode(', ');
+            $pesan = $guru->nama_lengkap.' disinkronkan: '.$label.'.';
+        } else {
+            $pesan = 'Data '.$guru->nama_lengkap.' sudah sama dengan Madani.';
+        }
+
+        if ($hasil['peringatan'] !== []) {
+            $pesan .= ' '.implode(' ', $hasil['peringatan']);
+        }
+
         return redirect()
-            ->route('guru.madani')
-            ->with('success', sprintf(
-                'Sync dari Madani selesai: %d guru diperbarui, %d guru yang hanya ada di Simpatisans dihapus beserta jadwalnya. Akun admin tidak ikut terhapus.',
-                $hasil['diperbarui'],
-                $hasil['dihapus'],
-            ));
+            ->route('guru.index')
+            ->with('success', $pesan);
     }
 }
