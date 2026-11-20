@@ -241,7 +241,7 @@
                 <div class="flex items-center justify-between p-6 border-b border-gray-100">
                     <div>
                         <h3 class="font-bold text-gray-900 text-xl" x-text="isEdit ? 'Edit Data Guru' : 'Tambah Guru Baru'"></h3>
-                        <p class="text-xs text-gray-500 mt-1" x-text="isEdit ? 'Identitas, DUK, dan biodata mengikuti Madani. Ubah di Madani lalu Sync. Mapel diampu tetap diatur di sini.' : 'Guru baru hanya bisa ditarik dari Madani.'"></p>
+                        <p class="text-xs text-gray-500 mt-1" x-text="isEdit ? 'Identitas, KG, DUK, ijazah, dan biodata mengikuti Madani. Ubah di Madani lalu Sync. Mapel diampu tetap diatur di sini.' : 'Guru baru hanya bisa ditarik dari Madani.'"></p>
                     </div>
                     <button @click="modalOpen = false" class="text-gray-400 hover:text-gray-600 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

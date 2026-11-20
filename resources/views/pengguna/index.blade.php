@@ -9,17 +9,28 @@
     activeRequest: null,
     showPlain: {}
 }">
-    <div class="mb-6 flex justify-between items-center">
+    <div class="mb-6 flex justify-between items-center gap-3 flex-wrap">
         <div>
             <h2 class="text-2xl font-bold text-gray-900">Akun Pengguna Guru</h2>
-            <p class="text-gray-600 mt-1 text-sm">Kelola akses login, reset password, dan status aktifitas akun guru.</p>
+            <p class="text-gray-600 mt-1 text-sm">Guru login lewat Madani, bukan Simpatisans. Akun admin tetap dipakai di sini.</p>
         </div>
+        <form method="POST" action="{{ route('pengguna.hapus-akun-guru') }}" data-confirm="Hapus semua akun dengan peran guru? Akun super admin dan admin kurikulum tidak ikut terhapus.">
+            @csrf
+            <button type="submit" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl">
+                Hapus semua akun guru
+            </button>
+        </form>
     </div>
 
     @if(session('success'))
         <div class="mb-4 bg-green-50 border-l-4 border-green-500 text-green-700 p-4 rounded shadow-sm">
             <p class="font-bold">Berhasil</p>
             <p>{{ session('success') }}</p>
+        </div>
+    @endif
+    @if(session('error'))
+        <div class="mb-4 bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm">
+            <p>{{ session('error') }}</p>
         </div>
     @endif
 
@@ -93,13 +104,7 @@
                             </td>
                             <td class="px-6 py-4 text-right space-x-1">
                                 @if(!$user)
-                                    <form action="{{ route('pengguna.generate', $guru->id) }}" method="POST" class="inline">
-                                        @csrf
-                                        <button type="submit" class="bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm inline-flex items-center">
-                                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-                                            Generate
-                                        </button>
-                                    </form>
+                                    <span class="text-xs text-gray-400">Login lewat Madani</span>
                                 @else
                                     <div class="flex justify-end gap-1">
                                         <!-- RESET PASSWORD BUTTON (With Approval Details) -->

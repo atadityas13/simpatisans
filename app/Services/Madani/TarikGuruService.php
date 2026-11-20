@@ -4,11 +4,14 @@ namespace App\Services\Madani;
 
 use App\Models\Guru;
 use App\Models\Mapel;
+use App\Models\Rumpun;
+use App\Models\User;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 class TarikGuruService
@@ -40,7 +43,7 @@ class TarikGuruService
     }
 
     /**
-     * @return array{diperbarui: int}
+     * @return array{diperbarui: int, dihapus: int}
      */
     public function syncDariSesi(): array
     {
@@ -62,6 +65,9 @@ class TarikGuruService
         $local = Guru::query()->orderBy('nama_guru')->get();
         $mapelByNama = Mapel::query()->get()->keyBy(
             fn (Mapel $mapel): string => mb_strtolower(trim($mapel->nama_mapel))
+        );
+        $rumpunByNama = Rumpun::query()->get()->keyBy(
+            fn (Rumpun $rumpun): string => mb_strtolower(trim($rumpun->nama_rumpun))
         );
 
         $remoteByNip = [];
@@ -141,7 +147,7 @@ class TarikGuruService
                     'kode' => $kode,
                     'duk' => $duk,
                     'status_pegawai' => $status,
-                    'payload' => $this->payloadBaru($row, $kode, $status, $duk, $mapelByNama, $peringatan),
+                    'payload' => $this->payloadBaru($row, $kode, $status, $duk, $mapelByNama, $rumpunByNama, $peringatan),
                 ];
 
                 continue;
@@ -153,7 +159,7 @@ class TarikGuruService
                     $peringatan[] = $guru->nama_lengkap.' nonaktif di Madani. Datanya tetap bisa disinkronkan, tidak dihapus dari Simpatisans.';
                 }
 
-                $perubahan = $this->perubahan($guru, $row, $mapelByNama, $local, $peringatan);
+                $perubahan = $this->perubahan($guru, $row, $mapelByNama, $rumpunByNama, $local, $kodeTerpakai, $peringatan);
                 if ($perubahan === []) {
                     $sama++;
 
@@ -212,7 +218,7 @@ class TarikGuruService
 
     /**
      * @param  list<array<string, mixed>>  $remoteRows
-     * @return array{diperbarui: int}
+     * @return array{diperbarui: int, dihapus: int}
      */
     public function sinkron(array $remoteRows): array
     {
@@ -232,8 +238,43 @@ class TarikGuruService
                 }
             }
 
-            return ['diperbarui' => $diperbarui];
+            $dihapus = 0;
+            foreach ($hasil['hanya_lokal'] as $guru) {
+                $this->hapusAkunGuru($guru);
+                $guru->delete();
+                $dihapus++;
+            }
+
+            return [
+                'diperbarui' => $diperbarui,
+                'dihapus' => $dihapus,
+            ];
         });
+    }
+
+    private function hapusAkunGuru(Guru $guru): void
+    {
+        if (! Schema::hasTable('users')) {
+            return;
+        }
+
+        $user = User::query()
+            ->where('username', $guru->username)
+            ->where('role', 'guru')
+            ->first();
+
+        if ($user === null) {
+            return;
+        }
+
+        if (Schema::hasTable('personal_access_tokens')) {
+            DB::table('personal_access_tokens')
+                ->where('tokenable_type', User::class)
+                ->where('tokenable_id', $user->id)
+                ->delete();
+        }
+
+        $user->delete();
     }
 
     /**
@@ -328,6 +369,7 @@ class TarikGuruService
             'kode_internal' => $row['kode_internal'] ?? null,
             'duk' => $row['duk'] ?? null,
             'mapel_ijazah' => $this->teks($row['mapel_ijazah'] ?? null, 255),
+            'rumpun_ijazah' => $this->teks($row['rumpun_ijazah'] ?? null, 255),
             'mapel_sertifikasi' => $this->teks($row['mapel_sertifikasi'] ?? null, 255),
             'status_sertifikasi' => (bool) ($row['status_sertifikasi'] ?? false),
             'is_bk' => (bool) ($row['is_bk'] ?? false),
@@ -338,18 +380,19 @@ class TarikGuruService
     /**
      * @param  array<string, mixed>  $row
      * @param  Collection<string, Mapel>  $mapelByNama
+     * @param  Collection<string, Rumpun>  $rumpunByNama
      * @param  list<string>  $peringatan
      * @return array<string, mixed>
      */
-    private function payloadBaru(array $row, string $kode, string $status, ?int $duk, $mapelByNama, array &$peringatan): array
+    private function payloadBaru(array $row, string $kode, string $status, ?int $duk, $mapelByNama, $rumpunByNama, array &$peringatan): array
     {
-        $mapelIjazah = $this->cariMapel($row['mapel_ijazah'] ?? null, $mapelByNama);
+        [$mapelIjazah, $rumpunIjazah] = $this->ijazah($row, $mapelByNama, $rumpunByNama, $row['nama'], $peringatan, 'tidak diisi');
         $mapelSertifikasi = $row['status_sertifikasi']
             ? $this->cariMapel($row['mapel_sertifikasi'] ?? null, $mapelByNama)
             : null;
 
-        if ($this->berisi($row['mapel_ijazah'] ?? null) && $mapelIjazah === null) {
-            $peringatan[] = 'Mapel ijazah '.$row['nama'].' ('.$row['mapel_ijazah'].') tidak ada di Simpatisans, jadi tidak diisi.';
+        if ($row['status_sertifikasi'] && $this->berisi($row['mapel_sertifikasi'] ?? null) && $mapelSertifikasi === null) {
+            $peringatan[] = 'Mapel sertifikasi '.$row['nama'].' ('.$row['mapel_sertifikasi'].') tidak ada di Simpatisans, jadi tidak diisi.';
         }
 
         $payload = [
@@ -360,6 +403,7 @@ class TarikGuruService
             'status_sertifikasi' => (bool) $row['status_sertifikasi'],
             'is_bk' => (bool) $row['is_bk'],
             'mapel_ijazah_id' => $mapelIjazah?->id,
+            'rumpun_ijazah_id' => $rumpunIjazah?->id,
             'mapel_sertifikasi_id' => $mapelSertifikasi?->id,
         ];
 
@@ -381,12 +425,14 @@ class TarikGuruService
 
     /**
      * @param  array<string, mixed>  $row
-     * @param  Collection<int, Guru>  $local
      * @param  Collection<string, Mapel>  $mapelByNama
+     * @param  Collection<string, Rumpun>  $rumpunByNama
+     * @param  Collection<int, Guru>  $local
+     * @param  array<string, true>  $kodeTerpakai
      * @param  list<string>  $peringatan
      * @return list<array{kolom: string, label: string, dari: ?string, ke: string, nilai: mixed}>
      */
-    private function perubahan(Guru $guru, array $row, $mapelByNama, $local, array &$peringatan): array
+    private function perubahan(Guru $guru, array $row, $mapelByNama, $rumpunByNama, $local, array &$kodeTerpakai, array &$peringatan): array
     {
         $hasil = [];
 
@@ -449,6 +495,24 @@ class TarikGuruService
             ];
         }
 
+        $kode = strtoupper(trim((string) ($row['kode_internal'] ?? '')));
+        $kodeLama = strtoupper(trim((string) $guru->kode_guru));
+        if (preg_match('/^[A-Z0-9]{2}$/', $kode) === 1 && $kode !== $kodeLama) {
+            if (isset($kodeTerpakai[$kode])) {
+                $peringatan[] = 'KG '.$kode.' untuk '.$guru->nama_lengkap.' sudah dipakai guru lain, jadi tidak diubah.';
+            } else {
+                unset($kodeTerpakai[$kodeLama]);
+                $kodeTerpakai[$kode] = true;
+                $hasil[] = [
+                    'kolom' => 'kode_guru',
+                    'label' => 'Kode guru',
+                    'dari' => $kodeLama !== '' ? $kodeLama : null,
+                    'ke' => $kode,
+                    'nilai' => $kode,
+                ];
+            }
+        }
+
         $duk = $this->dukAngka($row['duk'] ?? null);
         if ($duk !== null && (int) $guru->duk !== $duk) {
             $bentrok = $local->contains(fn (Guru $lain): bool => $lain->id !== $guru->id && (int) $lain->duk === $duk);
@@ -485,23 +549,41 @@ class TarikGuruService
             ];
         }
 
-        $mapelIjazah = $this->cariMapel($row['mapel_ijazah'] ?? null, $mapelByNama);
-        if ($this->berisi($row['mapel_ijazah'] ?? null) && $mapelIjazah === null) {
-            $peringatan[] = 'Mapel ijazah '.$guru->nama_lengkap.' ('.$row['mapel_ijazah'].') tidak ada di Simpatisans, jadi tidak diubah.';
-        }
-        if ($mapelIjazah !== null && (int) $guru->mapel_ijazah_id !== (int) $mapelIjazah->id) {
-            $hasil[] = [
-                'kolom' => 'mapel_ijazah_id',
-                'label' => 'Mapel ijazah',
-                'dari' => $guru->mapelIjazah?->nama_mapel,
-                'ke' => $mapelIjazah->nama_mapel,
-                'nilai' => $mapelIjazah->id,
-            ];
+        [$mapelIjazah, $rumpunIjazah] = $this->ijazah($row, $mapelByNama, $rumpunByNama, $guru->nama_lengkap, $peringatan, 'tidak diubah');
+        if ($mapelIjazah !== null) {
+            if ((int) $guru->mapel_ijazah_id !== (int) $mapelIjazah->id) {
+                $hasil[] = [
+                    'kolom' => 'mapel_ijazah_id',
+                    'label' => 'Mapel ijazah',
+                    'dari' => $guru->mapelIjazah?->nama_mapel,
+                    'ke' => $mapelIjazah->nama_mapel,
+                    'nilai' => $mapelIjazah->id,
+                ];
+            }
             if ($guru->rumpun_ijazah_id) {
                 $hasil[] = [
                     'kolom' => 'rumpun_ijazah_id',
                     'label' => 'Rumpun ijazah',
-                    'dari' => (string) $guru->rumpun_ijazah_id,
+                    'dari' => $guru->rumpunIjazah?->nama_rumpun,
+                    'ke' => 'kosong',
+                    'nilai' => null,
+                ];
+            }
+        } elseif ($rumpunIjazah !== null) {
+            if ((int) $guru->rumpun_ijazah_id !== (int) $rumpunIjazah->id) {
+                $hasil[] = [
+                    'kolom' => 'rumpun_ijazah_id',
+                    'label' => 'Rumpun ijazah',
+                    'dari' => $guru->rumpunIjazah?->nama_rumpun,
+                    'ke' => $rumpunIjazah->nama_rumpun,
+                    'nilai' => $rumpunIjazah->id,
+                ];
+            }
+            if ($guru->mapel_ijazah_id) {
+                $hasil[] = [
+                    'kolom' => 'mapel_ijazah_id',
+                    'label' => 'Mapel ijazah',
+                    'dari' => $guru->mapelIjazah?->nama_mapel,
                     'ke' => 'kosong',
                     'nilai' => null,
                 ];
@@ -584,6 +666,37 @@ class TarikGuruService
     /**
      * @param  Collection<string, Mapel>  $mapelByNama
      */
+    /**
+     * @param  array<string, mixed>  $row
+     * @param  Collection<string, Mapel>  $mapelByNama
+     * @param  Collection<string, Rumpun>  $rumpunByNama
+     * @param  list<string>  $peringatan
+     * @return array{0: ?Mapel, 1: ?Rumpun}
+     */
+    private function ijazah(array $row, $mapelByNama, $rumpunByNama, string $nama, array &$peringatan, string $akibat): array
+    {
+        if ($this->berisi($row['mapel_ijazah'] ?? null)) {
+            $mapel = $this->cariMapel($row['mapel_ijazah'], $mapelByNama);
+            if ($mapel === null) {
+                $peringatan[] = 'Mapel ijazah '.$nama.' ('.$row['mapel_ijazah'].') tidak ada di Simpatisans, jadi '.$akibat.'.';
+            }
+
+            return [$mapel, null];
+        }
+
+        if ($this->berisi($row['rumpun_ijazah'] ?? null)) {
+            $kunci = mb_strtolower(trim((string) $row['rumpun_ijazah']));
+            $rumpun = $rumpunByNama->get($kunci);
+            if ($rumpun === null) {
+                $peringatan[] = 'Rumpun ijazah '.$nama.' ('.$row['rumpun_ijazah'].') tidak ada di Simpatisans, jadi '.$akibat.'.';
+            }
+
+            return [null, $rumpun];
+        }
+
+        return [null, null];
+    }
+
     private function cariMapel(mixed $nama, $mapelByNama): ?Mapel
     {
         if (! $this->berisi($nama)) {

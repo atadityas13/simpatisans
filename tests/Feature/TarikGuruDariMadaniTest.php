@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\Guru;
 use App\Models\Mapel;
+use App\Models\Rumpun;
 use App\Services\Madani\TarikGuruService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -87,8 +89,8 @@ class TarikGuruDariMadaniTest extends TestCase
         $this->assertTrue($kolom->contains('nama_guru'));
         $this->assertTrue($kolom->contains('duk'));
         $this->assertTrue($kolom->contains('mapel_ijazah_id'));
+        $this->assertTrue($kolom->contains('kode_guru'));
         $this->assertFalse($kolom->contains('email'));
-        $this->assertFalse($kolom->contains('kode_guru'));
 
         $service->tarik($rows);
         $baru = Guru::query()->where('username', '199003032015011003')->first();
@@ -102,10 +104,62 @@ class TarikGuruDariMadaniTest extends TestCase
         $this->assertSame('Budi Diperbarui', $lama->nama_guru);
         $this->assertSame(2, (int) $lama->duk);
         $this->assertSame('budi@example.com', $lama->email);
-        $this->assertSame('BD', $lama->kode_guru);
+        $this->assertSame('ZZ', $lama->kode_guru);
         $this->assertTrue($lama->status_sertifikasi);
         $this->assertSame('Matematika', $lama->mapelIjazah->nama_mapel);
-        $this->assertNotNull(Guru::query()->where('username', '197001012000011009')->first());
+        $this->assertNull(Guru::query()->where('username', '197001012000011009')->first());
+        $this->assertDatabaseMissing('users', ['username' => '197001012000011009', 'role' => 'guru']);
+        $this->assertDatabaseHas('users', ['username' => 'admin.kurikulum', 'role' => 'admin_kurikulum']);
+    }
+
+    public function test_sync_memetakan_rumpun_dan_mengosongkan_mapel_ijazah(): void
+    {
+        $mapel = Mapel::query()->create(['nama_mapel' => 'Matematika']);
+        $rumpun = Rumpun::query()->create(['nama_rumpun' => 'IPA']);
+        $guru = Guru::query()->create([
+            'username' => '198001012005011001',
+            'kode_guru' => 'BD',
+            'nama_guru' => 'Budi Santoso',
+            'status_pegawai' => 'PNS',
+            'mapel_ijazah_id' => $mapel->id,
+        ]);
+
+        $rows = [
+            $this->baris([
+                'mapel_ijazah' => null,
+                'rumpun_ijazah' => 'IPA',
+                'kode_internal' => 'BD',
+            ]),
+        ];
+
+        app(TarikGuruService::class)->sinkron($rows);
+        $guru->refresh();
+
+        $this->assertNull($guru->mapel_ijazah_id);
+        $this->assertSame($rumpun->id, $guru->rumpun_ijazah_id);
+    }
+
+    public function test_referensi_mengirim_nama_mapel_dan_rumpun(): void
+    {
+        Mapel::query()->create(['nama_mapel' => 'Matematika']);
+        Rumpun::query()->create(['nama_rumpun' => 'IPA']);
+
+        $this->withoutMiddleware()
+            ->getJson('/api/madani/referensi')
+            ->assertOk()
+            ->assertJsonPath('mapels.0', 'Matematika')
+            ->assertJsonPath('rumpuns.0', 'IPA');
+    }
+
+    public function test_hapus_akun_guru_menyisakan_admin(): void
+    {
+        $this->withoutMiddleware()
+            ->post(route('pengguna.hapus-akun-guru'))
+            ->assertRedirect();
+
+        $this->assertDatabaseMissing('users', ['role' => 'guru']);
+        $this->assertDatabaseHas('users', ['role' => 'super_admin']);
+        $this->assertDatabaseHas('users', ['role' => 'admin_kurikulum']);
     }
 
     public function test_halaman_membandingkan_lewat_api_madani(): void
@@ -154,6 +208,7 @@ class TarikGuruDariMadaniTest extends TestCase
             'email' => null,
             'kode_internal' => null,
             'mapel_ijazah' => null,
+            'rumpun_ijazah' => null,
         ], $override));
     }
 
@@ -172,6 +227,46 @@ class TarikGuruDariMadaniTest extends TestCase
             $table->string('nama_rumpun');
             $table->timestamps();
         });
+
+        Schema::create('users', function (Blueprint $table) {
+            $table->id();
+            $table->string('username')->unique();
+            $table->string('nama_lengkap')->nullable();
+            $table->string('role')->nullable();
+            $table->string('password')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        DB::table('users')->insert([
+            [
+                'username' => '197001012000011009',
+                'nama_lengkap' => 'Hanya di Simpatisans',
+                'role' => 'guru',
+                'password' => 'rahasia',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'username' => 'superadmin',
+                'nama_lengkap' => 'Super Admin',
+                'role' => 'super_admin',
+                'password' => 'rahasia',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'username' => 'admin.kurikulum',
+                'nama_lengkap' => 'Admin Kurikulum',
+                'role' => 'admin_kurikulum',
+                'password' => 'rahasia',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+        ]);
 
         Schema::create('gurus', function (Blueprint $table) {
             $table->id();

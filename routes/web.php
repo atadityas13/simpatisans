@@ -129,6 +129,7 @@ Route::group(['middleware' => 'auth'], function () {
 
             // Teacher account management (Pengguna)
             Route::get('config/pengguna', [PenggunaController::class, 'index'])->name('pengguna.index');
+            Route::post('config/pengguna/hapus-akun-guru', [PenggunaController::class, 'hapusAkunGuru'])->name('pengguna.hapus-akun-guru');
             Route::post('config/pengguna/generate/{guru}', [PenggunaController::class, 'generate'])->name('pengguna.generate');
             Route::patch('config/pengguna/{user}/toggle', [PenggunaController::class, 'toggleStatus'])->name('pengguna.toggle');
             Route::post('config/pengguna/{user}/reset', [PenggunaController::class, 'resetPassword'])->name('pengguna.reset');

@@ -4,7 +4,7 @@
     <div class="mb-6 flex justify-between items-center gap-3 flex-wrap">
         <div>
             <h2 class="text-2xl font-bold text-gray-900">Bandingkan dengan Madani</h2>
-            <p class="text-gray-600 mt-1 text-sm">Periksa dulu. Tarik hanya menambah guru baru. Sync hanya mengubah data yang diisi di Madani.</p>
+            <p class="text-gray-600 mt-1 text-sm">Periksa dulu. Tarik menambah guru baru. Sync menimpa data Madani, termasuk KG, dan menghapus guru yang hanya ada di sini.</p>
         </div>
         <a href="{{ route('guru.index') }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-700">Kembali ke daftar guru</a>
     </div>
@@ -18,8 +18,9 @@
 
     <div class="mb-4 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-600">
         Ditemukan {{ $total_madani }} guru di Madani. {{ $sama }} sudah sama.
-        Cocok lewat NIP. Tendik tidak ikut. Guru yang hanya ada di Simpatisans tidak dihapus.
-        Kode guru 2 huruf, mapel diampu, akun, dan jadwal tidak ditimpa saat sync.
+        Cocok lewat NIP. Tendik tidak ikut. KG dari Madani menimpa kode di sini jika kodenya 2 karakter dan belum dipakai guru lain.
+        Guru yang hanya ada di Simpatisans dihapus saat Sync, termasuk jadwal dan tugas yang mengikutinya.
+        Akun admin tetap ada. Mapel diampu tidak ditimpa. Isian kosong di Madani tidak mengosongkan biodata.
     </div>
 
     @foreach ($peringatan as $pesan)
@@ -38,11 +39,11 @@
                 </button>
             </form>
         @endif
-        @if (count($sinkron) > 0)
+        @if (count($sinkron) > 0 || count($hanya_lokal) > 0)
             <form method="POST" action="{{ route('guru.madani.sync') }}">
                 @csrf
                 <button type="submit" class="bg-white hover:bg-gray-50 text-indigo-700 font-medium py-2.5 px-5 rounded-xl border border-indigo-200">
-                    Sync {{ count($sinkron) }} guru
+                    Sync {{ count($sinkron) }} guru@if (count($hanya_lokal) > 0) dan hapus {{ count($hanya_lokal) }}@endif
                 </button>
             </form>
         @endif
@@ -109,7 +110,10 @@
     </div>
 
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-5 py-4 border-b border-gray-100 font-bold text-gray-900">Hanya ada di Simpatisans ({{ count($hanya_lokal) }})</div>
+        <div class="px-5 py-4 border-b border-gray-100">
+            <div class="font-bold text-gray-900">Akan dihapus ({{ count($hanya_lokal) }})</div>
+            <p class="text-xs text-gray-500 mt-1">Guru ini tidak ada di Madani. Sync menghapus datanya beserta jadwal. Akun admin yang memakai NIP yang sama tidak dihapus.</p>
+        </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>

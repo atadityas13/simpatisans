@@ -35,7 +35,7 @@ class MadaniGuruSyncController extends Controller
         return redirect()
             ->route('guru.madani')
             ->with('success', sprintf(
-                'Tarik dari Madani selesai: %d guru ditambahkan. Akun, mapel diampu, dan jadwal tidak diubah.',
+                'Tarik dari Madani selesai: %d guru ditambahkan. Mapel diampu dan jadwal tidak diubah.',
                 $hasil['ditarik'],
             ));
     }
@@ -53,8 +53,9 @@ class MadaniGuruSyncController extends Controller
         return redirect()
             ->route('guru.madani')
             ->with('success', sprintf(
-                'Sync dari Madani selesai: %d guru diperbarui. Isian kosong di Madani tidak menghapus data di sini. Kode guru, mapel diampu, akun, dan jadwal tidak diubah.',
+                'Sync dari Madani selesai: %d guru diperbarui, %d guru yang hanya ada di Simpatisans dihapus beserta jadwalnya. Akun admin tidak ikut terhapus.',
                 $hasil['diperbarui'],
+                $hasil['dihapus'],
             ));
     }
 }

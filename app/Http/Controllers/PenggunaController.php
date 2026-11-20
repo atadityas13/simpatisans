@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
 use App\Models\Guru;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class PenggunaController extends Controller
@@ -16,6 +18,7 @@ class PenggunaController extends Controller
     public function index()
     {
         $gurus = Guru::with('user')->orderBy('nama_guru')->paginate(15);
+
         return view('pengguna.index', compact('gurus'));
     }
 
@@ -24,26 +27,25 @@ class PenggunaController extends Controller
      */
     public function generate(Guru $guru)
     {
-        $existingUser = User::where('username', $guru->username)->first();
-        
-        if ($existingUser && ($existingUser->isSuperAdmin() || $existingUser->isAdminKurikulum())) {
-            return back()->with('error', "Guru ini sudah terdaftar sebagai Admin. Kelola akun ini melalui menu Admin.");
-        }
+        return back()->with('error', 'Guru tidak login ke Simpatisans. Akun guru tidak dibuat. Login guru memakai Madani.');
+    }
 
-        $user = User::updateOrCreate(
-            ['username' => $guru->username],
-            [
-                'nama_lengkap' => $guru->nama_lengkap, // Accessor from Guru model
-                'role' => 'guru',
-                'jabatan' => $guru->jabatan,
-                'password' => Hash::make($guru->username),
-                'plain_password' => $guru->username,
-                'is_active' => true,
-                'reset_requested_at' => null,
-            ]
-        );
+    public function hapusAkunGuru()
+    {
+        $users = User::query()->where('role', 'guru')->get();
 
-        return back()->with('success', "Akun untuk {$guru->nama_guru} berhasil dibuat/direset.");
+        DB::transaction(function () use ($users): void {
+            if (Schema::hasTable('personal_access_tokens')) {
+                DB::table('personal_access_tokens')
+                    ->where('tokenable_type', User::class)
+                    ->whereIn('tokenable_id', $users->pluck('id'))
+                    ->delete();
+            }
+
+            User::query()->whereIn('id', $users->pluck('id'))->delete();
+        });
+
+        return back()->with('success', $users->count().' akun guru dihapus. Akun admin tetap ada.');
     }
 
     /**
@@ -51,10 +53,11 @@ class PenggunaController extends Controller
      */
     public function toggleStatus(User $user)
     {
-        $user->is_active = !$user->is_active;
+        $user->is_active = ! $user->is_active;
         $user->save();
 
         $status = $user->is_active ? 'diaktifkan' : 'dinonaktifkan';
+
         return back()->with('success', "Akun {$user->username} berhasil {$status}.");
     }
 
