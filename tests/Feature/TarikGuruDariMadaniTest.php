@@ -386,6 +386,45 @@ class TarikGuruDariMadaniTest extends TestCase
         $this->assertSame('Hanya di Simpatisans', $lain->nama_guru);
     }
 
+    public function test_sync_menghapus_guru_yang_tidak_ada_di_madani(): void
+    {
+        config([
+            'services.madani.url' => 'https://madani.test/api',
+            'services.madani.introspect_secret' => 'rahasia',
+        ]);
+
+        $lokal = Guru::query()->create([
+            'username' => '197001012000011009',
+            'kode_guru' => 'LL',
+            'nama_guru' => 'Hanya di Simpatisans',
+            'status_pegawai' => 'NON_ASN',
+        ]);
+        $tetap = Guru::query()->create([
+            'username' => '198001012005011001',
+            'kode_guru' => 'BD',
+            'nama_guru' => 'Budi Santoso',
+            'status_pegawai' => 'PNS',
+        ]);
+
+        Http::fake([
+            'https://madani.test/api/v1/simpatisans/gtks' => Http::response([
+                'data' => [
+                    $this->baris(['nip' => '198001012005011001', 'nama' => 'Budi Santoso']),
+                ],
+            ]),
+        ]);
+
+        $this->withoutMiddleware()
+            ->post(route('guru.sync', $lokal))
+            ->assertRedirect(route('guru.index'))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseMissing('gurus', ['id' => $lokal->id]);
+        $this->assertDatabaseMissing('users', ['username' => '197001012000011009', 'role' => 'guru']);
+        $this->assertDatabaseHas('users', ['username' => 'admin.kurikulum', 'role' => 'admin_kurikulum']);
+        $this->assertDatabaseHas('gurus', ['id' => $tetap->id]);
+    }
+
     public function test_update_hanya_menyimpan_mapel_diampu(): void
     {
         $mapel = Mapel::query()->create(['nama_mapel' => 'Matematika']);

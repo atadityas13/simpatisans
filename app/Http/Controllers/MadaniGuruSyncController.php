@@ -91,11 +91,13 @@ class MadaniGuruSyncController extends Controller
                 ->with('error', 'Sync gagal: '.$e->getMessage());
         }
 
-        if ($hasil['diperbarui']) {
+        if ($hasil['dihapus']) {
+            $pesan = $hasil['nama'].' tidak ditemukan di Madani, jadi dihapus beserta jadwalnya.';
+        } elseif ($hasil['diperbarui']) {
             $label = collect($hasil['perubahan'])->pluck('label')->implode(', ');
-            $pesan = $guru->nama_lengkap.' disinkronkan: '.$label.'.';
+            $pesan = $hasil['nama'].' disinkronkan: '.$label.'.';
         } else {
-            $pesan = 'Data '.$guru->nama_lengkap.' sudah sama dengan Madani.';
+            $pesan = 'Data '.$hasil['nama'].' sudah sama dengan Madani.';
         }
 
         if ($hasil['peringatan'] !== []) {

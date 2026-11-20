@@ -84,8 +84,11 @@
                 <p class="text-gray-600 mt-1 text-sm">Identitas, KG, DUK, ijazah, dan biodata mengikuti Madani. Mapel diampu diatur di sini.</p>
             </div>
             <button type="button" @click="bukaTarik()"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition whitespace-nowrap">
-                Tarik dari Madani
+                class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition whitespace-nowrap">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m0 0l-6-6m6 6l6-6" />
+                </svg>
+                Madani
             </button>
         </div>
 
@@ -159,18 +162,24 @@
                                     </div>
                                 </td>
                                 <td class="px-5 py-4">
-                                    <div class="flex flex-col items-stretch gap-1.5 min-w-[9.5rem]">
-                                        <form method="POST" action="{{ route('guru.sync', $guru) }}" data-confirm="Perbarui data {{ $guru->nama_lengkap }} dari Madani? Mapel diampu tidak berubah.">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <form method="POST" action="{{ route('guru.sync', $guru) }}" data-confirm="Sinkronkan {{ $guru->nama_lengkap }} dari Madani? Jika NIP ini tidak ada di Madani, guru dihapus beserta jadwalnya.">
                                             @csrf
-                                            <button type="submit" class="w-full px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg hover:bg-indigo-100 transition">Sync</button>
+                                            <button type="submit" title="Sync dari Madani" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-100">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                            </button>
                                         </form>
-                                        <button type="button"
+                                        <button type="button" title="Atur mapel diampu"
                                             data-action="{{ route('guru.update', $guru) }}"
                                             data-nama="{{ $guru->nama_lengkap }}"
                                             data-mapel="{{ $guru->mapelDiampu->pluck('id')->toJson() }}"
                                             @click="bukaMapel($el.dataset.action, $el.dataset.nama, JSON.parse($el.dataset.mapel || '[]'))"
-                                            class="w-full px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition">
-                                            Atur mapel diampu
+                                            class="p-1.5 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors border border-gray-200">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                            </svg>
                                         </button>
                                     </div>
                                 </td>

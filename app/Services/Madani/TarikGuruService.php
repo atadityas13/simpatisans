@@ -209,15 +209,31 @@ class TarikGuruService
     }
 
     /**
-     * @return array{diperbarui: bool, perubahan: list<array{label: string, dari: ?string, ke: string}>, peringatan: list<string>}
+     * @return array{diperbarui: bool, dihapus: bool, nama: string, perubahan: list<array{label: string, dari: ?string, ke: string}>, peringatan: list<string>}
      */
     public function sinkronSatu(Guru $guru): array
     {
+        $nama = $guru->nama_lengkap;
         $kunci = $this->kunci((string) $guru->username);
+        if ($kunci === '') {
+            throw new RuntimeException('NIP '.$nama.' tidak bisa dicocokkan, jadi tidak diubah.');
+        }
+
         $paket = $this->fetchRows();
-        $cocok = $kunci === '' ? [] : $this->barisNip($paket['rows'], $kunci);
+        $cocok = $this->barisNip($paket['rows'], $kunci);
         if ($cocok === []) {
-            throw new RuntimeException($guru->nama_lengkap.' tidak ada di Madani, jadi tidak diubah.');
+            DB::transaction(function () use ($guru): void {
+                $this->hapusAkunGuru($guru);
+                $guru->delete();
+            });
+
+            return [
+                'diperbarui' => false,
+                'dihapus' => true,
+                'nama' => $nama,
+                'perubahan' => [],
+                'peringatan' => [],
+            ];
         }
 
         $hasil = $this->bandingkan($cocok);
@@ -235,6 +251,8 @@ class TarikGuruService
         if ($item === null) {
             return [
                 'diperbarui' => false,
+                'dihapus' => false,
+                'nama' => $nama,
                 'perubahan' => [],
                 'peringatan' => $peringatan,
             ];
@@ -251,6 +269,8 @@ class TarikGuruService
 
         return [
             'diperbarui' => true,
+            'dihapus' => false,
+            'nama' => $nama,
             'perubahan' => array_map(fn (array $ubah): array => [
                 'label' => $ubah['label'],
                 'dari' => $ubah['dari'],
