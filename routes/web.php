@@ -1,19 +1,26 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\GuruController;
-use App\Http\Controllers\MapelController;
-use App\Http\Controllers\KelasController;
-use App\Http\Controllers\TugasTambahanController;
-use App\Http\Controllers\PembagianTugasController;
-use App\Http\Controllers\JadwalController;
-use App\Http\Controllers\EmisGtkController;
-
-use App\Http\Controllers\SemesterController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\PenggunaController;
+use App\Http\Controllers\AppUpdateController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CalendarEventController;
+use App\Http\Controllers\CetakController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DatabaseController;
+use App\Http\Controllers\EmisGtkController;
+use App\Http\Controllers\GuruController;
+use App\Http\Controllers\GuruWebDashboardController;
+use App\Http\Controllers\JadwalController;
+use App\Http\Controllers\KelasController;
+use App\Http\Controllers\MadaniGuruSyncController;
+use App\Http\Controllers\MapelController;
+use App\Http\Controllers\PembagianTugasController;
+use App\Http\Controllers\PenggunaController;
+use App\Http\Controllers\PengumumanController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SemesterController;
+use App\Http\Controllers\TugasTambahanController;
+use Illuminate\Support\Facades\Route;
 
 Route::view('privacy-policy', 'privacy-policy')->name('privacy-policy');
 Route::redirect('kebijakan-privasi', 'privacy-policy');
@@ -22,7 +29,7 @@ Route::redirect('kebijakan-privasi', 'privacy-policy');
 Route::group(['middleware' => 'guest'], function () {
     Route::get('login', [AuthController::class, 'showLogin'])->name('login');
     Route::post('login', [AuthController::class, 'login'])->name('login.post');
-    
+
     Route::get('forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
     Route::post('forgot-password/verify', [AuthController::class, 'verifyForgotPassword'])->name('password.verify');
     Route::post('forgot-password/request', [AuthController::class, 'requestReset'])->name('password.reset.request');
@@ -38,9 +45,9 @@ Route::group(['middleware' => 'auth'], function () {
     // Enforced Routes (Setup must be complete)
     Route::group(['middleware' => 'first_login'], function () {
         // Profile Routes
-        Route::get('profile', [App\Http\Controllers\ProfileController::class, 'index'])->name('profile.index');
-        Route::post('profile/photo', [App\Http\Controllers\ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
-        Route::post('profile/password', [App\Http\Controllers\ProfileController::class, 'updatePassword'])->name('profile.password.update');
+        Route::get('profile', [ProfileController::class, 'index'])->name('profile.index');
+        Route::post('profile/photo', [ProfileController::class, 'updatePhoto'])->name('profile.photo.update');
+        Route::post('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
 
         // Role Selection (Splash)
         Route::get('select-role', [AuthController::class, 'showSelectRole'])->name('auth.select-role');
@@ -63,14 +70,14 @@ Route::group(['middleware' => 'auth'], function () {
             Route::post('emis-gtk/export', [EmisGtkController::class, 'export'])->name('emis-gtk.export');
             Route::post('emis-gtk/import-references', [EmisGtkController::class, 'importReferences'])->name('emis-gtk.import-references');
 
-            Route::get('cetak', [App\Http\Controllers\CetakController::class, 'index'])->name('cetak.index');
-            Route::get('cetak/jadwal-pelajaran', [App\Http\Controllers\CetakController::class, 'jadwalPelajaran'])->name('cetak.jadwal-pelajaran');
-            Route::get('cetak/jadwal-besar', [App\Http\Controllers\CetakController::class, 'jadwalBesar'])->name('cetak.jadwal-besar');
-            Route::get('cetak/jadwal-piket', [App\Http\Controllers\CetakController::class, 'jadwalPiket'])->name('cetak.jadwal-piket');
-            Route::get('cetak/daftar-wali-kelas', [App\Http\Controllers\CetakController::class, 'daftarWaliKelas'])->name('cetak.daftar-wali-kelas');
-            Route::get('cetak/daftar-tugas-tambahan', [App\Http\Controllers\CetakController::class, 'daftarTugasTambahan'])->name('cetak.daftar-tugas-tambahan');
-            Route::get('cetak/lampiran-sk', [App\Http\Controllers\CetakController::class, 'lampiranSk'])->name('cetak.lampiran-sk');
-            Route::post('cetak/presets', [App\Http\Controllers\CetakController::class, 'storePresets'])->name('cetak.presets.store');
+            Route::get('cetak', [CetakController::class, 'index'])->name('cetak.index');
+            Route::get('cetak/jadwal-pelajaran', [CetakController::class, 'jadwalPelajaran'])->name('cetak.jadwal-pelajaran');
+            Route::get('cetak/jadwal-besar', [CetakController::class, 'jadwalBesar'])->name('cetak.jadwal-besar');
+            Route::get('cetak/jadwal-piket', [CetakController::class, 'jadwalPiket'])->name('cetak.jadwal-piket');
+            Route::get('cetak/daftar-wali-kelas', [CetakController::class, 'daftarWaliKelas'])->name('cetak.daftar-wali-kelas');
+            Route::get('cetak/daftar-tugas-tambahan', [CetakController::class, 'daftarTugasTambahan'])->name('cetak.daftar-tugas-tambahan');
+            Route::get('cetak/lampiran-sk', [CetakController::class, 'lampiranSk'])->name('cetak.lampiran-sk');
+            Route::post('cetak/presets', [CetakController::class, 'storePresets'])->name('cetak.presets.store');
 
             Route::get('pembagian-tugas', [PembagianTugasController::class, 'index'])->name('pembagian.index');
             Route::get('pembagian-tugas/guru/{guru}', [PembagianTugasController::class, 'show'])->name('pembagian.show');
@@ -85,6 +92,9 @@ Route::group(['middleware' => 'auth'], function () {
                 Route::delete('pembagian-tugas/guru/{guru}/tugas/{tugas}', [PembagianTugasController::class, 'destroyTugas'])->name('pembagian.tugas.destroy');
             });
 
+            Route::get('master/guru/madani', [MadaniGuruSyncController::class, 'index'])->name('guru.madani');
+            Route::post('master/guru/madani/tarik', [MadaniGuruSyncController::class, 'tarik'])->name('guru.madani.tarik');
+            Route::post('master/guru/madani/sync', [MadaniGuruSyncController::class, 'sync'])->name('guru.madani.sync');
             Route::resource('master/guru', GuruController::class);
             Route::resource('master/mapel', MapelController::class);
             Route::resource('master/kelas', KelasController::class);
@@ -97,25 +107,25 @@ Route::group(['middleware' => 'auth'], function () {
             Route::delete('pengaturan/semester/{semester}/versions/{version}', [SemesterController::class, 'destroyVersion'])->name('semester.versions.destroy');
             Route::resource('pengaturan/semester', SemesterController::class)->except(['create', 'show', 'edit']);
 
-            Route::get('pengaturan/pengumuman', [App\Http\Controllers\PengumumanController::class, 'index'])->name('pengumuman.index');
-            Route::post('pengaturan/pengumuman', [App\Http\Controllers\PengumumanController::class, 'store'])->name('pengumuman.store');
-            Route::put('pengaturan/pengumuman/{pengumuman}', [App\Http\Controllers\PengumumanController::class, 'update'])->name('pengumuman.update');
-            Route::delete('pengaturan/pengumuman/{pengumuman}', [App\Http\Controllers\PengumumanController::class, 'destroy'])->name('pengumuman.destroy');
+            Route::get('pengaturan/pengumuman', [PengumumanController::class, 'index'])->name('pengumuman.index');
+            Route::post('pengaturan/pengumuman', [PengumumanController::class, 'store'])->name('pengumuman.store');
+            Route::put('pengaturan/pengumuman/{pengumuman}', [PengumumanController::class, 'update'])->name('pengumuman.update');
+            Route::delete('pengaturan/pengumuman/{pengumuman}', [PengumumanController::class, 'destroy'])->name('pengumuman.destroy');
 
-            Route::get('pengaturan/kalender', [App\Http\Controllers\CalendarEventController::class, 'index'])->name('calendar-events.index');
-            Route::post('pengaturan/kalender', [App\Http\Controllers\CalendarEventController::class, 'store'])->name('calendar-events.store');
-            Route::put('pengaturan/kalender/{calendarEvent}', [App\Http\Controllers\CalendarEventController::class, 'update'])->name('calendar-events.update');
-            Route::delete('pengaturan/kalender/{calendarEvent}', [App\Http\Controllers\CalendarEventController::class, 'destroy'])->name('calendar-events.destroy');
+            Route::get('pengaturan/kalender', [CalendarEventController::class, 'index'])->name('calendar-events.index');
+            Route::post('pengaturan/kalender', [CalendarEventController::class, 'store'])->name('calendar-events.store');
+            Route::put('pengaturan/kalender/{calendarEvent}', [CalendarEventController::class, 'update'])->name('calendar-events.update');
+            Route::delete('pengaturan/kalender/{calendarEvent}', [CalendarEventController::class, 'destroy'])->name('calendar-events.destroy');
 
-            Route::get('pengaturan/update-app', [App\Http\Controllers\AppUpdateController::class, 'index'])->name('app-updates.index');
-            Route::post('pengaturan/update-app', [App\Http\Controllers\AppUpdateController::class, 'store'])->name('app-updates.store');
+            Route::get('pengaturan/update-app', [AppUpdateController::class, 'index'])->name('app-updates.index');
+            Route::post('pengaturan/update-app', [AppUpdateController::class, 'store'])->name('app-updates.store');
 
             // Admin roles and account management
             Route::resource('pengaturan/admin', AdminController::class)->except(['create', 'show', 'edit']);
-            
+
             // Database Management
-            Route::get('pengaturan/database', [App\Http\Controllers\DatabaseController::class, 'index'])->name('database.index');
-            Route::post('pengaturan/database/truncate', [App\Http\Controllers\DatabaseController::class, 'truncate'])->name('database.truncate');
+            Route::get('pengaturan/database', [DatabaseController::class, 'index'])->name('database.index');
+            Route::post('pengaturan/database/truncate', [DatabaseController::class, 'truncate'])->name('database.truncate');
 
             // Teacher account management (Pengguna)
             Route::get('config/pengguna', [PenggunaController::class, 'index'])->name('pengguna.index');
@@ -127,7 +137,7 @@ Route::group(['middleware' => 'auth'], function () {
 
         // GURU CONTEXT ROUTES
         Route::group(['middleware' => 'active_role:guru'], function () {
-            Route::get('/guru', [App\Http\Controllers\GuruWebDashboardController::class, 'index'])->name('guru.dashboard');
+            Route::get('/guru', [GuruWebDashboardController::class, 'index'])->name('guru.dashboard');
         });
     });
 });

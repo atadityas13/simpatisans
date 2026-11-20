@@ -2,6 +2,13 @@
 @section('header', 'Master Data Guru')
 @section('content')
 
+    @if(session('error'))
+        <div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{{ session('error') }}</div>
+    @endif
+    @if(session('success'))
+        <div class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ session('success') }}</div>
+    @endif
+
     <div x-data="{ 
         modalOpen: false, 
         isEdit: false, 
@@ -115,13 +122,10 @@
                 <h2 class="text-2xl font-bold text-gray-900">Daftar Guru</h2>
                 <p class="text-gray-600 mt-1 text-sm">Manajemen data rinci tenaga pendidik. Status, jabatan dan mapel.</p>
             </div>
-            <button @click="openAdd()"
+            <a href="{{ route('guru.madani') }}"
                 class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition inline-flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Tambah Guru
-            </button>
+                Tarik & Sync Madani
+            </a>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -237,7 +241,7 @@
                 <div class="flex items-center justify-between p-6 border-b border-gray-100">
                     <div>
                         <h3 class="font-bold text-gray-900 text-xl" x-text="isEdit ? 'Edit Data Guru' : 'Tambah Guru Baru'"></h3>
-                        <p class="text-xs text-gray-500 mt-1">Lengkapi informasi tenaga pendidik secara detail.</p>
+                        <p class="text-xs text-gray-500 mt-1" x-text="isEdit ? 'Identitas, DUK, dan biodata mengikuti Madani. Ubah di Madani lalu Sync. Mapel diampu tetap diatur di sini.' : 'Guru baru hanya bisa ditarik dari Madani.'"></p>
                     </div>
                     <button @click="modalOpen = false" class="text-gray-400 hover:text-gray-600 transition-colors">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
