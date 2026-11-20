@@ -62,12 +62,15 @@ class TarikGuruService
      */
     public function bandingkan(array $remoteRows, array $peringatan = []): array
     {
-        $local = Guru::query()->orderBy('nama_guru')->get();
+        $local = Guru::query()
+            ->with(['mapelIjazah', 'rumpunIjazah', 'mapelSertifikasi'])
+            ->orderBy('nama_guru')
+            ->get();
         $mapelByNama = Mapel::query()->get()->keyBy(
-            fn (Mapel $mapel): string => mb_strtolower(trim($mapel->nama_mapel))
+            fn (Mapel $mapel): string => $this->kunciNama($mapel->nama_mapel)
         );
         $rumpunByNama = Rumpun::query()->get()->keyBy(
-            fn (Rumpun $rumpun): string => mb_strtolower(trim($rumpun->nama_rumpun))
+            fn (Rumpun $rumpun): string => $this->kunciNama($rumpun->nama_rumpun)
         );
 
         $remoteByNip = [];
@@ -159,7 +162,7 @@ class TarikGuruService
                     $peringatan[] = $guru->nama_lengkap.' nonaktif di Madani. Datanya tetap bisa disinkronkan, tidak dihapus dari Simpatisans.';
                 }
 
-                $perubahan = $this->perubahan($guru, $row, $mapelByNama, $rumpunByNama, $local, $kodeTerpakai, $peringatan);
+                $perubahan = $this->perubahan($guru, $row, $mapelByNama, $rumpunByNama, $kodeTerpakai, $dukTerpakai, $peringatan);
                 if ($perubahan === []) {
                     $sama++;
 
@@ -168,6 +171,10 @@ class TarikGuruService
 
                 foreach ($perubahan as $ubah) {
                     if ($ubah['kolom'] === 'duk') {
+                        $dukLama = $guru->duk === null ? null : (int) $guru->duk;
+                        if ($dukLama !== null) {
+                            unset($dukTerpakai[$dukLama]);
+                        }
                         $dukTerpakai[(int) $ubah['nilai']] = true;
                     }
                 }
@@ -427,12 +434,12 @@ class TarikGuruService
      * @param  array<string, mixed>  $row
      * @param  Collection<string, Mapel>  $mapelByNama
      * @param  Collection<string, Rumpun>  $rumpunByNama
-     * @param  Collection<int, Guru>  $local
      * @param  array<string, true>  $kodeTerpakai
+     * @param  array<int, true>  $dukTerpakai
      * @param  list<string>  $peringatan
      * @return list<array{kolom: string, label: string, dari: ?string, ke: string, nilai: mixed}>
      */
-    private function perubahan(Guru $guru, array $row, $mapelByNama, $rumpunByNama, $local, array &$kodeTerpakai, array &$peringatan): array
+    private function perubahan(Guru $guru, array $row, $mapelByNama, $rumpunByNama, array &$kodeTerpakai, array &$dukTerpakai, array &$peringatan): array
     {
         $hasil = [];
 
@@ -472,7 +479,7 @@ class TarikGuruService
         }
 
         if ($this->berisi($row['tanggal_lahir'] ?? null)) {
-            $lama = $guru->tanggal_lahir?->toDateString();
+            $lama = $this->tanggalTersimpan($guru);
             if ($lama !== $row['tanggal_lahir']) {
                 $hasil[] = [
                     'kolom' => 'tanggal_lahir',
@@ -515,7 +522,7 @@ class TarikGuruService
 
         $duk = $this->dukAngka($row['duk'] ?? null);
         if ($duk !== null && (int) $guru->duk !== $duk) {
-            $bentrok = $local->contains(fn (Guru $lain): bool => $lain->id !== $guru->id && (int) $lain->duk === $duk);
+            $bentrok = isset($dukTerpakai[$duk]);
             if ($bentrok) {
                 $peringatan[] = 'DUK '.$duk.' untuk '.$guru->nama_lengkap.' sudah dipakai guru lain, jadi tidak diubah.';
             } else {
@@ -685,7 +692,7 @@ class TarikGuruService
         }
 
         if ($this->berisi($row['rumpun_ijazah'] ?? null)) {
-            $kunci = mb_strtolower(trim((string) $row['rumpun_ijazah']));
+            $kunci = $this->kunciNama($row['rumpun_ijazah']);
             $rumpun = $rumpunByNama->get($kunci);
             if ($rumpun === null) {
                 $peringatan[] = 'Rumpun ijazah '.$nama.' ('.$row['rumpun_ijazah'].') tidak ada di Simpatisans, jadi '.$akibat.'.';
@@ -703,7 +710,7 @@ class TarikGuruService
             return null;
         }
 
-        return $mapelByNama->get(mb_strtolower(trim((string) $nama)));
+        return $mapelByNama->get($this->kunciNama($nama));
     }
 
     private function kunci(?string $nilai): string
@@ -767,6 +774,23 @@ class TarikGuruService
             in_array($nilai, ['P', 'PEREMPUAN'], true) => 'P',
             default => null,
         };
+    }
+
+    private function tanggalTersimpan(Guru $guru): ?string
+    {
+        $mentah = $guru->getRawOriginal('tanggal_lahir');
+
+        return $this->tanggal($mentah);
+    }
+
+    private function kunciNama(mixed $nama): string
+    {
+        $teks = trim((string) ($nama ?? ''));
+        if ($teks === '' || ! mb_check_encoding($teks, 'UTF-8')) {
+            return '';
+        }
+
+        return mb_strtolower($teks, 'UTF-8');
     }
 
     private function tanggal(mixed $nilai): ?string

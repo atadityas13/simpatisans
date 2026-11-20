@@ -139,6 +139,24 @@ class TarikGuruDariMadaniTest extends TestCase
         $this->assertSame($rumpun->id, $guru->rumpun_ijazah_id);
     }
 
+    public function test_tanggal_lahir_rusak_tidak_menghentikan_perbandingan(): void
+    {
+        $guru = Guru::query()->create([
+            'username' => '198001012005011001',
+            'kode_guru' => 'BD',
+            'nama_guru' => 'Budi Santoso',
+            'status_pegawai' => 'PNS',
+        ]);
+        DB::table('gurus')->where('id', $guru->id)->update(['tanggal_lahir' => '0000-00-00']);
+
+        $hasil = app(TarikGuruService::class)->bandingkan([
+            $this->baris(['tanggal_lahir' => '1980-01-01']),
+        ]);
+
+        $kolom = collect($hasil['sinkron'][0]['perubahan'])->pluck('kolom');
+        $this->assertTrue($kolom->contains('tanggal_lahir'));
+    }
+
     public function test_referensi_mengirim_nama_mapel_dan_rumpun(): void
     {
         Mapel::query()->create(['nama_mapel' => 'Matematika']);

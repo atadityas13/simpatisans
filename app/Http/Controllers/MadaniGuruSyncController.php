@@ -4,32 +4,36 @@ namespace App\Http\Controllers;
 
 use App\Services\Madani\TarikGuruService;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
-use RuntimeException;
+use Illuminate\Http\Response;
+use Throwable;
 
 class MadaniGuruSyncController extends Controller
 {
-    public function index(TarikGuruService $tarik): View|RedirectResponse
+    public function index(TarikGuruService $tarik): Response|RedirectResponse
     {
         try {
             $hasil = $tarik->fetchAndRemember();
-        } catch (RuntimeException $e) {
+
+            return response(view('guru.madani', $hasil)->render());
+        } catch (Throwable $e) {
+            report($e);
+
             return redirect()
                 ->route('guru.index')
-                ->with('error', $e->getMessage());
+                ->with('error', 'Tarik dan sync gagal: '.$e->getMessage());
         }
-
-        return view('guru.madani', $hasil);
     }
 
     public function tarik(TarikGuruService $layanan): RedirectResponse
     {
         try {
             $hasil = $layanan->tarikDariSesi();
-        } catch (RuntimeException $e) {
+        } catch (Throwable $e) {
+            report($e);
+
             return redirect()
                 ->route('guru.madani')
-                ->with('error', $e->getMessage());
+                ->with('error', 'Tarik gagal: '.$e->getMessage());
         }
 
         return redirect()
@@ -44,10 +48,12 @@ class MadaniGuruSyncController extends Controller
     {
         try {
             $hasil = $layanan->syncDariSesi();
-        } catch (RuntimeException $e) {
+        } catch (Throwable $e) {
+            report($e);
+
             return redirect()
                 ->route('guru.madani')
-                ->with('error', $e->getMessage());
+                ->with('error', 'Sync gagal: '.$e->getMessage());
         }
 
         return redirect()
